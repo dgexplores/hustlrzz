@@ -30,9 +30,11 @@ services:
       # --- Firebase (auth + Firestore) ---
       - key: GOOGLE_CLOUD_PROJECT
         value: hustlrzz
-      # Path to the service-account JSON inside the repo, OR use the
-      # FIREBASE_KEY_JSON secret in Secret Manager instead.
-      - key: FIREBASE_KEY_PATH
+      # Paste the full service-account JSON (from Firebase console ->
+      # Project settings -> Service accounts -> Generate new private key)
+      # into this env var. The backend also supports FIREBASE_KEY_PATH for a
+      # locally-mounted file.
+      - key: FIREBASE_KEY_JSON
         sync: false
       # --- CORS: your deployed frontend URL(s), comma-separated ---
       - key: CORS_ORIGINS

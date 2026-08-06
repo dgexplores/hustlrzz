@@ -18,10 +18,24 @@ load_dotenv(dotenv_path=project_root / ".env")
 
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "")
 FIREBASE_KEY_PATH = os.getenv("FIREBASE_KEY_PATH", "")
+FIREBASE_KEY_JSON = os.getenv("FIREBASE_KEY_JSON", "")
 
 
 def load_firebase_key():
-    """Return the Firebase service-account JSON as a dict."""
+    """Return the Firebase service-account JSON as a dict.
+
+    Resolution order:
+      1. FIREBASE_KEY_JSON   -> the raw service-account JSON as an env var
+                                (easiest on Render)
+      2. FIREBASE_KEY_PATH   -> a local JSON file (dev / mounted file)
+      3. Secret Manager      -> only when GOOGLE_CLOUD_PROJECT is set
+    """
+    if FIREBASE_KEY_JSON:
+        try:
+            return json.loads(FIREBASE_KEY_JSON)
+        except Exception as exc:
+            raise Exception(f"FIREBASE_KEY_JSON env var is not valid JSON: {exc}") from exc
+
     if FIREBASE_KEY_PATH:
         key_path = Path(FIREBASE_KEY_PATH)
         if not key_path.is_absolute():
