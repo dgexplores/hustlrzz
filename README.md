@@ -1,151 +1,82 @@
-# 🎯 Hustlrzz — AI-Powered Interview Preparation Platform
+# Hustlrzz — AI Mock Interview Coach
 
-**Ace your next interview with AI-powered mock interviews, personalized question banks, and detailed performance feedback — completely free to run.**
+A web app that runs practice interviews with you before the real thing. Upload your resume and a job description, and it builds a personalized question bank for the role. Then an AI interviewer actually talks you through a timed practice session, and afterwards you get a breakdown of what went well and what to work on.
 
-Hustlrzz is a full-stack interview-coaching platform:
+**Live demo → https://hustlrzz.vercel.app**
 
-- Upload your resume + a target job description
-- An AI pipeline analyzes your profile, searches the web for real industry questions, and generates **personalized Q&A** (up to 50 questions with model answers)
-- Practice with a **live AI interviewer** over a timed, real-time chat session
-- Get a **structured performance review** — strengths, improvement areas, and hand-picked learning resources
+I built this because I kept messing up interviews — freezing on behavioral questions, rambling without structure, never knowing how I actually did. Practicing with a friend only goes so far, so I made something that would grill me properly and then tell me where I fell short.
 
-## ✨ Features
+## What it does
 
-### 📋 Interview Preparation
-- **PDF resume analysis** — upload your resume (or paste text) for AI-powered parsing
-- **Profile enrichment** — optional GitHub and portfolio links are analyzed too
-- **Personalized Q&A** — tailored questions + model answers based on your background and the target role
-- **Industry research** — real interview questions gathered from the web for your specific role
+- **Preparation** — upload a resume (PDF or pasted text) plus a job description. The backend summarizes your background, searches the web for questions people actually get asked for that role, and generates a set of questions with sample answers.
+- **Mock interview** — pick one of your prepared roles and a duration (5–60 min). A live AI interviewer chats with you over WebSocket, follows up on your answers, and keeps a transcript the whole time.
+- **Feedback** — when you end the session it reviews the transcript and scores you across several areas, then links resources for the specific things you struggled with.
+- **History** — every transcript and feedback report is saved, so you can track your progress across multiple sessions.
 
-### 🤖 Live Mock Interviews
-- **Real-time AI interviewer** over WebSocket — adaptive follow-up questions based on your answers
-- **Timed sessions** (5–60 min) with automatic transcript saving
-- **Voice support** — audio turns are transcribed with Whisper and answered out loud (turn-based)
+## Tech stack
 
-### 📊 Feedback & Analytics
-- **Multi-dimensional evaluation** — positives, improvement areas with concrete examples, and actionable suggestions
-- **Curated resources** — learning links are verified live; dead links are automatically re-searched
-- **Session history** — review every past transcript and feedback report per position
+- **Frontend:** Flutter (web) · Material 3 · Provider
+- **Backend:** Python · FastAPI · WebSockets
+- **AI:** Groq free tier — Llama 3.3 70B (text), Whisper (speech-to-text), Orpheus (text-to-speech)
+- **Auth & storage:** Firebase — Auth (Google sign-in) + Firestore
+- **Hosting:** Frontend on Vercel · backend on Render (Docker)
 
-## 🛠️ Tech Stack
+I went with Groq mostly because it's actually free — no credit card, roughly a thousand requests a day, which is plenty for this app. The first version ran on Google's Gemini, but the free daily quota would run out after a few practice sessions and the 2.0 models eventually got retired, so I rewrote the whole AI layer on Groq. Best decision I made on this project.
 
-| Layer | Technology |
-|---|---|
-| Frontend | Flutter Web (Dart, Material 3) |
-| Backend | Python FastAPI + WebSocket |
-| AI | **Groq** (free tier — llama-3.3-70b text, Whisper STT, Orpheus TTS) |
-| Auth + DB | Firebase Auth + Cloud Firestore |
-| Deployment | Render (backend) · Vercel or Firebase Hosting (frontend) |
+## Running it locally
 
-> **Why Groq?** All AI features run on Groq's free tier — roughly 1,000 requests/day on `llama-3.3-70b-versatile`, no credit card required. No API quota walls.
-
-## 🚀 Getting Started
-
-### Prerequisites
-- **Python 3.10+**
-- **Flutter SDK 3.x** (for the frontend)
-- A **Groq API key** (free: https://console.groq.com/keys)
-- A **Firebase project** with Authentication (Email/Password + Google) and Firestore enabled
-
-### 1. Backend
+### Backend
 
 ```bash
 cd backend
-python -m venv venv && source venv/bin/activate
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env: add GROQ_API_KEY, your Firebase project id and service-account key path
-
-# Run the API (docs at http://localhost:8000/docs)
+cp .env.example .env              # then fill in your keys
 uvicorn backend.app:app --reload --port 8000
 ```
 
-**Firebase setup:** In the Firebase console, go to *Project settings → Service accounts → Generate new private key*, save the JSON as `backend/credentials/firebase_key.json`, and set `FIREBASE_KEY_PATH=credentials/firebase_key.json` in `.env`.
+You'll need:
 
-### 2. Frontend
+- A **Groq API key** (free) from https://console.groq.com
+- A **Firebase project** with Email/Password + Google sign-in enabled and Firestore created
+- A **service account JSON** saved to `backend/credentials/firebase_key.json` (Project settings → Service accounts → Generate new private key)
+
+API docs land at http://localhost:8000/docs once it's running.
+
+### Frontend
 
 ```bash
 cd frontend/mocker_web
 flutter pub get
-
-# Point the app at your backend
-flutter run -d chrome --web-port=3000 \
-  --dart-define=API_BASE_URL=http://localhost:8000
+flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
-**Firebase web config:** run `flutterfire configure` in `frontend/mocker_web` (select your Firebase project) to regenerate `lib/firebase_options.dart` with your own project IDs.
+If you're using your own Firebase project, run `flutterfire configure` inside `frontend/mocker_web` to regenerate `lib/firebase_options.dart`.
 
-### 3. Use it
+## How the interview flow works
 
-1. Create an account (Google sign-in)
-2. **Prepare** — upload a resume + job description, wait for the AI workflow to finish
-3. **Q&A** — review the generated questions and model answers
-4. **Mock Interview** — pick a position and duration, then chat with the AI interviewer
-5. **Feedback** — read your evaluation after the session
+1. **Preparation** — the workflow runs four steps: summarize your resume → search for real interview questions for the role → generate personalized questions → write model answers. Results are saved to Firestore.
+2. **Mock interview** — the frontend opens a WebSocket to the backend. Your answers go to the AI interviewer, which comes back with a follow-up question. The whole conversation is stored as a transcript.
+3. **Feedback** — when the session ends (you stop it, or the timer runs out), a separate judge pass evaluates the transcript and writes the report. It even checks that the resource links it recommends actually load, and re-searches for fresh ones if a link is dead.
 
-## 🌐 Deployment
+## Deployment
 
-### Backend → Render (Blueprint)
-1. This repo is pushed to GitHub.
-2. Render dashboard → **New → Blueprint** → select this repo. The root
-   `render.yaml` is auto-detected; commands run from the repo root and the
-   Python version is pinned in `runtime.txt` (3.10.13).
-3. When prompted, set the **GROQ_API_KEY** and **FIREBASE_KEY_PATH** env values
-   (or use a FIREBASE_KEY_JSON secret). CORS already includes the Vercel URL.
-4. Deploy. The backend is then live at `https://hustlrzz-backend.onrender.com`
-   (that's the URL the frontend is already built against).
+The backend deploys to Render via the `render.yaml` blueprint at the repo root (Docker-based, Python 3.10). The frontend deploys to Vercel with `frontend/mocker_web/vercel.json` — the build installs Flutter 3.35 and compiles the web app with `--dart-define=API_BASE_URL=...`.
 
-### Frontend → Vercel
-```bash
-cd frontend/mocker_web
-vercel --prod \
-  --build-env API_BASE_URL=https://your-backend.onrender.com
-```
+## What I'd still like to add
 
-The Flutter web build is handled by `deploy.sh` (installs Flutter 3.35 in the
-build environment). Live: **https://hustlrzz.vercel.app**
+- **Voice mode** — the backend already supports Whisper transcription and TTS, but the UI doesn't have a microphone button wired up yet
+- **Camera/body-language analysis** — eye contact, posture, hand gestures during the interview, folded into the feedback scores (the feature I'm most excited about)
+- **Proper Firestore security rules** — right now access is wide open, fine for a demo but not production
+- **Stricter question counts** — the model sometimes ignores the "generate exactly N questions" instruction no matter how loudly the prompt yells it
 
-## 📁 Project Structure
+## Known quirks
 
-```
-hustlrzz/
-├── backend/                  # Python FastAPI backend
-│   ├── agents/              # AI agents (interviewer, judge, question/answer generation)
-│   ├── api/                 # REST + WebSocket endpoints
-│   ├── coordinator/         # Session management + preparation workflow
-│   ├── data/                # Firestore models and access layer
-│   ├── services/            # PDF, GitHub and portfolio analyzers
-│   └── tools/               # Groq provider, Firebase config
-└── frontend/
-    └── mocker_web/          # Flutter Web frontend
-        └── lib/
-            ├── pages/       # UI screens
-            ├── services/    # API + WebSocket service layer
-            ├── models/      # Data models
-            ├── widgets/     # Reusable UI components
-            └── config/      # App configuration
-```
+- The free Render instance goes to sleep after ~15 minutes of inactivity, so the first request after a break can take 30–60 seconds to wake up.
+- Works best in Chrome.
+- Groq's free tier allows about 30 requests/minute — if you hammer the prep workflow you'll occasionally hit a rate limit and just need to retry.
 
-## 📡 API Overview
-
-- `POST /workflows/start-with-pdf` · `POST /workflows/start-with-text` — run the preparation workflow
-- `GET /workflows` — list your prepared positions
-- `POST /interviews/start` — begin a mock interview session
-- `WS /ws/{session_id}` — real-time interview conversation
-- `POST /interviews/{workflow}/{session}/feedback` — fetch session feedback
-
-Interactive API docs: `http://localhost:8000/docs`
-
-## 🧪 Testing
-
-```bash
-cd backend
-export CI=true GOOGLE_CLOUD_PROJECT=dummy
-python -m pytest -q
-```
-
-## 📝 License
+## License
 
 MIT — see [LICENSE](LICENSE).
