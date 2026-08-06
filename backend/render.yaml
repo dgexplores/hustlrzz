@@ -1,0 +1,36 @@
+# Render blueprint — one-click backend deployment.
+# 1. Push this repo to GitHub.
+# 2. In Render: New -> Blueprint -> select this repo (render.yaml is auto-detected).
+# 3. Fill in the environment values below when prompted.
+
+services:
+  - type: web
+    name: hustlrzz-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn backend.app:app --host 0.0.0.0 --port 10000
+    healthCheckPath: /
+    envVars:
+      # --- AI: get a free key at https://console.groq.com/keys ---
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_TEXT_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GROQ_TRANSCRIPTION_MODEL
+        value: whisper-large-v3-turbo
+      - key: GROQ_TTS_MODEL
+        value: canopylabs/orpheus-v1-english
+      - key: GROQ_TTS_VOICE
+        value: tara
+      # --- Firebase (auth + Firestore) ---
+      - key: GOOGLE_CLOUD_PROJECT
+        sync: false
+      # Set this to the path of your service-account JSON, or use a
+      # FIREBASE_KEY_JSON secret in Secret Manager instead.
+      - key: FIREBASE_KEY_PATH
+        sync: false
+      # --- CORS: your deployed frontend URL(s), comma-separated ---
+      - key: CORS_ORIGINS
+        sync: false
