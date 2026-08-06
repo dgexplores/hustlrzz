@@ -87,11 +87,15 @@ flutter run -d chrome --web-port=3000 \
 
 ## 🌐 Deployment
 
-### Backend → Render
-1. Push this repo to GitHub.
-2. In Render, create a **Web Service** from the repo (`backend/` directory).
-3. Set the **start command**: `uvicorn backend.app:app --host 0.0.0.0 --port 10000`
-4. Add environment variables from `.env.example` (GROQ_API_KEY, GOOGLE_CLOUD_PROJECT, FIREBASE_KEY_PATH — or a FIREBASE_KEY_JSON secret, CORS_ORIGINS including `https://hustlrzz.vercel.app`).
+### Backend → Render (Blueprint)
+1. This repo is pushed to GitHub.
+2. Render dashboard → **New → Blueprint** → select this repo. The root
+   `render.yaml` is auto-detected; commands run from the repo root and the
+   Python version is pinned in `runtime.txt` (3.10.13).
+3. When prompted, set the **GROQ_API_KEY** and **FIREBASE_KEY_PATH** env values
+   (or use a FIREBASE_KEY_JSON secret). CORS already includes the Vercel URL.
+4. Deploy. The backend is then live at `https://hustlrzz-backend.onrender.com`
+   (that's the URL the frontend is already built against).
 
 ### Frontend → Vercel
 ```bash
