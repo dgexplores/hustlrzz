@@ -41,15 +41,13 @@ class DefaultFirebaseOptions {
     }
   }
 
-  // REPLACE the two PASTE_ values below with your Firebase web app config:
-  // Firebase console -> Project settings -> Your apps -> your web app ->
-  // the firebaseConfig snippet contains apiKey and appId.
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'PASTE_FIREBASE_WEB_API_KEY_HERE',
-    appId: 'PASTE_FIREBASE_WEB_APP_ID_HERE',
-    messagingSenderId: '970566023417', // == Firebase project number
+    apiKey: 'REDACTED',
+    appId: '1:970566023417:web:5a205a3c04e69ba4d9ca28',
+    messagingSenderId: '970566023417',
     projectId: 'hustlrzz',
     authDomain: 'hustlrzz.firebaseapp.com',
     storageBucket: 'hustlrzz.firebasestorage.app',
+    measurementId: 'G-0PMZGE5YJS',
   );
 }
