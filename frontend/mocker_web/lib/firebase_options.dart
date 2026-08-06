@@ -41,14 +41,15 @@ class DefaultFirebaseOptions {
     }
   }
 
-  // REPLACE THESE VALUES with your own Firebase web app config, or run
-  // `flutterfire configure` to regenerate this file.
+  // REPLACE the two PASTE_ values below with your Firebase web app config:
+  // Firebase console -> Project settings -> Your apps -> your web app ->
+  // the firebaseConfig snippet contains apiKey and appId.
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR_FIREBASE_WEB_API_KEY',
-    appId: 'YOUR_FIREBASE_WEB_APP_ID',
-    messagingSenderId: 'YOUR_FIREBASE_SENDER_ID',
-    projectId: 'YOUR_FIREBASE_PROJECT_ID',
-    authDomain: 'YOUR_FIREBASE_PROJECT_ID.firebaseapp.com',
-    storageBucket: 'YOUR_FIREBASE_PROJECT_ID.firebasestorage.app',
+    apiKey: 'PASTE_FIREBASE_WEB_API_KEY_HERE',
+    appId: 'PASTE_FIREBASE_WEB_APP_ID_HERE',
+    messagingSenderId: '970566023417', // == Firebase project number
+    projectId: 'hustlrzz',
+    authDomain: 'hustlrzz.firebaseapp.com',
+    storageBucket: 'hustlrzz.firebasestorage.app',
   );
 }

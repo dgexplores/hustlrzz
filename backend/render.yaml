@@ -26,7 +26,7 @@ services:
         value: tara
       # --- Firebase (auth + Firestore) ---
       - key: GOOGLE_CLOUD_PROJECT
-        sync: false
+        value: hustlrzz
       # Set this to the path of your service-account JSON, or use a
       # FIREBASE_KEY_JSON secret in Secret Manager instead.
       - key: FIREBASE_KEY_PATH
