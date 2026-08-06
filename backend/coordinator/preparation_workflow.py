@@ -212,6 +212,9 @@ async def run_preparation_workflow(
         )
         if not isinstance(questions_data, list):
             questions_data = questions_data.get("questions", []) if isinstance(questions_data, dict) else []
+        # Models don't always honor the exact-count instruction — clamp.
+        if len(questions_data) > num_questions:
+            questions_data = questions_data[:num_questions]
         completed_agents.append("question_generator")
         print(f"=== Step 2 complete ({len(questions_data)} questions) ===")
 
@@ -228,6 +231,9 @@ async def run_preparation_workflow(
         )
         if not isinstance(answers_data, list):
             answers_data = answers_data.get("answers", []) if isinstance(answers_data, dict) else []
+        # Keep answers aligned with the clamped question count.
+        if len(answers_data) > len(questions_data):
+            answers_data = answers_data[: len(questions_data)]
         completed_agents.append("answer_generator")
         print(f"=== Step 3 complete ({len(answers_data)} answers) ===")
 

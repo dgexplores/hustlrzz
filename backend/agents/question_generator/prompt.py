@@ -69,15 +69,17 @@ STEP 5: If the count doesn't match, add or remove questions to match exactly
 - 🚨 **GENERATE EXACTLY THE NUMBER OF QUESTIONS SPECIFIED IN THE PERSONAL SUMMARY** 🚨
 
 ## REQUIRED OUTPUT FORMAT:
-You must output a JSON array EXACTLY matching this structure WITHOUT any markdown formatting or code blocks:
+You must output a JSON object EXACTLY matching this structure WITHOUT any markdown formatting or code blocks:
 
-[
-  {
-    "question": "Concise, clear interview question",
-    "answer": "",
-    "tags": ["QuestionType", "CoreSkill", "DifficultyLevel"]
-  }
-]
+{
+  "questions": [
+    {
+      "question": "Concise, clear interview question",
+      "answer": "",
+      "tags": ["QuestionType", "CoreSkill", "DifficultyLevel"]
+    }
+  ]
+}
 
 ## 🏷️ SYSTEMATIC 3-TAG REQUIREMENT:
 
@@ -129,7 +131,8 @@ Before submitting your response, verify:
 
 IMPORTANT FORMATTING INSTRUCTIONS:
 - Do NOT wrap the JSON in markdown code blocks (do not use ```json or ``` tags)
-- Return ONLY the raw JSON array without any other text before or after
+- Return ONLY a raw JSON object with a single key "questions" whose value is the array of question objects
+- Do not return any other text before or after the JSON
 - Ensure all JSON property names and values are correctly formatted with proper quotes
 - Make sure the JSON is valid and complete
 - Each question should be unique and appropriately challenging
@@ -137,28 +140,30 @@ IMPORTANT FORMATTING INSTRUCTIONS:
 - 🚨 **OUTPUT EXACTLY THE NUMBER OF QUESTIONS SPECIFIED IN THE PERSONAL SUMMARY** 🚨
 
 EXAMPLE OF GOOD OUTPUT:
-[
-  {
-    "question": "How would you design a scalable API system for high-traffic applications?",
-    "answer": "",
-    "tags": ["Technical", "SystemDesign", "Senior"]
-  },
-  {
-    "question": "Tell me about a time you had to learn a new technology quickly to solve a problem.",
-    "answer": "",
-    "tags": ["Behavioral", "Programming", "Mid"]
-  },
-  {
-    "question": "If you discovered a critical security vulnerability in production, how would you handle it?",
-    "answer": "",
-    "tags": ["Situational", "Security", "Senior"]
-  },
-  {
-    "question": "Why are you interested in this specific role and what do you hope to achieve?",
-    "answer": "",
-    "tags": ["CompanySpecific", "Leadership", "Entry"]
-  }
-]
+{
+  "questions": [
+    {
+      "question": "How would you design a scalable API system for high-traffic applications?",
+      "answer": "",
+      "tags": ["Technical", "SystemDesign", "Senior"]
+    },
+    {
+      "question": "Tell me about a time you had to learn a new technology quickly to solve a problem.",
+      "answer": "",
+      "tags": ["Behavioral", "Programming", "Mid"]
+    },
+    {
+      "question": "If you discovered a critical security vulnerability in production, how would you handle it?",
+      "answer": "",
+      "tags": ["Situational", "Security", "Senior"]
+    },
+    {
+      "question": "Why are you interested in this specific role and what do you hope to achieve?",
+      "answer": "",
+      "tags": ["CompanySpecific", "Leadership", "Entry"]
+    }
+  ]
+}
 
 ## 🎯 FINAL REMINDER 🎯
 - Extract the exact number of questions from the personal summary input

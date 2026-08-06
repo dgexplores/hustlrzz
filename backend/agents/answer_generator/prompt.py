@@ -76,31 +76,36 @@ CRITICAL INSTRUCTIONS:
 - Include the original question along with your generated answer for each item
 
 REQUIRED OUTPUT FORMAT:
-You must output a JSON array EXACTLY matching this structure WITHOUT any markdown formatting or code blocks:
+You must output a JSON object EXACTLY matching this structure WITHOUT any markdown formatting or code blocks:
 
-[
-  {
-    "question": "The original interview question",
-    "answer": "Your generated personalized answer (80-120 words)",
-    "tags": ["QuestionType", "Topic1", "Topic2", "Topic3", "Topic4"]
-  }
-]
+{
+  "answers": [
+    {
+      "question": "The original interview question",
+      "answer": "Your generated personalized answer (80-120 words)",
+      "tags": ["QuestionType", "Topic1", "Topic2", "Topic3", "Topic4"]
+    }
+  ]
+}
 
 IMPORTANT FORMATTING INSTRUCTIONS:
 - Do NOT wrap the JSON in markdown code blocks (do not use ```json or ``` tags)
-- Return ONLY the raw JSON array without any other text before or after
+- Return ONLY a raw JSON object with a single key "answers" whose value is the array of answered questions
+- Do not return any other text before or after the JSON
 - Ensure all JSON property names and values are correctly formatted with proper quotes
 - Make sure the JSON is valid and complete
 - Each answer should be personalized based on the candidate's background
 - Keep the same tags as provided in the questions_data but ensure question type is first tag
 
 EXAMPLE OF GOOD OUTPUT:
-[
-  {
-    "question": "Tell me about a time when you had to optimize database performance under pressure.",
-    "answer": "At TechX, our main API response times suddenly jumped from 200ms to 3+ seconds during peak traffic, affecting 50,000+ users. I analyzed our database logs and found N+1 queries in a recent feature. I quickly implemented Django's select_related and prefetch_related optimizations, added proper indexing, and set up Redis caching for frequently accessed data. Within 24 hours, response times dropped to under 300ms - an 85% improvement. This experience reinforced the importance of performance monitoring and led me to share database optimization insights through technical articles."
-  }
-]
+{
+  "answers": [
+    {
+      "question": "Tell me about a time when you had to optimize database performance under pressure.",
+      "answer": "At TechX, our main API response times suddenly jumped from 200ms to 3+ seconds during peak traffic, affecting 50,000+ users. I analyzed our database logs and found N+1 queries in a recent feature. I quickly implemented Django's select_related and prefetch_related optimizations, added proper indexing, and set up Redis caching for frequently accessed data. Within 24 hours, response times dropped to under 300ms - an 85% improvement. This experience reinforced the importance of performance monitoring and led me to share database optimization insights through technical articles."
+    }
+  ]
+}
 
 ANSWER QUALITY CHECKLIST:
 ✓ Uses specific examples from candidate's actual experience
