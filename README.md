@@ -77,6 +77,10 @@ The backend deploys to Render via the `render.yaml` blueprint at the repo root (
 - Works best in Chrome.
 - Groq's free tier allows about 30 requests/minute — if you hammer the prep workflow you'll occasionally hit a rate limit and just need to retry.
 
+
+feel free to colaborate fork this and add things you wish it can have .........
+
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
