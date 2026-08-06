@@ -91,15 +91,17 @@ flutter run -d chrome --web-port=3000 \
 1. Push this repo to GitHub.
 2. In Render, create a **Web Service** from the repo (`backend/` directory).
 3. Set the **start command**: `uvicorn backend.app:app --host 0.0.0.0 --port 10000`
-4. Add environment variables from `.env.example` (GROQ_API_KEY, GOOGLE_CLOUD_PROJECT, FIREBASE_KEY_PATH — or a FIREBASE_KEY_JSON secret, CORS_ORIGINS with your frontend URL).
+4. Add environment variables from `.env.example` (GROQ_API_KEY, GOOGLE_CLOUD_PROJECT, FIREBASE_KEY_PATH — or a FIREBASE_KEY_JSON secret, CORS_ORIGINS including `https://hustlrzz.vercel.app`).
 
 ### Frontend → Vercel
 ```bash
 cd frontend/mocker_web
-flutter build web --release --dart-define=API_BASE_URL=https://your-backend.onrender.com
-# deploy the build/web folder via vercel:
-vercel --prod
+vercel --prod \
+  --build-env API_BASE_URL=https://your-backend.onrender.com
 ```
+
+The Flutter web build is handled by `deploy.sh` (installs Flutter 3.35 in the
+build environment). Live: **https://hustlrzz.vercel.app**
 
 ## 📁 Project Structure
 
