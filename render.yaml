@@ -1,19 +1,18 @@
 # Render blueprint — one-click backend deployment.
 # Render's Blueprint feature looks for render.yaml at the REPOSITORY ROOT.
+# Uses the repo's Dockerfile (python:3.10-slim) for a deterministic build —
+# this avoids the Python-version/wheel issues of Render's managed Python runtime.
+#
 # 1. Push this repo to GitHub.
 # 2. Render dashboard: New -> Blueprint -> select this repo.
 # 3. Fill in the env values marked (set manually) when prompted.
-#
-# Note: commands run from the repo root, so the backend package is importable
-# via `uvicorn backend.app:app`. The Python version is pinned in runtime.txt.
 
 services:
   - type: web
     name: hustlrzz-backend
-    runtime: python
+    runtime: docker
     plan: free
-    buildCommand: pip install --upgrade pip && pip install -r backend/requirements.txt
-    startCommand: uvicorn backend.app:app --host 0.0.0.0 --port 10000
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /
     envVars:
       # --- AI: get a free key at https://console.groq.com/keys ---
@@ -30,10 +29,8 @@ services:
       # --- Firebase (auth + Firestore) ---
       - key: GOOGLE_CLOUD_PROJECT
         value: hustlrzz
-      # Paste the full service-account JSON (from Firebase console ->
-      # Project settings -> Service accounts -> Generate new private key)
-      # into this env var. The backend also supports FIREBASE_KEY_PATH for a
-      # locally-mounted file.
+      # Paste the full service-account JSON (Firebase console -> Project
+      # settings -> Service accounts -> Generate new private key) here.
       - key: FIREBASE_KEY_JSON
         sync: false
       # --- CORS: your deployed frontend URL(s), comma-separated ---
