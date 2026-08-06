@@ -12,7 +12,7 @@ class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: kIsWeb
-        ? '1022761324834-ma82nm7e3cvck3bgv2k6rjnlakn33flm.apps.googleusercontent.com'
+        ? '970566023417-55qvr3q89oniib9k22stj9d71rlnj0sg.apps.googleusercontent.com'
         : null,
     scopes: ['email', 'profile'],
   );
