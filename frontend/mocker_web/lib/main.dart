@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'pages/dashboard_page.dart';
@@ -18,7 +19,19 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  
+
+  // Firebase App Check (web): attest requests come from this app. The
+  // reCAPTCHA site key is injected via dart-define; when it is not configured
+  // (e.g. fresh local dev) App Check is skipped so the app still boots.
+  if (DefaultFirebaseOptions.appCheckReCaptchaSiteKey.isNotEmpty) {
+    await FirebaseAppCheck.instance.activate(
+      webProvider: ReCaptchaV3Provider(
+        DefaultFirebaseOptions.appCheckReCaptchaSiteKey,
+      ),
+    );
+    FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+  }
+
   runApp(const HustlrzzApp());
 }
 

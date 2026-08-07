@@ -24,6 +24,13 @@ import 'package:flutter/foundation.dart'
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 class DefaultFirebaseOptions {
+  /// reCAPTCHA v3 site key for Firebase App Check (web). Optional: when unset,
+  /// the app starts without App Check so local dev keeps working; once the key
+  /// is configured (dart_defines.env / CI) App Check activates automatically.
+  static const String appCheckReCaptchaSiteKey = String.fromEnvironment(
+    'FIREBASE_APP_CHECK_RECAPTCHA_SITE_KEY',
+  );
+
   static const String _apiKey = String.fromEnvironment('FIREBASE_API_KEY');
   static const String _appId = String.fromEnvironment('FIREBASE_APP_ID');
   static const String _messagingSenderId =
