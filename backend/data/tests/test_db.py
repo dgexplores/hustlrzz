@@ -166,10 +166,15 @@ def test_get_coding_problem_by_id_not_found():
 
 
 def test_get_coding_problem_by_id_found():
-    # Insert a problem first
+    # Insert a problem first (via the public API so the storage engine is irrelevant)
     problem_id = "123"
-    problem_data = {"title": "Two Sum"}
-    database.firestore_db.db.collection("problems").document(problem_id).set(problem_data)
+    problem = CodingProblems(
+        id=problem_id, title="Two Sum", slug="two-sum", difficulty="Easy",
+        links={"problem": None, "description": None, "solutions": None},
+        stats={"acceptance_rate": 0.5, "submissions": 1, "accepted": 1, "likes": 0, "dislikes": 0},
+        statement={"description": "x", "examples": [{"input": "a", "output": "b"}], "constraints": []},
+    )
+    database.firestore_db.set_coding_problems([problem])
 
     result = database.firestore_db.get_coding_problems(problem_id)
     assert "successfully" in result["message"]

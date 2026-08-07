@@ -68,7 +68,7 @@ class _InterviewPreparePageState extends State<InterviewPreparePage> {
       );
       // get idToken
       final authService = Provider.of<AuthService>(context, listen: false);
-      final idToken = await authService.currentUser?.getIdToken();
+      final idToken = await authService.getIdToken();
       if (idToken == null) {
         if (mounted) {
           setState(() => _submitting = false);

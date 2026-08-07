@@ -1,7 +1,5 @@
 import subprocess
 import json
-import firebase_admin
-from firebase_admin import credentials, firestore
 import argparse
 import os
 import sys

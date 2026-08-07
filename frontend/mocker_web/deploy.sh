@@ -25,26 +25,24 @@ flutter pub get
 API_BASE_URL="${API_BASE_URL:-http://localhost:8000}"
 echo "[deploy] Building web app with API_BASE_URL=$API_BASE_URL"
 
-# Firebase config is injected at build time so no secrets live in the repo.
-# Preference order: individual CI env vars (FIREBASE_*) > local dart_defines.env.
-FIREBASE_DEFINES=()
+# Supabase config is injected at build time so no secrets live in the repo.
+# Preference order: individual CI env vars (SUPABASE_*) > local dart_defines.env.
+SUPABASE_DEFINES=()
 if [ -f dart_defines.env ]; then
-  FIREBASE_DEFINES+=(--dart-define-from-file=dart_defines.env)
+  SUPABASE_DEFINES+=(--dart-define-from-file=dart_defines.env)
 fi
-for VAR in FIREBASE_API_KEY FIREBASE_APP_ID FIREBASE_MESSAGING_SENDER_ID \
-           FIREBASE_PROJECT_ID FIREBASE_AUTH_DOMAIN FIREBASE_STORAGE_BUCKET \
-           FIREBASE_MEASUREMENT_ID FIREBASE_APP_CHECK_RECAPTCHA_SITE_KEY; do
+for VAR in SUPABASE_URL SUPABASE_ANON_KEY; do
   if [ -n "${!VAR}" ]; then
-    FIREBASE_DEFINES+=(--dart-define="$VAR=${!VAR}")
+    SUPABASE_DEFINES+=(--dart-define="$VAR=${!VAR}")
   fi
 done
-if [ ${#FIREBASE_DEFINES[@]} -eq 0 ]; then
-  echo "[deploy] ERROR: Firebase configuration missing."
-  echo "[deploy] Set FIREBASE_* env vars in CI, or create frontend/mocker_web/dart_defines.env"
-  echo "[deploy] (cp dart_defines.env.example dart_defines.env and fill in your values)."
+if [ ${#SUPABASE_DEFINES[@]} -eq 0 ]; then
+  echo "[deploy] ERROR: Supabase configuration missing."
+  echo "[deploy] Set SUPABASE_URL and SUPABASE_ANON_KEY env vars in CI, or create"
+  echo "[deploy] frontend/mocker_web/dart_defines.env (cp dart_defines.env.example dart_defines.env)."
   exit 1
 fi
 
 flutter build web --release \
   --dart-define=API_BASE_URL="$API_BASE_URL" \
-  "${FIREBASE_DEFINES[@]}"
+  "${SUPABASE_DEFINES[@]}"

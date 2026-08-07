@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'pages/dashboard_page.dart';
@@ -11,28 +10,23 @@ import 'pages/forgot_password_page.dart';
 import 'pages/privacy_policy_page.dart';
 import 'pages/terms_of_service_page.dart';
 import 'services/auth_service.dart';
-import 'firebase_options.dart';
+import 'config/supabase_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
 
-  // Firebase App Check (web): attest requests come from this app. The
-  // reCAPTCHA site key is injected via dart-define; when it is not configured
-  // (e.g. fresh local dev) App Check is skipped so the app still boots.
-  // reCAPTCHA Enterprise is used because the Firebase console now only offers
-  // the Enterprise provider when registering new web apps.
-  if (DefaultFirebaseOptions.appCheckReCaptchaSiteKey.isNotEmpty) {
-    await FirebaseAppCheck.instance.activate(
-      webProvider: ReCaptchaEnterpriseProvider(
-        DefaultFirebaseOptions.appCheckReCaptchaSiteKey,
-      ),
-    );
-    FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
-  }
+  SupabaseConfig.assertConfigured();
+
+  // Supabase (auth + Postgres). PKCE flow is required for web OAuth/email
+  // redirects so the session is exchanged safely without exposing the auth
+  // code in the URL.
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+    ),
+  );
 
   runApp(const HustlrzzApp());
 }
@@ -77,12 +71,12 @@ class AuthWrapper extends StatelessWidget {
         if (!authService.isLoggedIn) {
           return const LoginPage();
         }
-        
+
         // If logged in but email not verified (for email/password users)
         if (authService.needsEmailVerification) {
           return const EmailVerificationPage();
         }
-        
+
         // Logged in and verified (or Google user), show dashboard
         return const DashboardPage();
       },

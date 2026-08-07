@@ -7,9 +7,8 @@ from typing import Optional
 import secrets
 import time
 from urllib.parse import urlparse
-from firebase_admin import auth as firebase_auth
 from pydantic import HttpUrl
-from backend.tools.firebase_config import auth, firebase_ready
+from backend.tools.supabase_config import supabase, supabase_ready
 from backend.tools.logger import get_logger, audit
 from backend.tools.ssrf import is_blocked_host
 from backend.data.database import firestore_db
@@ -48,27 +47,21 @@ async def verify_token(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(bearer),
 ):
-    if not firebase_ready or auth is None:
+    if not supabase_ready or supabase is None:
         raise HTTPException(
             status_code=503,
-            detail="Backend not configured: set FIREBASE_KEY_PATH in backend/.env (see .env.example) and restart.",
+            detail="Backend not configured: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in backend/.env (see .env.example) and restart.",
         )
     request_id = getattr(request.state, "request_id", None)
     try:
-        decoded_token = auth.verify_id_token(credentials.credentials)
-        uid = decoded_token["uid"]
-        email = decoded_token.get("email", "")
-
-        # Get full user info from Firebase to get displayName
-        try:
-            user_record = auth.get_user(uid)
-            name = user_record.display_name or ""
-            picture = user_record.photo_url or ""
-        except Exception as e:
-            logger.warning("Could not fetch user record for %s: %s", uid, e)
-            # Fallback to token data
-            name = decoded_token.get("name", "")
-            picture = decoded_token.get("picture", "")
+        # Server-side verification of the Supabase access token (JWT).
+        user_response = supabase.auth.get_user(credentials.credentials)
+        user = user_response.user
+        uid = user.id
+        email = user.email or ""
+        meta = user.user_metadata or {}
+        name = meta.get("full_name") or meta.get("name") or ""
+        picture = meta.get("avatar_url") or meta.get("picture") or ""
 
         audit("auth.verify_success", request_id=request_id, uid=uid)
         return {
@@ -77,22 +70,10 @@ async def verify_token(
             "name": name,
             "picture": picture
         }
-    except firebase_auth.ExpiredIdTokenError as e:
-        # Expired tokens are normal (tokens rotate) - log at INFO
-        logger.info("Token expired: %s", e)
-        audit("auth.verify_failed", request_id=request_id, reason="expired")
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    except (
-        firebase_auth.InvalidIdTokenError,
-        firebase_auth.RevokedIdTokenError,
-        ValueError,
-    ) as e:
-        logger.info("Invalid token: %s", e)
-        audit("auth.verify_failed", request_id=request_id, reason="invalid")
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
     except Exception as e:
-        logger.exception("Unexpected token verification failure: %s", e)
-        audit("auth.verify_failed", request_id=request_id, reason="unexpected")
+        # Invalid or expired tokens raise AuthApiError; log details, return generic.
+        logger.info("Token verification failed: %s", e)
+        audit("auth.verify_failed", request_id=request_id, reason="invalid_or_expired")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 @router.get("/")
@@ -187,6 +168,24 @@ def update_user_info(user=Depends(verify_token), updates: Profile = Body(...)):
         "success": True if updated["data"] else False,
         "data": updated["data"]
     }
+
+
+@router.delete("/user")
+def delete_user_account(request: Request, user=Depends(verify_token)):
+    """Permanently delete the user's account and all their data."""
+    request_id = getattr(request.state, "request_id", None)
+    uid = user["uid"]
+    try:
+        # Delete the user row (workflows/interviews cascade via FK)
+        firestore_db.delete_user(uid)
+        # Delete the auth account (service role)
+        supabase.auth.admin.delete_user(uid)
+        audit("user.deleted", request_id=request_id, uid=uid)
+        return {"success": True, "data": None}
+    except Exception as e:
+        logger.exception("Account deletion failed for %s: %s", uid, e)
+        audit("user.delete_failed", request_id=request_id, uid=uid)
+        raise HTTPException(status_code=500, detail="Failed to delete account")
 
 # workflows routes
 @router.get("/workflows")

@@ -6,7 +6,7 @@ import 'dart:convert';
 import '../config/api_config.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InterviewService {
   static final InterviewService _instance = InterviewService._internal();
@@ -23,16 +23,13 @@ class InterviewService {
   String _currentStreamingMessage = '';
   String _currentMessageId = '';
 
-  // get current user token
+  // get current user access token
   Future<String?> _getIdToken() async {
     try {
-      final user = firebase_auth.FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        return await user.getIdToken();
-      }
-      return null;
+      final session = Supabase.instance.client.auth.currentSession;
+      return session?.accessToken;
     } catch (e) {
-      debugPrint('Failed to get ID token: $e');
+      debugPrint('Failed to get access token: $e');
       return null;
     }
   }

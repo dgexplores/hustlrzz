@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/api_config.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
 class UserService extends ChangeNotifier {
   static final UserService _instance = UserService._internal();
@@ -14,16 +14,13 @@ class UserService extends ChangeNotifier {
   User? _currentUser;
   User? get currentUser => _currentUser;
 
-  // get current user token
+  // get current user access token
   Future<String?> _getIdToken() async {
     try {
-      final user = firebase_auth.FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        return await user.getIdToken();
-      }
-      return null;
+      final session = Supabase.instance.client.auth.currentSession;
+      return session?.accessToken;
     } catch (e) {
-      debugPrint('Failed to get ID token: $e');
+      debugPrint('Failed to get access token: $e');
       return null;
     }
   }

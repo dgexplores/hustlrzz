@@ -3,7 +3,7 @@ import '../data/mock_data.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/api_config.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 
 class WorkflowService {
@@ -11,16 +11,13 @@ class WorkflowService {
   factory WorkflowService() => _instance;
   WorkflowService._internal();
 
-  // get current user token
+  // get current user access token
   Future<String?> _getIdToken() async {
     try {
-      final user = firebase_auth.FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        return await user.getIdToken();
-      }
-      return null;
+      final session = Supabase.instance.client.auth.currentSession;
+      return session?.accessToken;
     } catch (e) {
-      debugPrint('Failed to get ID token: $e');
+      debugPrint('Failed to get access token: $e');
       return null;
     }
   }

@@ -18,7 +18,7 @@ I built this because I kept messing up interviews — freezing on behavioral que
 - **Frontend:** Flutter (web) · Material 3 · Provider
 - **Backend:** Python · FastAPI · WebSockets
 - **AI:** Groq free tier — Llama 3.3 70B (text), Whisper (speech-to-text), Orpheus (text-to-speech)
-- **Auth & storage:** Firebase — Auth (Google sign-in) + Firestore
+- **Auth & storage:** Supabase — Auth (Google/Apple/email sign-in) + Postgres with Row-Level Security
 - **Hosting:** Frontend on Vercel · backend on Render (Docker)
 
 I went with Groq mostly because it's actually free — no credit card, roughly a thousand requests a day, which is plenty for this app. The first version ran on Google's Gemini, but the free daily quota would run out after a few practice sessions and the 2.0 models eventually got retired, so I rewrote the whole AI layer on Groq. Best decision I made on this project.
@@ -39,8 +39,9 @@ uvicorn backend.app:app --reload --port 8000
 You'll need:
 
 - A **Groq API key** (free) from https://console.groq.com
-- A **Firebase project** with Email/Password + Google sign-in enabled and Firestore created
-- A **service account JSON** saved to `backend/credentials/firebase_key.json` (Project settings → Service accounts → Generate new private key)
+- A **Supabase project** (free, no credit card) from https://supabase.com — run
+  `supabase_schema.sql` (repo root) in its SQL editor once, then copy the project
+  URL + keys from *Project Settings → API*
 
 API docs land at http://localhost:8000/docs once it's running.
 
@@ -52,11 +53,11 @@ flutter pub get
 flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
-If you're using your own Firebase project, run `flutterfire configure` inside `frontend/mocker_web` to regenerate `lib/firebase_options.dart`.
+The frontend reads `SUPABASE_URL` / `SUPABASE_ANON_KEY` from `frontend/mocker_web/dart_defines.env` (copy from `dart_defines.env.example`).
 
 ## How the interview flow works
 
-1. **Preparation** — the workflow runs four steps: summarize your resume → search for real interview questions for the role → generate personalized questions → write model answers. Results are saved to Firestore.
+1. **Preparation** — the workflow runs four steps: summarize your resume → search for real interview questions for the role → generate personalized questions → write model answers. Results are saved to Postgres (via the backend).
 2. **Mock interview** — the frontend opens a WebSocket to the backend. Your answers go to the AI interviewer, which comes back with a follow-up question. The whole conversation is stored as a transcript.
 3. **Feedback** — when the session ends (you stop it, or the timer runs out), a separate judge pass evaluates the transcript and writes the report. It even checks that the resource links it recommends actually load, and re-searches for fresh ones if a link is dead.
 
@@ -66,30 +67,29 @@ The backend deploys to Render via the `render.yaml` blueprint at the repo root (
 
 ## Security
 
-- **Firestore rules** — strict per-user rules ship in `firestore.rules` at the repo
-  root (each user can only read/write their own `users/{uid}` subtree; system
-  collections are read-only). **Deploy them before going live:**
-  ```bash
-  # from the repo root, with firebase-tools installed
-  firebase deploy --only firestore:rules
-  # or paste the file into Firebase console -> Firestore -> Rules
-  ```
-- **Secrets** — never committed. Firebase web config is injected at build time
-  (`frontend/mocker_web/dart_defines.env`, gitignored); the backend reads
-  `GROQ_API_KEY` / `FIREBASE_KEY_JSON` from the environment (Render / `.env`).
-- **Auth** — all API routes require a verified Firebase ID token; interview
-  WebSocket sessions are bound to the user who started them server-side.
-- **Input validation** — social URLs are validated with pydantic `HttpUrl`;
-  uploads are size-limited (10 MB) and checked for the PDF magic bytes.
+- **Row-Level Security (RLS)** — `supabase_schema.sql` (repo root) defines
+  Postgres RLS policies: every user can only read/write their own rows
+  (`auth.uid()` must equal the row's owner), system tables are read-only for
+  authenticated clients, and the backend uses the service-role key (which
+  bypasses RLS) for server-side operations. This is enforced by Postgres
+  itself — even if the public anon key leaks, no one can touch another
+  user's data.
+- **Secrets** — never committed. The public Supabase keys are injected at
+  build time (`frontend/mocker_web/dart_defines.env`, gitignored); the backend
+  reads `GROQ_API_KEY` / `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` from the
+  environment (Render / `.env`). The service-role key is backend-only and
+  never exposed to the browser.
+- **Auth** — all API routes require a verified Supabase access token (JWT);
+  interview WebSocket sessions are bound to the user who started them
+  server-side with an opaque token.
+- **Input validation** — social URLs are validated with pydantic `HttpUrl`
+  plus an SSRF guard; uploads are size-limited (10 MB) and checked for PDF
+  magic bytes.
 - **Rate limiting** — per-IP sliding-window limits on all endpoints, with a
   stricter tier for expensive AI endpoints (env-configurable).
-- **App Check** — the web app attests itself via Firebase App Check
-  (reCAPTCHA Enterprise, since the Firebase console now only offers the
-  Enterprise provider for web apps). The site key is injected as
-  `FIREBASE_APP_CHECK_RECAPTCHA_SITE_KEY` (dart-define); see setup below.
 - **CORS** — explicit allowed origins/methods/headers only.
-- **Encryption** — Firestore data is encrypted at rest by default (Google-managed
-  keys); access is further limited to per-user rules above.
+- **Encryption** — Postgres data is encrypted at rest (managed by Supabase/
+  the cloud provider); access is further limited by RLS above.
 
 ## What I'd still like to add
 
@@ -97,22 +97,26 @@ The backend deploys to Render via the `render.yaml` blueprint at the repo root (
 - **Camera/body-language analysis** — eye contact, posture, hand gestures during the interview, folded into the feedback scores (the feature I'm most excited about)
 - **Stricter question counts** — the model sometimes ignores the "generate exactly N questions" instruction no matter how loudly the prompt yells it
 
-## Firebase App Check setup (web)
+## Supabase setup (one-time)
 
-1. **Create the key** — Firebase console → **Build → App Check** → *Get
-   started* → Web app → choose **reCAPTCHA Enterprise** → *Create a new key*
-   (this opens the Google Cloud reCAPTCHA Enterprise page; the default name is
-   fine) → copy the **site key**.
-2. **Configure the app** — put the site key in `frontend/mocker_web/dart_defines.env`
-   (`FIREBASE_APP_CHECK_RECAPTCHA_SITE_KEY=...`) and add the same var to Vercel
-   (Settings → Environment Variables → Production) so deploys bake it in.
-3. **Deploy** — push/rebuild; the live app now sends App Check tokens.
-4. **Enforce** — only after the new build is live, in App Check → *Manage* →
-   **Enforce** on Firestore (and optionally Authentication). Enforcing before
-   the app ships App Check tokens will lock out the current build.
+1. **Create the project** — https://supabase.com → **New project** (free tier,
+   no credit card).
+2. **Run the schema** — open the **SQL Editor**, paste the contents of
+   `supabase_schema.sql` (repo root), run it. This creates the tables and the
+   Row-Level Security policies.
+3. **Configure the app** — put `SUPABASE_URL` and `SUPABASE_ANON_KEY` in
+   `frontend/mocker_web/dart_defines.env` (and the same two vars on Vercel,
+   Production), and `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` on Render.
+4. **Auth providers** — Supabase dashboard → **Authentication → Sign In /
+   Providers** → enable **Email** and **Google** (paste your Google OAuth
+   Client ID + Secret from Google Cloud Console; add
+   `https://<ref>.supabase.co/auth/v1/callback` to the client's authorized
+   redirect URIs). Under **URL Configuration**, set the Site URL to
+   `https://hustlrzz.vercel.app` and add `http://localhost:3000` and
+   `https://hustlrzz.vercel.app` to Redirect URLs.
 
-> The backend (Admin SDK) bypasses App Check, so enforcement doesn't affect
-> server-side requests.
+> Google/Apple sign-in uses Supabase's hosted OAuth flow — it does **not**
+> call the People API, so no extra Google APIs are needed.
 
 ## Known quirks
 

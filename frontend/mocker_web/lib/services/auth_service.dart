@@ -1,22 +1,16 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../config/api_config.dart';
 import '../data/mock_data.dart';
 
+/// AuthService backed by Supabase (email/password + Google/Apple OAuth).
+///
+/// The public API is unchanged from the Firebase-backed version so pages
+/// keep working: isLoggedIn, needsEmailVerification, signInWithGoogle(),
+/// signInWithEmail(), signUpWithEmail(), deleteAccount(), etc.
 class AuthService extends ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: kIsWeb
-        ? '970566023417-55qvr3q89oniib9k22stj9d71rlnj0sg.apps.googleusercontent.com'
-        : null,
-    scopes: ['email', 'profile'],
-  );
-
   User? _user;
   bool _isLoading = false;
   String? _error;
@@ -28,15 +22,16 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   String? get userEmail => _user?.email;
-  String? get userName => _user?.displayName;
-  String? get userPhotoURL => _user?.photoURL;
+  String? get userName => _user?.userMetadata?['full_name'] as String?;
+  String? get userPhotoURL => _user?.userMetadata?['avatar_url'] as String?;
   Map<String, dynamic>? get userProfile => _userProfile;
 
   AuthService() {
-    // listen Firebase auth state changes
-    _auth.authStateChanges().listen((User? user) {
-      _user = user;
-      if (user != null) {
+    // Listen for Supabase auth state changes (initial session, OAuth/email
+    // redirects, sign in/out) and mirror them into this ChangeNotifier.
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      _user = data.session?.user;
+      if (_user != null) {
         _initializeUser(); // user login, call backend to initialize
       } else {
         _userProfile = null; // user logout, clear profile
@@ -45,19 +40,19 @@ class AuthService extends ChangeNotifier {
     });
   }
 
-  // get current user's ID Token
+  // get current user's access token (Supabase JWT)
   Future<String?> _getIdToken() async {
     try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        return await user.getIdToken();
-      }
-      return null;
+      final session = Supabase.instance.client.auth.currentSession;
+      return session?.accessToken;
     } catch (e) {
-      debugPrint('Failed to get ID token: $e');
+      debugPrint('Failed to get access token: $e');
       return null;
     }
   }
+
+  /// Public token accessor (used by pages for authorized API calls).
+  Future<String?> getIdToken() => _getIdToken();
 
   // call backend /auth/init to initialize user
   Future<void> _initializeUser() async {
@@ -99,59 +94,22 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // Google sign in
+  // Google sign in (OAuth redirect on web — no People API required)
   Future<bool> signInWithGoogle() async {
     try {
       _setLoading(true);
       _clearError();
 
-      // start Google sign in process
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
-      if (googleUser == null) {
-        // user cancelled sign in
-        _setLoading(false);
-        return false;
-      }
-
-      // get authentication details
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      if (googleAuth.idToken == null) {
-        throw StateError(
-          'Google did not return an ID token. This usually means the OAuth '
-          'client ID is not a Web application client, or Google sign-in is '
-          'not enabled for this Firebase project.',
-        );
-      }
-
-      // create Firebase credentials
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: Uri.base.toString(),
+        authScreenLaunchMode: LaunchMode.platformDefault,
       );
 
-      // sign in Firebase with credentials
-      final UserCredential userCredential = await _auth.signInWithCredential(
-        credential,
-      );
-
-      _user = userCredential.user;
+      // On web this navigates to Supabase's hosted Google flow; the session
+      // is restored on return via onAuthStateChange above.
       _setLoading(false);
-
-      if (kDebugMode) {
-        print('Google sign in successful: ${_user?.email}');
-      }
-
       return true;
-    } on FirebaseAuthException catch (e) {
-      _setError(_googleAuthErrorMessage(e));
-      _setLoading(false);
-      if (kDebugMode) {
-        print('Google sign in FirebaseAuthException: ${e.code} - ${e.message}');
-      }
-      return false;
     } catch (e) {
       _setError('Google sign in failed: ${e.toString()}');
       _setLoading(false);
@@ -162,80 +120,19 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  /// Maps common Google/Firebase auth failures to actionable messages so the
-  /// user (or developer) can tell exactly what needs fixing.
-  String _googleAuthErrorMessage(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'account-exists-with-different-credential':
-        return 'An account already exists with this email using a different '
-            'sign-in method. Sign in with that method instead.';
-      case 'operation-not-allowed':
-        return 'Google sign-in is not enabled for this Firebase project. '
-            'Enable it in Firebase console: Authentication > Sign-in method > '
-            'Google.';
-      case 'invalid-credential':
-        return 'Google sign-in could not be completed. Check that the OAuth '
-            'client ID is a Web application client and that this site\'s URL '
-            'is listed in its Authorized JavaScript origins (Google Cloud '
-            'Console > APIs & Services > Credentials).';
-      case 'cancelled-popup-request':
-      case 'popup-closed-by-user':
-        return 'Sign-in was cancelled.';
-      default:
-        return 'Google sign in failed (${e.code}): ${e.message}';
-    }
-  }
-
-  // Apple sign in
+  // Apple sign in (OAuth redirect on web)
   Future<bool> signInWithApple() async {
     try {
       _setLoading(true);
       _clearError();
 
-      // Check if Apple Sign In is available
-      if (!await SignInWithApple.isAvailable()) {
-        _setError('Apple Sign In is not available on this device');
-        _setLoading(false);
-        return false;
-      }
-
-      // Request Apple ID credential
-      final appleCredential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.apple,
+        redirectTo: Uri.base.toString(),
+        authScreenLaunchMode: LaunchMode.platformDefault,
       );
-
-      // Create OAuth credential for Firebase
-      final oauthCredential = OAuthProvider("apple.com").credential(
-        idToken: appleCredential.identityToken,
-        accessToken: appleCredential.authorizationCode,
-      );
-
-      // Sign in to Firebase with Apple credential
-      final UserCredential userCredential = await _auth.signInWithCredential(
-        oauthCredential,
-      );
-
-      _user = userCredential.user;
-
-      // Update display name if available from Apple and not already set
-      if (_user != null && appleCredential.givenName != null && appleCredential.familyName != null) {
-        final displayName = '${appleCredential.givenName} ${appleCredential.familyName}';
-        if (_user!.displayName == null || _user!.displayName!.isEmpty) {
-          await _user!.updateDisplayName(displayName);
-          await _user!.reload();
-          _user = _auth.currentUser;
-        }
-      }
 
       _setLoading(false);
-
-      if (kDebugMode) {
-        print('Apple sign in successful: ${_user?.email}');
-      }
-
       return true;
     } catch (e) {
       _setError('Apple sign in failed: ${e.toString()}');
@@ -248,56 +145,28 @@ class AuthService extends ChangeNotifier {
   }
 
   // Email/Password sign up
-  Future<bool> signUpWithEmail(String email, String password, String displayName) async {
+  Future<bool> signUpWithEmail(
+      String email, String password, String displayName) async {
     try {
       _setLoading(true);
       _clearError();
 
-      // Create user with email and password
-      final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      final res = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
+        data: {'full_name': displayName},
       );
 
-      _user = userCredential.user;
-
-      // Update display name
-      if (_user != null) {
-        await _user!.updateDisplayName(displayName);
-        await _user!.reload();
-        _user = _auth.currentUser;
-        
-        // Send email verification
-        await _user!.sendEmailVerification();
-        
-        if (kDebugMode) {
-          print('Email sign up successful: ${_user?.email}');
-          print('Verification email sent');
-        }
-      }
+      _user = res.user;
 
       _setLoading(false);
-      return true;
-    } on FirebaseAuthException catch (e) {
-      String errorMessage = 'Registration failed';
-      
-      switch (e.code) {
-        case 'email-already-in-use':
-          errorMessage = 'This email is already registered';
-          break;
-        case 'invalid-email':
-          errorMessage = 'Invalid email address';
-          break;
-        case 'weak-password':
-          errorMessage = 'Password is too weak';
-          break;
-        case 'operation-not-allowed':
-          errorMessage = 'Email/password sign up is not enabled';
-          break;
-        default:
-          errorMessage = 'Registration failed: ${e.message}';
+      if (kDebugMode) {
+        print('Email sign up successful: ${_user?.email}');
+        print('Confirmation email sent (if email confirmation is enabled)');
       }
-      
+      return true;
+    } on AuthException catch (e) {
+      String errorMessage = _signUpErrorMessage(e);
       _setError(errorMessage);
       _setLoading(false);
       if (kDebugMode) {
@@ -314,18 +183,30 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  String _signUpErrorMessage(AuthException e) {
+    final msg = e.message.toLowerCase();
+    if (msg.contains('already') && msg.contains('registered')) {
+      return 'This email is already registered';
+    }
+    if (msg.contains('invalid') && msg.contains('email')) {
+      return 'Invalid email address';
+    }
+    if (msg.contains('password')) {
+      return 'Password is too weak';
+    }
+    return 'Registration failed: ${e.message}';
+  }
+
   // Email/Password sign in
   Future<bool> signInWithEmail(String email, String password) async {
     try {
       _setLoading(true);
       _clearError();
 
-      final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final res = await Supabase.instance.client.auth
+          .signInWithPassword(email: email, password: password);
 
-      _user = userCredential.user;
+      _user = res.user;
       _setLoading(false);
 
       if (kDebugMode) {
@@ -333,29 +214,8 @@ class AuthService extends ChangeNotifier {
       }
 
       return true;
-    } on FirebaseAuthException catch (e) {
-      String errorMessage = 'Login failed';
-      
-      switch (e.code) {
-        case 'user-not-found':
-          errorMessage = 'No account found with this email';
-          break;
-        case 'wrong-password':
-          errorMessage = 'Incorrect password';
-          break;
-        case 'invalid-email':
-          errorMessage = 'Invalid email address';
-          break;
-        case 'user-disabled':
-          errorMessage = 'This account has been disabled';
-          break;
-        case 'invalid-credential':
-          errorMessage = 'Invalid email or password';
-          break;
-        default:
-          errorMessage = 'Login failed: ${e.message}';
-      }
-      
+    } on AuthException catch (e) {
+      String errorMessage = _signInErrorMessage(e);
       _setError(errorMessage);
       _setLoading(false);
       if (kDebugMode) {
@@ -372,13 +232,32 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // Send email verification
+  String _signInErrorMessage(AuthException e) {
+    final msg = e.message.toLowerCase();
+    if (msg.contains('invalid login credentials') ||
+        msg.contains('invalid email or password')) {
+      return 'Invalid email or password';
+    }
+    if (msg.contains('email not confirmed')) {
+      return 'Please verify your email before signing in. Check your inbox.';
+    }
+    if (msg.contains('invalid') && msg.contains('email')) {
+      return 'Invalid email address';
+    }
+    return 'Login failed: ${e.message}';
+  }
+
+  // Send email verification (Supabase resend confirmation)
   Future<bool> sendEmailVerification() async {
     try {
-      if (_user != null && !_user!.emailVerified) {
-        await _user!.sendEmailVerification();
+      final email = _user?.email;
+      if (email != null && !(isEmailVerified)) {
+        await Supabase.instance.client.auth.resend(
+          email: email,
+          type: OtpType.signup,
+        );
         if (kDebugMode) {
-          print('Verification email sent to ${_user?.email}');
+          print('Verification email sent to $email');
         }
         return true;
       }
@@ -395,10 +274,12 @@ class AuthService extends ChangeNotifier {
   // Check if email is verified
   Future<bool> checkEmailVerified() async {
     try {
-      await _user?.reload();
-      _user = _auth.currentUser;
+      // Refresh the session so the latest user state (emailConfirmedAt) is
+      // fetched from Supabase after the user clicks the confirmation link.
+      await Supabase.instance.client.auth.refreshSession();
+      _user = Supabase.instance.client.auth.currentUser;
       notifyListeners();
-      return _user?.emailVerified ?? false;
+      return isEmailVerified;
     } catch (e) {
       if (kDebugMode) {
         print('Check email verified error: $e');
@@ -412,28 +293,25 @@ class AuthService extends ChangeNotifier {
     try {
       _setLoading(true);
       _clearError();
-      
-      await _auth.sendPasswordResetEmail(email: email);
-      
+
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: Uri.base.toString(),
+      );
+
       _setLoading(false);
       if (kDebugMode) {
         print('Password reset email sent to $email');
       }
       return true;
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
       String errorMessage = 'Failed to send reset email';
-      
-      switch (e.code) {
-        case 'user-not-found':
-          errorMessage = 'No account found with this email';
-          break;
-        case 'invalid-email':
-          errorMessage = 'Invalid email address';
-          break;
-        default:
-          errorMessage = 'Failed to send reset email: ${e.message}';
+      final msg = e.message.toLowerCase();
+      if (msg.contains('not found')) {
+        errorMessage = 'No account found with this email';
+      } else if (msg.contains('invalid') && msg.contains('email')) {
+        errorMessage = 'Invalid email address';
       }
-      
       _setError(errorMessage);
       _setLoading(false);
       if (kDebugMode) {
@@ -451,15 +329,16 @@ class AuthService extends ChangeNotifier {
   }
 
   // Get email verification status
-  bool get isEmailVerified => _user?.emailVerified ?? false;
+  bool get isEmailVerified => _user?.emailConfirmedAt != null;
 
   // Check if user needs email verification (signed up with email but not verified)
   bool get needsEmailVerification {
     if (_user == null) return false;
-    // Check if user signed up with email/password (not Google)
-    final providerData = _user!.providerData;
-    final hasEmailProvider = providerData.any((info) => info.providerId == 'password');
-    return hasEmailProvider && !_user!.emailVerified;
+    // OAuth users (Google/Apple) have confirmed emails; email/password users
+    // must confirm before first sign-in when confirmation is enabled.
+    final provider = _user?.appMetadata['provider'] as String?;
+    final isEmailAuth = provider == null || provider == 'email';
+    return isEmailAuth && !isEmailVerified;
   }
 
   // sign out
@@ -468,8 +347,7 @@ class AuthService extends ChangeNotifier {
       _setLoading(true);
       _clearError();
 
-      // sign out Google and Firebase
-      await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
+      await Supabase.instance.client.auth.signOut();
 
       _user = null;
       _userProfile = null;
@@ -487,7 +365,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // Delete user account and all data
+  // Delete user account and all data (backend deletes DB rows + auth user)
   Future<bool> deleteAccount() async {
     try {
       _setLoading(true);
@@ -499,13 +377,21 @@ class AuthService extends ChangeNotifier {
         return false;
       }
 
-      final userId = _user!.uid;
+      final token = await _getIdToken();
+      if (token == null) {
+        throw Exception('No authentication token available');
+      }
 
-      // Step 1: Delete all Firestore data
-      await _deleteUserFirestoreData(userId);
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.userEndpoint}'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
 
-      // Step 2: Delete Firebase Authentication account
-      await _user!.delete();
+      if (response.statusCode != 200) {
+        throw Exception('API returned ${response.statusCode}: ${response.body}');
+      }
+
+      await Supabase.instance.client.auth.signOut();
 
       _user = null;
       _userProfile = null;
@@ -516,19 +402,6 @@ class AuthService extends ChangeNotifier {
       }
 
       return true;
-    } on FirebaseAuthException catch (e) {
-      String errorMessage = 'Failed to delete account';
-      
-      if (e.code == 'requires-recent-login') {
-        errorMessage = 'For security, please sign out and sign in again before deleting your account.';
-      }
-      
-      _setError(errorMessage);
-      _setLoading(false);
-      if (kDebugMode) {
-        print('Delete account error: $e');
-      }
-      return false;
     } catch (e) {
       _setError('Failed to delete account: ${e.toString()}');
       _setLoading(false);
@@ -539,55 +412,9 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // Helper method to delete all user data from Firestore
-  Future<void> _deleteUserFirestoreData(String userId) async {
-    try {
-      final firestore = FirebaseFirestore.instance;
-      
-      // Delete workflows collection and its subcollections
-      final workflowsRef = firestore.collection('users').doc(userId).collection('workflows');
-      final workflowSnapshots = await workflowsRef.get();
-      
-      for (var doc in workflowSnapshots.docs) {
-        await doc.reference.delete();
-      }
-      
-      // Delete interviews collection and its subcollections
-      final interviewsRef = firestore.collection('users').doc(userId).collection('interviews');
-      final interviewSnapshots = await interviewsRef.get();
-      
-      for (var interviewDoc in interviewSnapshots.docs) {
-        // Delete sessions subcollection
-        final sessionsRef = interviewDoc.reference.collection('sessions');
-        final sessionSnapshots = await sessionsRef.get();
-        
-        for (var sessionDoc in sessionSnapshots.docs) {
-          await sessionDoc.reference.delete();
-        }
-        
-        await interviewDoc.reference.delete();
-      }
-      
-      // Delete user document (profile)
-      await firestore.collection('users').doc(userId).delete();
-      
-      if (kDebugMode) {
-        print('All Firestore data deleted for user: $userId');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error deleting Firestore data: $e');
-      }
-      // Continue with account deletion even if Firestore cleanup fails
-    }
-  }
-
-  // get user ID (get from backend profile, if not, use email)
+  // get user ID
   String? getUserId() {
-    if (_userProfile != null && _userProfile!['user'] != null) {
-      return _userProfile!['user']['userId'];
-    }
-    return _user?.email;
+    return _user?.id;
   }
 
   // check if user is authenticated
