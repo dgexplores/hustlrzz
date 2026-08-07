@@ -6,6 +6,8 @@ import sys
 import os
 import asyncio
 
+import pytest
+
 # Add project root to path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
 sys.path.insert(0, project_root)
@@ -50,6 +52,7 @@ def test_github_functionality():
         print(f"Unexpected error: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_workflow_with_github():
     """Test complete workflow with GitHub integration"""
     print("\n=== Workflow Integration Test ===")

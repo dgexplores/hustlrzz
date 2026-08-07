@@ -8,6 +8,7 @@ import secrets
 import time
 from urllib.parse import urlparse
 from firebase_admin import auth as firebase_auth
+from pydantic import HttpUrl
 from backend.tools.firebase_config import auth, firebase_ready
 from backend.tools.logger import get_logger, audit
 from backend.tools.ssrf import is_blocked_host
