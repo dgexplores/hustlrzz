@@ -105,9 +105,9 @@ class PortfolioWebScraper:
         try:
             page = await self.browser.new_page()
             
-            # Set user agent
+            # Set user agent (rotated per request to avoid fingerprinting/blocks)
             await page.set_extra_http_headers({
-                "User-Agent": self.config.USER_AGENT
+                "User-Agent": self.config.random_user_agent()
             })
             
             # Navigate to portfolio URL with timeout

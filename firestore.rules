@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- System data (readable by any authenticated user, writable only by
+    // admins via the backend / Firebase console). ----
+    match /bqs/{document} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /problems/{document} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ---- Per-user data: only the owning user may read or write. ----
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /workflows/{workflowId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Interviews are nested: users/{userId}/interviews/{workflowId}/sessions/...
+      match /interviews/{workflowId}/{sessions=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}

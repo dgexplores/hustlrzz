@@ -64,11 +64,32 @@ If you're using your own Firebase project, run `flutterfire configure` inside `f
 
 The backend deploys to Render via the `render.yaml` blueprint at the repo root (Docker-based, Python 3.10). The frontend deploys to Vercel with `frontend/mocker_web/vercel.json` — the build installs Flutter 3.35 and compiles the web app with `--dart-define=API_BASE_URL=...`.
 
+## Security
+
+- **Firestore rules** — strict per-user rules ship in `firestore.rules` at the repo
+  root (each user can only read/write their own `users/{uid}` subtree; system
+  collections are read-only). **Deploy them before going live:**
+  ```bash
+  # from the repo root, with firebase-tools installed
+  firebase deploy --only firestore:rules
+  # or paste the file into Firebase console -> Firestore -> Rules
+  ```
+- **Secrets** — never committed. Firebase web config is injected at build time
+  (`frontend/mocker_web/dart_defines.env`, gitignored); the backend reads
+  `GROQ_API_KEY` / `FIREBASE_KEY_JSON` from the environment (Render / `.env`).
+- **Auth** — all API routes require a verified Firebase ID token; interview
+  WebSocket sessions are bound to the user who started them server-side.
+- **Input validation** — social URLs are validated with pydantic `HttpUrl`;
+  uploads are size-limited (10 MB) and checked for the PDF magic bytes.
+- **Rate limiting** — per-IP sliding-window limits on all endpoints, with a
+  stricter tier for expensive AI endpoints (env-configurable).
+- **CORS** — explicit allowed origins/methods/headers only.
+
 ## What I'd still like to add
 
 - **Voice mode** — the backend already supports Whisper transcription and TTS, but the UI doesn't have a microphone button wired up yet
 - **Camera/body-language analysis** — eye contact, posture, hand gestures during the interview, folded into the feedback scores (the feature I'm most excited about)
-- **Proper Firestore security rules** — right now access is wide open, fine for a demo but not production
+- **Firebase App Check** — enforce client attestation so only your real web app can call Firebase APIs
 - **Stricter question counts** — the model sometimes ignores the "generate exactly N questions" instruction no matter how loudly the prompt yells it
 
 ## Known quirks

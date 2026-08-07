@@ -1,8 +1,14 @@
-from fastapi import APIRouter, File, UploadFile, Form, Depends, HTTPException, Body, WebSocket, WebSocketDisconnect, Query
+from fastapi import (
+    APIRouter, File, UploadFile, Form, Depends, HTTPException, Body,
+    WebSocket, WebSocketDisconnect, Query, Request,
+)
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 import time
+from firebase_admin import auth as firebase_auth
+from pydantic import HttpUrl
 from backend.tools.firebase_config import auth, firebase_ready
+from backend.tools.logger import get_logger, audit
 from backend.data.database import firestore_db
 from backend.data.schemas import Profile
 from backend.agents.interviewer.agent import start_agent_session, client_to_agent_messaging, agent_to_client_messaging, save_transcript
@@ -29,39 +35,61 @@ from backend.services.pdf.exceptions import (
 router = APIRouter()
 bearer = HTTPBearer()
 
+logger = get_logger("routes")
+
 # Initialize PDF processor with configuration
 pdf_config = PDFConfig()
 pdf_processor = PDFProcessor(pdf_config)
 
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(bearer)):
+async def verify_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+):
     if not firebase_ready or auth is None:
         raise HTTPException(
             status_code=503,
             detail="Backend not configured: set FIREBASE_KEY_PATH in backend/.env (see .env.example) and restart.",
         )
+    request_id = getattr(request.state, "request_id", None)
     try:
         decoded_token = auth.verify_id_token(credentials.credentials)
         uid = decoded_token["uid"]
-        
+        email = decoded_token.get("email", "")
+
         # Get full user info from Firebase to get displayName
         try:
             user_record = auth.get_user(uid)
             name = user_record.display_name or ""
             picture = user_record.photo_url or ""
         except Exception as e:
-            print(f"Warning: Could not fetch user record: {e}")
+            logger.warning("Could not fetch user record for %s: %s", uid, e)
             # Fallback to token data
             name = decoded_token.get("name", "")
             picture = decoded_token.get("picture", "")
-        
+
+        audit("auth.verify_success", request_id=request_id, uid=uid)
         return {
             "uid": uid,
-            "email": decoded_token["email"], 
+            "email": email,
             "name": name,
             "picture": picture
         }
+    except firebase_auth.ExpiredIdTokenError as e:
+        # Expired tokens are normal (tokens rotate) - log at INFO
+        logger.info("Token expired: %s", e)
+        audit("auth.verify_failed", request_id=request_id, reason="expired")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except (
+        firebase_auth.InvalidIdTokenError,
+        firebase_auth.RevokedIdTokenError,
+        ValueError,
+    ) as e:
+        logger.info("Invalid token: %s", e)
+        audit("auth.verify_failed", request_id=request_id, reason="invalid")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
     except Exception as e:
-        print(f"Token verification failed: {e}")
+        logger.exception("Unexpected token verification failure: %s", e)
+        audit("auth.verify_failed", request_id=request_id, reason="unexpected")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 @router.get("/")
@@ -70,6 +98,27 @@ def public_route():
 
 # Default avatar URL for users without profile pictures
 DEFAULT_AVATAR_URL = "https://api.dicebear.com/7.x/avataaars/svg?seed=default"
+
+
+def _validate_optional_url(field_name: str, value: str) -> str:
+    """Validate an optional URL form field; returns normalized string or ''."""
+    value = (value or "").strip()
+    if not value:
+        return ""
+    try:
+        return str(HttpUrl(value))
+    except Exception:
+        raise HTTPException(status_code=422, detail=f"Invalid URL for {field_name}")
+
+
+def _validate_num_questions(num_questions: int) -> int:
+    """Clamp the requested question count to a sane, abuse-resistant range."""
+    if not (1 <= num_questions <= 200):
+        raise HTTPException(
+            status_code=422,
+            detail="num_questions must be between 1 and 200",
+        )
+    return num_questions
 
 # auth route
 @router.post("/auth/init")
@@ -162,9 +211,27 @@ async def websocket_endpoint(
 ):    
     """Client WebSocket endpoint to interact with real-time interview agent."""
 
+    # SECURITY: only the user who started this session via POST /interviews/start
+    # may connect. Sessions are bound to their owner server-side; reject
+    # connections for unregistered or foreign session ids.
+    bound = await session_service.get_session("Hustlrzz", user_id, session_id)
+    if bound is None:
+        logger.warning(
+            "Rejected WebSocket connect for unbound session %s (user_id=%s)",
+            session_id, user_id,
+        )
+        audit(
+            "ws.connect_rejected",
+            session_id=session_id,
+            claimed_user_id=user_id,
+            reason="session_not_bound",
+        )
+        await websocket.close(code=1008)
+        return
+
     # Wait for client connection
     await manager.connect(websocket)
-    print(f"Client #{session_id} connected, audio mode: {is_audio}")
+    logger.info("Client #%s connected (user %s), audio mode: %s", session_id, user_id, is_audio)
 
     try: 
         # Start agent session
@@ -216,15 +283,46 @@ async def websocket_endpoint(
             pass
 
 @router.post("/interviews/start")
-async def start_interview(request: InterviewStartRequest, user=Depends(verify_token)):
+async def start_interview(
+    request: Request,
+    payload: InterviewStartRequest,
+    user=Depends(verify_token),
+):
+    request_id = getattr(request.state, "request_id", None)
+
+    # SECURITY: the workflow must belong to the authenticated user.
+    workflow = firestore_db.get_workflow(user["uid"], payload.workflow_id)
+    if not (workflow.get("data")):
+        audit(
+            "interview.start_rejected",
+            request_id=request_id,
+            uid=user["uid"],
+            workflow_id=payload.workflow_id,
+            reason="workflow_not_found",
+        )
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
     session_id = generate_session_id()
 
-    # You might want to store this session info in the database here
+    # Bind the session to its owner so the WebSocket endpoint can verify it.
+    await session_service.create_session(
+        app_name="Hustlrzz",
+        user_id=user["uid"],
+        session_id=session_id,
+    )
 
     # Format WebSocket parameters
     websocket_parameter = (
-        f"?user_id={user['uid']}&workflow_id={request.workflow_id}"
-        f"&duration={request.duration}&is_audio={str(request.is_audio).lower()}"
+        f"?user_id={user['uid']}&workflow_id={payload.workflow_id}"
+        f"&duration={payload.duration}&is_audio={str(payload.is_audio).lower()}"
+    )
+
+    audit(
+        "interview.start",
+        request_id=request_id,
+        uid=user["uid"],
+        session_id=session_id,
+        workflow_id=payload.workflow_id,
     )
 
     return {
@@ -247,6 +345,7 @@ async def generate_feedback(workflow_id: str, session_id: str, user=Depends(veri
 # Authenticated workflow APIs
 @router.post("/workflows/start-with-pdf")
 async def start_workflow_with_pdf(
+    request: Request,
     file: UploadFile = File(...),
     job_description: str = Form(...),
     linkedin_link: str = Form(""),
@@ -259,7 +358,14 @@ async def start_workflow_with_pdf(
 ):
     start_time = time.time()
     user_id = user["uid"]
-    
+    request_id = getattr(request.state, "request_id", None)
+
+    # Validate optional social URLs (reject malformed/malicious URLs)
+    linkedin_link = _validate_optional_url("linkedin_link", linkedin_link)
+    github_link = _validate_optional_url("github_link", github_link)
+    portfolio_link = _validate_optional_url("portfolio_link", portfolio_link)
+    num_questions = _validate_num_questions(num_questions)
+
     try:
         # Process PDF and extract resume text
         resume_text = await pdf_processor.extract_text_from_upload(file)
@@ -309,6 +415,13 @@ async def start_workflow_with_pdf(
         
         # Return workflow results
         if workflow_result.get("success", False):
+            audit(
+                "workflow.start",
+                request_id=request_id,
+                uid=user_id,
+                workflow_id=workflow_result.get("workflow_id"),
+                completed_agents=workflow_result.get("completed_agents", []),
+            )
             return {
                 "success": True,
                 "session_id": workflow_result.get("session_id"),
@@ -318,24 +431,32 @@ async def start_workflow_with_pdf(
                 "processing_time": processing_time
             }
         else:
+            logger.warning(
+                "Workflow execution failed for user %s: %s",
+                user_id, workflow_result.get("error"),
+            )
             return {
                 "success": False,
-                "error": workflow_result.get("error", "Workflow execution failed"),
+                "error": "Workflow execution failed",
                 "user_id": user_id,
                 "processing_time": processing_time
             }
             
     except (FileTooLargeError,) as e:
+        audit("workflow.start_rejected", request_id=request_id, uid=user_id, reason="file_too_large")
         raise HTTPException(status_code=413, detail=str(e))
     except (InvalidFileTypeError, InvalidPDFError, EmptyPDFError) as e:
+        audit("workflow.start_rejected", request_id=request_id, uid=user_id, reason="invalid_file")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        processing_time = time.time() - start_time
-        raise HTTPException(status_code=500, detail=f"Workflow execution failed: {str(e)}")
+        logger.exception("Workflow execution failed for user %s: %s", user_id, e)
+        audit("workflow.start_failed", request_id=request_id, uid=user_id)
+        raise HTTPException(status_code=500, detail="Workflow execution failed")
 
 
 @router.post("/workflows/start-with-text")
 async def start_workflow_with_text(
+    request: Request,
     resume_text: str = Form(...),
     job_description: str = Form(...),
     linkedin_link: str = Form(""),
@@ -348,7 +469,14 @@ async def start_workflow_with_text(
 ):
     start_time = time.time()
     user_id = user["uid"]
-    
+    request_id = getattr(request.state, "request_id", None)
+
+    # Validate optional social URLs (reject malformed/malicious URLs)
+    linkedin_link = _validate_optional_url("linkedin_link", linkedin_link)
+    github_link = _validate_optional_url("github_link", github_link)
+    portfolio_link = _validate_optional_url("portfolio_link", portfolio_link)
+    num_questions = _validate_num_questions(num_questions)
+
     try:
         # Validate resume text
         if not resume_text or len(resume_text.strip()) < pdf_config.MIN_TEXT_LENGTH:
@@ -396,6 +524,13 @@ async def start_workflow_with_text(
         
         # Return workflow results
         if workflow_result.get("success", False):
+            audit(
+                "workflow.start",
+                request_id=request_id,
+                uid=user_id,
+                workflow_id=workflow_result.get("workflow_id"),
+                completed_agents=workflow_result.get("completed_agents", []),
+            )
             return {
                 "success": True,
                 "session_id": workflow_result.get("session_id"),
@@ -405,13 +540,18 @@ async def start_workflow_with_text(
                 "processing_time": processing_time
             }
         else:
+            logger.warning(
+                "Workflow execution failed for user %s: %s",
+                user_id, workflow_result.get("error"),
+            )
             return {
                 "success": False,
-                "error": workflow_result.get("error", "Workflow execution failed"),
+                "error": "Workflow execution failed",
                 "user_id": user_id,
                 "processing_time": processing_time
             }
             
     except Exception as e:
-        processing_time = time.time() - start_time
-        raise HTTPException(status_code=500, detail=f"Workflow execution failed: {str(e)}")
+        logger.exception("Workflow execution failed for user %s: %s", user_id, e)
+        audit("workflow.start_failed", request_id=request_id, uid=user_id)
+        raise HTTPException(status_code=500, detail="Workflow execution failed")

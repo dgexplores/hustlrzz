@@ -38,11 +38,19 @@ else:
     try:
         _init_firebase()
         print("[FIREBASE] Firebase initialized successfully.")
-    except Exception as exc:
+    except Exception:
+        # Do NOT print the exception here: it can include the service-account
+        # key path or parsing internals. Log the generic status instead; the
+        # operator can enable DEBUG logging to diagnose.
+        import logging
+        logging.getLogger("hustlrzz.firebase").warning(
+            "Firebase not initialized. Auth/data endpoints return 503 until "
+            "FIREBASE_KEY_PATH (or FIREBASE_KEY_JSON / Secret Manager) is set.",
+            exc_info=True,
+        )
         print(
-            f"[WARN] Firebase not initialized ({exc}). "
-            "Auth and data endpoints will return 503 until FIREBASE_KEY_PATH is set. "
-            "See backend/.env.example."
+            "[WARN] Firebase not initialized. Auth and data endpoints will return "
+            "503 until Firebase credentials are configured. See backend/.env.example."
         )
         db = None
         firebase_ready = False

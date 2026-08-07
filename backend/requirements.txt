@@ -1,32 +1,32 @@
-# Hustlrzz backend dependencies (minimal, unpinned on purpose).
+# Hustlrzz backend dependencies — pinned for reproducible, supply-chain-safe
+# installs. These versions ship prebuilt wheels for CPython 3.10 (Docker/Render)
+# and 3.11 (CI). Bump deliberately and re-run the test suite.
 #
-# Every package here is imported somewhere under backend/ and each ships
-# prebuilt wheels for Python 3.10+. Versions are floors, so pip picks a
-# release with wheels for whatever Python it runs on (local, Render, Docker).
+# To update a package: bump the pin, then run `pytest` and rebuild.
 
 # --- Web framework ---
-fastapi>=0.110
-uvicorn[standard]>=0.29
-python-multipart>=0.0.9
-pydantic[email]>=2.7
-email-validator>=2.0
+fastapi==0.115.14
+uvicorn[standard]==0.34.3
+python-multipart==0.0.20
+pydantic[email]==2.10.6
+email-validator==2.2.0
 
 # --- Firebase (auth + Firestore) ---
-firebase-admin>=6.5
+firebase-admin==6.6.0
 
 # --- HTTP clients ---
-httpx>=0.27
-requests>=2.31
-PyJWT>=2.8
+httpx==0.28.1
+requests==2.32.3
+PyJWT==2.10.1
 
 # --- PDF resume parsing ---
-PyMuPDF>=1.24
+PyMuPDF==1.25.3
 
 # --- Web search & scraping ---
-beautifulsoup4>=4.12
-lxml>=5.0
-playwright>=1.40
-duckduckgo-search>=8.0
+beautifulsoup4==4.13.3
+lxml==5.3.1
+playwright==1.52.0
+duckduckgo-search==8.1.1
 
 # --- Misc ---
-python-dotenv>=1.0
+python-dotenv==1.1.0
