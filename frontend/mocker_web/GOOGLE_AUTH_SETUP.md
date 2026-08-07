@@ -32,22 +32,39 @@ const firebaseConfig = {
 };
 ```
 
-### 0.2 Update firebase_options.dart
-Your `lib/firebase_options.dart` should match these values:
+### 0.2 Put the config in `dart_defines.env` (not in source code)
 
-```dart
-static const FirebaseOptions web = FirebaseOptions(
-  apiKey: 'YOUR_API_KEY_HERE',                    // from firebaseConfig.apiKey
-  appId: 'YOUR_APP_ID_HERE',                      // from firebaseConfig.appId
-  messagingSenderId: 'YOUR_SENDER_ID_HERE',       // from firebaseConfig.messagingSenderId
-  projectId: 'YOUR_PROJECT_ID_HERE',              // from firebaseConfig.projectId
-  authDomain: 'YOUR_AUTH_DOMAIN_HERE',            // from firebaseConfig.authDomain
-  storageBucket: 'YOUR_STORAGE_BUCKET_HERE',      // from firebaseConfig.storageBucket
-  measurementId: 'YOUR_MEASUREMENT_ID_HERE',      // from firebaseConfig.measurementId
-);
+Firebase config values are injected at build time so **no API keys are committed**
+to the repository. Create the local config file and fill in the values you got
+above:
+
+```bash
+cp dart_defines.env.example dart_defines.env
 ```
 
-**Replace all `YOUR_*_HERE` with the actual values you get from the Firebase Console.**
+Your `dart_defines.env` should look like (with real values):
+
+```
+FIREBASE_API_KEY=AIzaSyAxxxxxxxxxxxxx            # from firebaseConfig.apiKey
+FIREBASE_APP_ID=1:3469xxxx2089:web:4462xxxxxb9d5a8
+FIREBASE_MESSAGING_SENDER_ID=3469018xxxxx
+FIREBASE_PROJECT_ID=mock-interview-app-2025
+FIREBASE_AUTH_DOMAIN=mock-interview-app-2025.firebaseapp.com
+FIREBASE_STORAGE_BUCKET=mock-interview-app-2025.firebasestorage.app
+FIREBASE_MEASUREMENT_ID=G-RY4QxxxxD6
+```
+
+This file is gitignored, so it never gets pushed. **Always run/build with:**
+
+```bash
+flutter run -d chrome --web-port=3000 --dart-define-from-file=dart_defines.env
+```
+
+> **Security note:** the old web API key was hardcoded in `lib/firebase_options.dart`
+> and may already be in public git history. If so, **rotate the key** (or at
+> minimum restrict it) in Google Cloud Console, and consider adding Firebase
+> App Check. Restricting the key by HTTP referrer is the real fix — just make
+> sure your dev/deployed origins are allowed, or sign-in will fail.
 
 ## Step 1: Enable Google APIs
 
@@ -144,12 +161,70 @@ flutter run -d chrome --web-port=3000
 3. Verify user is logged in
 4. Test logout functionality
 
+## Step 5: Troubleshooting "authentication error" when clicking Google
+
+Almost all Google sign-in failures are Google Cloud / Firebase **console
+configuration**, not app code. Work through this checklist in order:
+
+### 5.1 The OAuth client must be a **Web application** client
+In Google Cloud Console → **APIs & Services → Credentials**, the client ID used
+in `lib/services/auth_service.dart` (and `web/index.html`) must be an OAuth
+client of type **Web application**. If you accidentally copied an *Android* or
+*iOS* client ID, sign-in fails with an `invalid_client` / token error.
+
+### 5.2 Authorized JavaScript origins must include the exact URL you're on
+In the same OAuth client, under **Authorized JavaScript origins** (and
+**Authorized redirect URIs**) add the **exact** origin you are testing from:
+
+- `http://localhost:3000` (or whatever port — `--web-port` controls it; if you
+  omit it, Flutter picks a random port and you must update the origins again!)
+- `https://hustlrzz.vercel.app` (your deployed domain, if applicable)
+
+A missing/mismatched origin shows errors like `idpiframe_initialization_failed`,
+`redirect_uri_mismatch`, `invalid_request`, or `Origin ... is not allowed`.
+
+### 5.3 Google provider must be enabled in Firebase
+Firebase console → **Authentication → Sign-in method → Google** → Enable.
+Otherwise you get `auth/operation-not-allowed`.
+
+### 5.4 The Firebase API key must not be restricted away
+If you restricted the web API key (recommended!) make sure the **HTTP referrer
+restrictions** in Google Cloud Console include your dev and production origins.
+Over-restriction causes `auth/api-key-not-valid` or CORS errors that look like
+"authentication error".
+
+### 5.5 Client ID must match everywhere
+`web/index.html` meta tag, `lib/services/auth_service.dart`, and the Web SDK
+config in Firebase Console (Authentication → Google provider) must all use the
+**same** client ID.
+
+### 5.6 People API must be enabled (error: `403 SERVICE_DISABLED`)
+If Google sign-in fails with an error like:
+```
+People API has not been used in project ... before or it is disabled.
+```
+then the **People API** is not enabled on the Google Cloud project. The
+google_sign_in plugin calls it to fetch your name/photo after the popup.
+
+Fix: open this link (uses your project ID) and click **Enable**:
+`https://console.developers.google.com/apis/api/people.googleapis.com/overview`
+
+Then wait 1–3 minutes for it to propagate and retry sign-in.
+
+### 5.7 Popups / cookies
+Allow popups and third-party cookies for the site, or the sign-in popup may
+close instantly with `popup-closed-by-user`.
+
+If it still fails, the app now shows the underlying error code on the login
+page (e.g. `invalid-credential`, `operation-not-allowed`) — search that code.
+
 ## Production Deployment
 
 When deploying to production:
 
 1. Add your production domain to OAuth configuration
-2. Update Client ID in environment variables
+2. Set the `FIREBASE_*` environment variables in your CI/CD provider (the
+   `deploy.sh` script reads them automatically)
 3. Ensure HTTPS is enabled
 4. Test the complete authentication flow
 

@@ -16,6 +16,14 @@ migrate_working_dir/
 .firebase/
 .firebaserc
 
+# Firebase - contains API keys (should not be public)
+# Environment config with real Firebase secrets - never commit
+.dart_defines.env
+.env
+*.env
+!dart_defines.env.example
+
+
 # IntelliJ related
 *.iml
 *.ipr

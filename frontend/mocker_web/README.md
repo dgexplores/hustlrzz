@@ -14,20 +14,28 @@ a live AI interviewer over WebSocket, and detailed performance feedback.
 
 ```bash
 flutter pub get
-flutter run -d chrome --web-port=3000 --dart-define=API_BASE_URL=http://localhost:8000
+cp dart_defines.env.example dart_defines.env   # fill in your Firebase values
+flutter run -d chrome --web-port=3000 \
+  --dart-define-from-file=dart_defines.env \
+  --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
-> **Firebase:** run `flutterfire configure` to generate `lib/firebase_options.dart`
-> with your own Firebase project (the file currently ships with placeholders).
+> **Firebase:** all Firebase config values (including the API key) are injected
+> at build/run time via `dart_defines.env` (gitignored — no secrets in the
+> repo). See `dart_defines.env.example`.
+> `FIREBASE_MEASUREMENT_ID` is optional; the rest are required for auth to work.
 
 ### Production build
 
 ```bash
 flutter build web --release \
+  --dart-define-from-file=dart_defines.env \
   --dart-define=API_BASE_URL=https://your-backend.example.com
 ```
 
-Deploy the `build/web` folder to Vercel, Firebase Hosting, or any static host.
+In CI, set the `FIREBASE_*` environment variables instead (the `deploy.sh`
+script picks them up automatically). Deploy the `build/web` folder to Vercel,
+Firebase Hosting, or any static host.
 
 ## Architecture
 

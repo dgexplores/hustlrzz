@@ -118,6 +118,14 @@ class AuthService extends ChangeNotifier {
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
+      if (googleAuth.idToken == null) {
+        throw StateError(
+          'Google did not return an ID token. This usually means the OAuth '
+          'client ID is not a Web application client, or Google sign-in is '
+          'not enabled for this Firebase project.',
+        );
+      }
+
       // create Firebase credentials
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
@@ -137,13 +145,44 @@ class AuthService extends ChangeNotifier {
       }
 
       return true;
+    } on FirebaseAuthException catch (e) {
+      _setError(_googleAuthErrorMessage(e));
+      _setLoading(false);
+      if (kDebugMode) {
+        print('Google sign in FirebaseAuthException: ${e.code} - ${e.message}');
+      }
+      return false;
     } catch (e) {
-      _setError('sign in failed: ${e.toString()}');
+      _setError('Google sign in failed: ${e.toString()}');
       _setLoading(false);
       if (kDebugMode) {
         print('Google sign in error: $e');
       }
       return false;
+    }
+  }
+
+  /// Maps common Google/Firebase auth failures to actionable messages so the
+  /// user (or developer) can tell exactly what needs fixing.
+  String _googleAuthErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'account-exists-with-different-credential':
+        return 'An account already exists with this email using a different '
+            'sign-in method. Sign in with that method instead.';
+      case 'operation-not-allowed':
+        return 'Google sign-in is not enabled for this Firebase project. '
+            'Enable it in Firebase console: Authentication > Sign-in method > '
+            'Google.';
+      case 'invalid-credential':
+        return 'Google sign-in could not be completed. Check that the OAuth '
+            'client ID is a Web application client and that this site\'s URL '
+            'is listed in its Authorized JavaScript origins (Google Cloud '
+            'Console > APIs & Services > Credentials).';
+      case 'cancelled-popup-request':
+      case 'popup-closed-by-user':
+        return 'Sign-in was cancelled.';
+      default:
+        return 'Google sign in failed (${e.code}): ${e.message}';
     }
   }
 
