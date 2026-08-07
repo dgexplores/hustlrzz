@@ -23,9 +23,11 @@ void main() async {
   // Firebase App Check (web): attest requests come from this app. The
   // reCAPTCHA site key is injected via dart-define; when it is not configured
   // (e.g. fresh local dev) App Check is skipped so the app still boots.
+  // reCAPTCHA Enterprise is used because the Firebase console now only offers
+  // the Enterprise provider when registering new web apps.
   if (DefaultFirebaseOptions.appCheckReCaptchaSiteKey.isNotEmpty) {
     await FirebaseAppCheck.instance.activate(
-      webProvider: ReCaptchaV3Provider(
+      webProvider: ReCaptchaEnterpriseProvider(
         DefaultFirebaseOptions.appCheckReCaptchaSiteKey,
       ),
     );

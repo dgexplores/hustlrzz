@@ -84,7 +84,8 @@ The backend deploys to Render via the `render.yaml` blueprint at the repo root (
 - **Rate limiting** — per-IP sliding-window limits on all endpoints, with a
   stricter tier for expensive AI endpoints (env-configurable).
 - **App Check** — the web app attests itself via Firebase App Check
-  (reCAPTCHA v3). The site key is injected as
+  (reCAPTCHA Enterprise, since the Firebase console now only offers the
+  Enterprise provider for web apps). The site key is injected as
   `FIREBASE_APP_CHECK_RECAPTCHA_SITE_KEY` (dart-define); see setup below.
 - **CORS** — explicit allowed origins/methods/headers only.
 - **Encryption** — Firestore data is encrypted at rest by default (Google-managed
@@ -94,13 +95,14 @@ The backend deploys to Render via the `render.yaml` blueprint at the repo root (
 
 - **Voice mode** — the backend already supports Whisper transcription and TTS, but the UI doesn't have a microphone button wired up yet
 - **Camera/body-language analysis** — eye contact, posture, hand gestures during the interview, folded into the feedback scores (the feature I'm most excited about)
-- **Firebase App Check** — enforce client attestation so only your real web app can call Firebase APIs
 - **Stricter question counts** — the model sometimes ignores the "generate exactly N questions" instruction no matter how loudly the prompt yells it
 
 ## Firebase App Check setup (web)
 
 1. **Create the key** — Firebase console → **Build → App Check** → *Get
-   started* → Web app → *Add reCAPTCHA v3* → save, then copy the **site key**.
+   started* → Web app → choose **reCAPTCHA Enterprise** → *Create a new key*
+   (this opens the Google Cloud reCAPTCHA Enterprise page; the default name is
+   fine) → copy the **site key**.
 2. **Configure the app** — put the site key in `frontend/mocker_web/dart_defines.env`
    (`FIREBASE_APP_CHECK_RECAPTCHA_SITE_KEY=...`) and add the same var to Vercel
    (Settings → Environment Variables → Production) so deploys bake it in.
