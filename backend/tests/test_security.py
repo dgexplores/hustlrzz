@@ -63,6 +63,20 @@ def test_workflow_rejects_huge_question_count():
     assert response.status_code == 422
 
 
+def test_workflow_rejects_ssrf_url():
+    """Internal/private hosts must be rejected (SSRF guard)."""
+    response = client.post(
+        "/workflows/start-with-text",
+        data={
+            "resume_text": VALID_RESUME,
+            "job_description": "Software Engineer",
+            "portfolio_link": "http://169.254.169.254/latest/meta-data/",
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert response.status_code == 422
+
+
 def test_request_id_echoed():
     """The X-Request-ID header must be echoed on responses."""
     response = client.get("/", headers={"X-Request-ID": "abc123"})

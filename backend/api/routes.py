@@ -4,11 +4,13 @@ from fastapi import (
 )
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
+import secrets
 import time
+from urllib.parse import urlparse
 from firebase_admin import auth as firebase_auth
-from pydantic import HttpUrl
 from backend.tools.firebase_config import auth, firebase_ready
 from backend.tools.logger import get_logger, audit
+from backend.tools.ssrf import is_blocked_host
 from backend.data.database import firestore_db
 from backend.data.schemas import Profile
 from backend.agents.interviewer.agent import start_agent_session, client_to_agent_messaging, agent_to_client_messaging, save_transcript
@@ -101,14 +103,25 @@ DEFAULT_AVATAR_URL = "https://api.dicebear.com/7.x/avataaars/svg?seed=default"
 
 
 def _validate_optional_url(field_name: str, value: str) -> str:
-    """Validate an optional URL form field; returns normalized string or ''."""
+    """Validate an optional URL form field; returns normalized string or ''.
+
+    Rejects malformed URLs and any host that resolves to internal/private
+    infrastructure (SSRF protection for the server-side portfolio scraper).
+    """
     value = (value or "").strip()
     if not value:
         return ""
     try:
-        return str(HttpUrl(value))
+        normalized = str(HttpUrl(value))
     except Exception:
         raise HTTPException(status_code=422, detail=f"Invalid URL for {field_name}")
+
+    if is_blocked_host(urlparse(normalized).hostname or ""):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid URL for {field_name}: internal/private hosts are not allowed",
+        )
+    return normalized
 
 
 def _validate_num_questions(num_questions: int) -> int:
@@ -206,25 +219,31 @@ async def websocket_endpoint(
     session_id: str,
     user_id: str = Query(...),
     workflow_id: str = Query(...),
+    token: str = Query(None),
     duration: int = Query(10), #change the default duration here
     is_audio: bool = Query(False)
 ):    
     """Client WebSocket endpoint to interact with real-time interview agent."""
 
     # SECURITY: only the user who started this session via POST /interviews/start
-    # may connect. Sessions are bound to their owner server-side; reject
-    # connections for unregistered or foreign session ids.
+    # may connect. Auth is an opaque token (issued with the session, never
+    # guessable from the query string); the user_id binding is checked too.
     bound = await session_service.get_session("Hustlrzz", user_id, session_id)
-    if bound is None:
+    expected_token = bound.state.get("ws_token", "") if bound else ""
+    if (
+        bound is None
+        or not token
+        or not secrets.compare_digest(str(expected_token), str(token))
+    ):
         logger.warning(
-            "Rejected WebSocket connect for unbound session %s (user_id=%s)",
+            "Rejected WebSocket connect for session %s (user_id=%s): bad token or unbound session",
             session_id, user_id,
         )
         audit(
             "ws.connect_rejected",
             session_id=session_id,
             claimed_user_id=user_id,
-            reason="session_not_bound",
+            reason="invalid_token_or_unbound_session",
         )
         await websocket.close(code=1008)
         return
@@ -304,17 +323,22 @@ async def start_interview(
 
     session_id = generate_session_id()
 
-    # Bind the session to its owner so the WebSocket endpoint can verify it.
-    await session_service.create_session(
+    # Bind the session to its owner, with an opaque one-time WebSocket token
+    # so the WS endpoint can authenticate the connection (query params alone
+    # are guessable and must never be trusted as proof of ownership).
+    ws_token = secrets.token_urlsafe(32)
+    bound_session = await session_service.create_session(
         app_name="Hustlrzz",
         user_id=user["uid"],
         session_id=session_id,
     )
+    bound_session.state["ws_token"] = ws_token
 
     # Format WebSocket parameters
     websocket_parameter = (
         f"?user_id={user['uid']}&workflow_id={payload.workflow_id}"
         f"&duration={payload.duration}&is_audio={str(payload.is_audio).lower()}"
+        f"&token={ws_token}"
     )
 
     audit(

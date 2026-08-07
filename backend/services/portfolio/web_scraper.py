@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from playwright.async_api import async_playwright, Browser, Page, TimeoutError as PlaywrightTimeoutError
 
 from backend.config import PortfolioConfig
+from backend.tools.ssrf import is_blocked_host
 from .exceptions import PortfolioURLError, PortfolioScrapingError, PortfolioTimeoutError
 
 class PortfolioWebScraper:
@@ -78,7 +79,11 @@ class PortfolioWebScraper:
                 raise PortfolioURLError(url, "Invalid URL format")
         except Exception:
             raise PortfolioURLError(url, "Invalid URL format")
-        
+
+        # SSRF guard: never fetch internal/private hosts
+        if is_blocked_host(parsed.hostname or ""):
+            raise PortfolioURLError(url, "URL points to an internal/private host")
+
         return url
     
     async def scrape_portfolio(self, url: str) -> str:

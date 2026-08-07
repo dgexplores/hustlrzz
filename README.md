@@ -84,6 +84,8 @@ The backend deploys to Render via the `render.yaml` blueprint at the repo root (
 - **Rate limiting** — per-IP sliding-window limits on all endpoints, with a
   stricter tier for expensive AI endpoints (env-configurable).
 - **CORS** — explicit allowed origins/methods/headers only.
+- **Encryption** — Firestore data is encrypted at rest by default (Google-managed
+  keys); access is further limited to per-user rules above.
 
 ## What I'd still like to add
 

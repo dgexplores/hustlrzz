@@ -39,13 +39,19 @@ async def global_exception_handler(request: Request, exc: Exception):
         method=request.method,
         path=request.url.path,
     )
+    # Only emit CORS headers for origins we actually allow (mirrors the
+    # CORSMiddleware behavior instead of echoing any origin on error paths).
+    headers = {}
+    origin = request.headers.get("origin")
+    if origin and origin in CORS_ORIGINS:
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+        }
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
-        headers={
-            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
-            "Access-Control-Allow-Credentials": "true",
-        },
+        headers=headers,
     )
 
 

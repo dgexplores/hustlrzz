@@ -66,6 +66,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         now = time.monotonic()
         async with self._lock:
+            # Opportunistic cleanup so idle client entries don't accumulate forever
+            if len(self._hits) > 10000:
+                self._hits = {k: v for k, v in self._hits.items() if v}
+
             window = self._hits[key]
             while window and now - window[0] > 60:
                 window.popleft()
