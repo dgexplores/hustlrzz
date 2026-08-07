@@ -6,7 +6,6 @@ import 'dart:convert';
 import '../config/api_config.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:web_socket_channel/status.dart' as ws_status;
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
 class InterviewService {

@@ -16,7 +16,6 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final UserService _userService = UserService();
-  final AuthService _authService = AuthService();
   User? _user;
   bool _loading = true;
   bool _isEditing = false;

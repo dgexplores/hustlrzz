@@ -12,7 +12,7 @@ This guide will help you set up Google Authentication for the Mocker Flutter Web
 
 ### 0.1 Get Firebase Web App Config
 1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select your project: `mock-interview-app-2025`
+2. Select your project: `hustlrzz`
 3. Click the **gear icon** (Settings) → **Project settings**
 4. Scroll down to **Your apps** section
 5. If you don't have a web app, click **Add app** → Web (</>) icon
@@ -23,9 +23,9 @@ You'll see something like this:
 ```javascript
 const firebaseConfig = {
   apiKey: "AIzaSyAxxxxxxxxxxxxx",
-  authDomain: "mock-interview-app-2025.firebaseapp.com",
-  projectId: "mock-interview-app-2025",
-  storageBucket: "mock-interview-app-2025.firebasestorage.app",
+  authDomain: "hustlrzz.firebaseapp.com",
+  projectId: "hustlrzz",
+  storageBucket: "hustlrzz.firebasestorage.app",
   messagingSenderId: "3469018xxxxx",
   appId: "1:3469xxxx2089:web:4462xxxxxb9d5a8",
   measurementId: "G-RY4QxxxxD6"
@@ -48,9 +48,9 @@ Your `dart_defines.env` should look like (with real values):
 FIREBASE_API_KEY=AIzaSyAxxxxxxxxxxxxx            # from firebaseConfig.apiKey
 FIREBASE_APP_ID=1:3469xxxx2089:web:4462xxxxxb9d5a8
 FIREBASE_MESSAGING_SENDER_ID=3469018xxxxx
-FIREBASE_PROJECT_ID=mock-interview-app-2025
-FIREBASE_AUTH_DOMAIN=mock-interview-app-2025.firebaseapp.com
-FIREBASE_STORAGE_BUCKET=mock-interview-app-2025.firebasestorage.app
+FIREBASE_PROJECT_ID=hustlrzz
+FIREBASE_AUTH_DOMAIN=hustlrzz.firebaseapp.com
+FIREBASE_STORAGE_BUCKET=hustlrzz.firebasestorage.app
 FIREBASE_MEASUREMENT_ID=G-RY4QxxxxD6
 ```
 
@@ -70,7 +70,7 @@ flutter run -d chrome --web-port=3000 --dart-define-from-file=dart_defines.env
 
 ### 1.1 Open Google Cloud Console
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Select your project: `mock-interview-app-2025`
+2. Select your project: `hustlrzz`
 
 ### 1.2 Enable Required APIs
 Navigate to **APIs & Services** → **Library** and enable:
@@ -123,7 +123,7 @@ Or check existing OAuth 2.0 Client IDs in Google Cloud Console → APIs & Servic
 
 ### 3.1 Enable Google Sign-In
 1. Open [Firebase Console](https://console.firebase.google.com/)
-2. Select your project: `mock-interview-app-2025`
+2. Select your project: `hustlrzz`
 3. Go to **Authentication** → **Sign-in method**
 4. Enable **Google**
 5. Enter your **Web SDK configuration** (Client ID from Step 2.4)
