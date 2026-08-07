@@ -79,25 +79,34 @@ alter table public.bqs       enable row level security;
 alter table public.problems  enable row level security;
 
 -- users: only the owner
+-- Note: auth.uid() is `uuid`; the user_id columns are `text`, so cast to text.
+drop policy if exists "users owner select" on public.users;
 create policy "users owner select" on public.users
-  for select using (auth.uid() = user_id);
+  for select using (auth.uid()::text = user_id);
+drop policy if exists "users owner insert" on public.users;
 create policy "users owner insert" on public.users
-  for insert with check (auth.uid() = user_id);
+  for insert with check (auth.uid()::text = user_id);
+drop policy if exists "users owner update" on public.users;
 create policy "users owner update" on public.users
-  for update using (auth.uid() = user_id);
+  for update using (auth.uid()::text = user_id);
+drop policy if exists "users owner delete" on public.users;
 create policy "users owner delete" on public.users
-  for delete using (auth.uid() = user_id);
+  for delete using (auth.uid()::text = user_id);
 
 -- workflows: only the owner
+drop policy if exists "workflows owner all" on public.workflows;
 create policy "workflows owner all" on public.workflows
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using (auth.uid()::text = user_id) with check (auth.uid()::text = user_id);
 
 -- interviews: only the owner
+drop policy if exists "interviews owner all" on public.interviews;
 create policy "interviews owner all" on public.interviews
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using (auth.uid()::text = user_id) with check (auth.uid()::text = user_id);
 
 -- bqs / problems: authenticated users may read; writes only via service role
+drop policy if exists "bqs read authed" on public.bqs;
 create policy "bqs read authed" on public.bqs
   for select using (auth.role() = 'authenticated');
+drop policy if exists "problems read authed" on public.problems;
 create policy "problems read authed" on public.problems
   for select using (auth.role() = 'authenticated');
