@@ -8,7 +8,7 @@
 fastapi==0.115.14
 uvicorn[standard]==0.34.3
 python-multipart==0.0.20
-pydantic[email]==2.10.6
+pydantic[email]==2.13.4
 email-validator==2.2.0
 
 # --- Supabase (auth + Postgres) ---
@@ -17,7 +17,7 @@ supabase==2.31.0
 # --- HTTP clients ---
 httpx==0.28.1
 requests==2.32.3
-PyJWT==2.10.1
+PyJWT==2.13.0
 
 # --- PDF resume parsing ---
 PyMuPDF==1.25.3
