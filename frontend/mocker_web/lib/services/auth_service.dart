@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/api_config.dart';
-import '../data/mock_data.dart';
 
 /// AuthService backed by Supabase (email/password + Google/Apple OAuth).
 ///
@@ -84,12 +83,8 @@ class AuthService extends ChangeNotifier {
         );
       }
     } catch (e) {
-      debugPrint('❌ Real API failed: $e');
-      debugPrint('🔄 Falling back to mock data...');
-
-      // Fallback to mock data
-      _userProfile = MockData.authInitResponse['data'];
-      debugPrint('✅ Mock API: User initialized with mock data');
+      debugPrint('❌ Failed to initialize user profile: $e');
+      _userProfile = null;
       notifyListeners();
     }
   }

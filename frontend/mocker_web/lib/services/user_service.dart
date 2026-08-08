@@ -1,5 +1,4 @@
 import '../models/user.dart';
-import '../data/mock_data.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -54,20 +53,8 @@ class UserService extends ChangeNotifier {
         throw Exception('API returned ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Real API failed: $e');
-      debugPrint('🔄 Falling back to mock data...');
-      
-      try {
-        // Fallback to mock data
-        final user = User.fromJson(MockData.userProfile);
-        _currentUser = user;
-        debugPrint('✅ Mock API: User profile loaded with mock data');
-        notifyListeners();
-        return user;
-      } catch (mockError) {
-        debugPrint('❌ Mock data also failed: $mockError');
-        throw Exception('Failed to load user profile: Real API failed ($e), Mock data also failed ($mockError)');
-      }
+      debugPrint('❌ Failed to load user profile: $e');
+      rethrow;
     }
   }
 
@@ -100,30 +87,8 @@ class UserService extends ChangeNotifier {
         throw Exception('API returned ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Real API failed: $e');
-      debugPrint('🔄 Falling back to mock data...');
-      
-      try {
-        // Mock update (just update local data)
-        if (_currentUser != null) {
-          // Update local user data for mock using copyWith
-          _currentUser = _currentUser!.copyWith(
-            name: profileData['name'],
-            linkedinLink: profileData['linkedinLink'],
-            githubLink: profileData['githubLink'],
-            portfolioLink: profileData['portfolioLink'],
-            additionalInfo: profileData['additionalInfo'],
-          );
-          debugPrint('✅ Mock API: User profile updated with mock data');
-          notifyListeners();
-          return _currentUser!;
-        } else {
-          throw Exception('No current user data available for mock update');
-        }
-      } catch (mockError) {
-        debugPrint('❌ Mock update also failed: $mockError');
-        throw Exception('Failed to update user profile: Real API failed ($e), Mock update also failed ($mockError)');
-      }
+      debugPrint('❌ Failed to update user profile: $e');
+      rethrow;
     }
   }
 
@@ -163,30 +128,8 @@ class UserService extends ChangeNotifier {
         throw Exception('API returned ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Real API failed: $e');
-      debugPrint('🔄 Falling back to mock data...');
-      
-      try {
-        // Mock avatar upload (just simulate success)
-        await Future.delayed(Duration(seconds: 1)); // Simulate network delay
-        
-        final mockAvatarUrl = 'https://via.placeholder.com/150/mock_avatar_${DateTime.now().millisecondsSinceEpoch}';
-        
-        if (_currentUser != null) {
-          // Update with a mock avatar URL
-          _currentUser = _currentUser!.copyWith(
-            photoURL: mockAvatarUrl,
-          );
-          debugPrint('✅ Mock API: Avatar uploaded with mock data');
-          notifyListeners();
-          return mockAvatarUrl;
-        } else {
-          throw Exception('No current user data available for mock avatar upload');
-        }
-      } catch (mockError) {
-        debugPrint('❌ Mock upload also failed: $mockError');
-        throw Exception('Failed to upload avatar: Real API failed ($e), Mock upload also failed ($mockError)');
-      }
+      debugPrint('❌ Failed to upload avatar: $e');
+      rethrow;
     }
   }
 } 

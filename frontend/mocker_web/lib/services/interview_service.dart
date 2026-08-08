@@ -1,5 +1,4 @@
 import '../models/interview.dart';
-import '../data/mock_data.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -106,22 +105,8 @@ class InterviewService {
         throw Exception('API returned ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Real API failed: $e');
-      debugPrint('🔄 Falling back to mock data...');
-      
-      try {
-        // Mock session data
-        await Future.delayed(const Duration(seconds: 1)); 
-        final mockSession = {
-          'session_id': 'mock_session_${DateTime.now().millisecondsSinceEpoch}',
-          'websocket_parameter': 'token=mock_ws_token_${DateTime.now().millisecondsSinceEpoch}',
-        };
-        debugPrint('✅ Mock API: Interview session started with mock data');
-        return mockSession;
-      } catch (mockError) {
-        debugPrint('❌ Mock data also failed: $mockError');
-        throw Exception('Failed to start interview session: Real API failed ($e), Mock data also failed ($mockError)');
-      }
+      debugPrint('❌ Failed to start interview session: $e');
+      rethrow;
     }
   }
 
@@ -151,18 +136,8 @@ class InterviewService {
         throw Exception('API returned ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Real API failed: $e');
-      debugPrint('🔄 Falling back to mock data...');
-      
-      try {
-        // Fallback to mock data
-        await Future.delayed(const Duration(milliseconds: 800));
-        debugPrint('✅ Mock API: Interview feedback loaded with mock data');
-        return MockData.singleInterviewFeedback;
-      } catch (mockError) {
-        debugPrint('❌ Mock data also failed: $mockError');
-        throw Exception('Failed to get interview feedback: Real API failed ($e), Mock data also failed ($mockError)');
-      }
+      debugPrint('❌ Failed to get interview feedback: $e');
+      rethrow;
     }
   }
 
@@ -194,21 +169,8 @@ class InterviewService {
         throw Exception('API returned ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Real API failed: $e');
-      debugPrint('🔄 Falling back to mock data...');
-      
-      try {
-        await Future.delayed(const Duration(milliseconds: 600));
-        
-          final filteredHistory = MockData.interviewHistory
-              .where((interview) => interview['workflowId'] == workflowId)
-              .toList();
-          debugPrint('✅ Mock API: Interview history loaded with mock data (${filteredHistory.length} items)');
-          return filteredHistory;
-      } catch (mockError) {
-        debugPrint('❌ Mock data also failed: $mockError');
-        throw Exception('Failed to get interview history: Real API failed ($e), Mock data also failed ($mockError)');
-      }
+      debugPrint('❌ Failed to get interview history: $e');
+      rethrow;
     }
   }
 

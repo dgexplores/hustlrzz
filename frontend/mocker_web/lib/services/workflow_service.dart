@@ -1,5 +1,4 @@
 import '../models/workflow.dart';
-import '../data/mock_data.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/api_config.dart';
@@ -51,18 +50,8 @@ class WorkflowService {
         throw Exception('API returned ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Real API failed: $e');
-      debugPrint('🔄 Falling back to mock data...');
-      
-      try {
-        // Fallback to mock data
-        final workflows = MockData.workflows.map((workflowData) => Workflow.fromJson(workflowData)).toList();
-        debugPrint('✅ Mock API: Workflows loaded with mock data (${workflows.length} items)');
-        return workflows;
-      } catch (mockError) {
-        debugPrint('❌ Mock data also failed: $mockError');
-        throw Exception('Failed to load workflows: Real API failed ($e), Mock data also failed ($mockError)');
-      }
+      debugPrint('❌ Failed to load workflows: $e');
+      rethrow;
     }
   }
 
@@ -95,19 +84,8 @@ class WorkflowService {
         throw Exception('API returned ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      debugPrint('❌ Real API failed: $e');
-      debugPrint('🔄 Falling back to mock data...');
-      
-      try {
-        // Fallback to mock data
-        final qasData = MockData.recommendedQAs[workflowId] ?? [];
-        final qas = qasData.map((qaData) => RecommendedQA.fromJson(qaData)).toList();
-        debugPrint('✅ Mock API: Recommended QAs loaded with mock data (${qas.length} items)');
-        return qas;
-      } catch (mockError) {
-        debugPrint('❌ Mock data also failed: $mockError');
-        throw Exception('Failed to load recommended QAs: Real API failed ($e), Mock data also failed ($mockError)');
-      }
+      debugPrint('❌ Failed to load recommended QAs: $e');
+      rethrow;
     }
   }
 } 
