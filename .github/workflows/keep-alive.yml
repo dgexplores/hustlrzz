@@ -1,0 +1,26 @@
+# Keep the Render backend awake.
+#
+# The backend runs on Render's free tier, which spins the instance down after
+# 15 minutes of inactivity. The first request after a spin-down can take ~60s
+# to boot, and during that window the browser gets a proxy response without
+# CORS headers, surfacing as "Failed to fetch". This cron pings the health
+# endpoint every 10 minutes so the instance stays warm for real users.
+name: keep-alive
+
+on:
+  schedule:
+    # Every 10 minutes, every day (Render free sleep threshold is 15 min).
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    name: Ping backend health endpoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping (2 attempts — first may trigger a cold boot)
+        run: |
+          curl -sf --max-time 90 -o /dev/null \
+            https://hustlrzz-backend.onrender.com/ || \
+          curl -sf --max-time 90 -o /dev/null \
+            https://hustlrzz-backend.onrender.com/ || true
