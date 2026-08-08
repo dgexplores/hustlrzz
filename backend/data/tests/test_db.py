@@ -1,6 +1,6 @@
 import pytest, os
 from backend.data import database
-from backend.data.schemas import Interview, Workflow, TranscriptTurn, Feedback, PersonalExperience, RecommendedQA, GeneralBQ, Profile
+from backend.data.schemas import Interview, Workflow, TranscriptTurn, Feedback, PersonalExperience, RecommendedQA, GeneralBQ, Profile, CodingProblems
 from backend.data.tests.mock_data import personalExperience, recommendedQAs, transcript, feedback, generalBQ, profile_data
 
 # Skip all Firestore-dependent tests when running in CI

@@ -27,7 +27,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'python', 'javascript-typescript' ]
+        # Python only: the backend is Python and the frontend is Flutter/Dart
+        # (no committed JS/TS sources), so javascript-typescript would fail
+        # with "no files to analyze".
+        language: [ 'python' ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,9 +41,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
 
-      # Autobuild attempts to build any compilable languages (Python needs
-      # none; the Flutter web output is not committed, so JS analysis falls
-      # back to a source scan).
+      # Autobuild attempts to build any compilable languages (Python needs none).
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
