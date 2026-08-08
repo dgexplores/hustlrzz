@@ -1,6 +1,10 @@
+import 'dart:js_interop';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:web/web.dart' as web;
 import 'theme/app_theme.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/login_page.dart';
@@ -15,6 +19,7 @@ import 'config/session_local_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _reloadOnAppUpdate();
 
   SupabaseConfig.assertConfigured();
 
@@ -36,6 +41,28 @@ void main() async {
   );
 
   runApp(const HustlrzzApp());
+}
+
+/// Reload the app when a freshly deployed version takes over.
+///
+/// Flutter web ships a service worker that caches the app bundle. After a
+/// redeploy the new service worker activates and claims the open tab
+/// ([clients.claim]), but the tab keeps running the OLD JavaScript it already
+/// loaded — which can point at an outdated backend or carry old auth config,
+/// surfacing as "Couldn't reach the server" errors or a broken login flow.
+/// Listening for [controllerchange] lets us reload exactly when the new
+/// version goes live, so users always run the latest build.
+void _reloadOnAppUpdate() {
+  if (!kIsWeb) return;
+  try {
+    final container = web.window.navigator.serviceWorker;
+    container.addEventListener('controllerchange', ((web.Event event) {
+      debugPrint('🔄 New app version detected — reloading to latest build');
+      web.window.location.reload();
+    }).toJS);
+  } catch (e) {
+    debugPrint('Failed to set up app-update watcher: $e');
+  }
 }
 
 class HustlrzzApp extends StatelessWidget {
