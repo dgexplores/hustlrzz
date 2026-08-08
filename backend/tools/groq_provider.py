@@ -33,60 +33,112 @@ class GroqRateLimitError(GroqError):
     """Raised when Groq rate-limits us (HTTP 429)."""
 
 
+def _active_keys() -> list:
+    """All configured Groq keys, primary first, deduplicated."""
+    keys: list = []
+    for key in GroqConfig.API_KEYS:
+        if key and key not in keys:
+            keys.append(key)
+    return keys
+
+
 def is_configured() -> bool:
-    """True when a GROQ_API_KEY is present."""
-    return bool(GroqConfig.API_KEY)
+    """True when at least one GROQ API key is present."""
+    return bool(_active_keys())
 
 
-def _headers() -> dict:
+def _headers(key: str) -> dict:
     return {
-        "Authorization": f"Bearer {GroqConfig.API_KEY}",
+        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
     }
 
 
 def _post_json(path: str, payload: dict, timeout: float = 120.0) -> dict:
-    """POST JSON to Groq, retrying with backoff on rate limits / 5xx."""
+    """POST JSON to Groq, retrying with backoff and rotating keys on rate limits.
+
+    Each configured key (primary first, then backups from GROQ_API_KEYS) gets
+    up to MAX_RETRIES attempts. On HTTP 429 the provider switches to the next
+    key, so a rate-limited primary key no longer takes the whole app down.
+    """
     url = GroqConfig.BASE_URL.rstrip("/") + path
+    keys = _active_keys()
+    if not keys:
+        raise GroqError("GROQ_API_KEY is not set. Add it to backend/.env (see .env.example).")
+
     last_error: Optional[Exception] = None
-    for attempt in range(GroqConfig.MAX_RETRIES):
-        try:
-            with httpx.Client(timeout=timeout) as client:
-                resp = client.post(url, headers=_headers(), json=payload)
-            if resp.status_code == 429:
-                raise GroqRateLimitError(resp.text[:300])
-            resp.raise_for_status()
+    for key_index, key in enumerate(keys):
+        for attempt in range(GroqConfig.MAX_RETRIES):
             try:
-                return resp.json()
-            except ValueError as exc:
-                raise GroqError(f"Groq returned non-JSON response: {resp.text[:200]}") from exc
-        except GroqRateLimitError as exc:
-            last_error = exc
-            logger.warning("Groq rate-limited (attempt %d/%d): %s", attempt + 1, GroqConfig.MAX_RETRIES, exc)
-        except httpx.HTTPStatusError as exc:
-            last_error = exc
-            if exc.response.status_code == 429:
-                logger.warning("Groq rate-limited (attempt %d/%d)", attempt + 1, GroqConfig.MAX_RETRIES)
-            else:
-                raise GroqError(f"Groq HTTP {exc.response.status_code}: {exc.response.text[:300]}") from exc
-        except httpx.HTTPError as exc:
-            last_error = exc
-            logger.warning("Groq request failed (attempt %d/%d): %s", attempt + 1, GroqConfig.MAX_RETRIES, exc)
+                with httpx.Client(timeout=timeout) as client:
+                    resp = client.post(url, headers=_headers(key), json=payload)
+                if resp.status_code == 429:
+                    raise GroqRateLimitError(resp.text[:300])
+                resp.raise_for_status()
+                try:
+                    return resp.json()
+                except ValueError as exc:
+                    raise GroqError(f"Groq returned non-JSON response: {resp.text[:200]}") from exc
+            except GroqRateLimitError as exc:
+                last_error = exc
+                logger.warning(
+                    "Groq key #%d rate-limited (attempt %d/%d): %s",
+                    key_index + 1, attempt + 1, GroqConfig.MAX_RETRIES, exc,
+                )
+            except httpx.HTTPStatusError as exc:
+                last_error = exc
+                if exc.response.status_code == 429:
+                    logger.warning(
+                        "Groq key #%d rate-limited (attempt %d/%d)",
+                        key_index + 1, attempt + 1, GroqConfig.MAX_RETRIES,
+                    )
+                else:
+                    raise GroqError(f"Groq HTTP {exc.response.status_code}: {exc.response.text[:300]}") from exc
+            except httpx.HTTPError as exc:
+                last_error = exc
+                logger.warning(
+                    "Groq request failed on key #%d (attempt %d/%d): %s",
+                    key_index + 1, attempt + 1, GroqConfig.MAX_RETRIES, exc,
+                )
 
-        if attempt < GroqConfig.MAX_RETRIES - 1:
-            time.sleep(min(2 ** attempt, 30))
+            if attempt < GroqConfig.MAX_RETRIES - 1:
+                time.sleep(min(2 ** attempt, 30))
 
-    raise GroqError(f"Groq request failed after {GroqConfig.MAX_RETRIES} attempts: {last_error}") from last_error
+        if key_index < len(keys) - 1:
+            logger.warning("Groq key #%d exhausted, rotating to backup key #%d", key_index + 1, key_index + 2)
+
+    raise GroqError(
+        f"Groq request failed after {len(keys)} key(s) x "
+        f"{GroqConfig.MAX_RETRIES} attempts: {last_error}"
+    ) from last_error
 
 
 def _post_files(path: str, files: dict, data: dict, timeout: float = 180.0) -> dict:
-    """POST multipart form data (used by STT)."""
+    """POST multipart form data (used by STT), rotating keys on 429."""
     url = GroqConfig.BASE_URL.rstrip("/") + path
-    headers = {"Authorization": f"Bearer {GroqConfig.API_KEY}"}
-    with httpx.Client(timeout=timeout) as client:
-        resp = client.post(url, headers=headers, files=files, data=data)
-    resp.raise_for_status()
-    return resp.json()
+    keys = _active_keys()
+    if not keys:
+        raise GroqError("GROQ_API_KEY is not set. Add it to backend/.env (see .env.example).")
+    last_error: Optional[Exception] = None
+    for key_index, key in enumerate(keys):
+        try:
+            headers = {"Authorization": f"Bearer {key}"}
+            with httpx.Client(timeout=timeout) as client:
+                resp = client.post(url, headers=headers, files=files, data=data)
+            if resp.status_code == 429:
+                raise GroqRateLimitError(resp.text[:300])
+            resp.raise_for_status()
+            return resp.json()
+        except GroqRateLimitError as exc:
+            last_error = exc
+            logger.warning("Groq STT key #%d rate-limited: %s", key_index + 1, exc)
+        except httpx.HTTPError as exc:
+            last_error = exc
+            logger.warning("Groq STT request failed on key #%d: %s", key_index + 1, exc)
+            if exc.response.status_code == 429:
+                continue
+            raise
+    raise GroqError(f"Groq STT request failed after {len(keys)} key(s): {last_error}") from last_error
 
 
 def chat(
