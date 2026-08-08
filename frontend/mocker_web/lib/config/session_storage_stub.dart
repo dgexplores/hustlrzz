@@ -1,7 +1,7 @@
 // Non-web fallback: keep sessions in memory only, so they die with the process.
 final Map<String, String> _memory = {};
 
-Future<void> initializeSessionStorage() async {}
+Future<void> initializeSessionStorage(String persistSessionKey) async {}
 
 Future<bool> hasSessionItem(String key) async => _memory.containsKey(key);
 

@@ -3,13 +3,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'session_storage_stub.dart'
     if (dart.library.js_interop) 'session_storage_web.dart';
 
-/// A [LocalStorage] that keeps the Supabase session alive only for the
-/// lifetime of the browser tab.
+/// A [LocalStorage] that keeps the Supabase session shared across browser
+/// tabs while still requiring a fresh sign-in once the whole browser is
+/// closed.
 ///
-/// Sessions are written to the browser's *session* storage instead of local
-/// storage: they survive page reloads (F5/refresh) but are wiped automatically
-/// the moment the tab or browser window is closed. Leaving the site therefore
-/// always requires signing in again — there is no persistent login.
+/// The token is stored in *localStorage* (so every tab shares the login), and
+/// a per-tab heartbeat registry + `pagehide` listener clears it as soon as the
+/// last tab goes away. Page refreshes keep the same tab alive, so F5 does not
+/// log you out.
 ///
 /// On non-web targets (this project ships as a web app) it falls back to an
 /// in-memory map, so the session dies with the process.
@@ -19,7 +20,7 @@ class SessionLocalStorage extends LocalStorage {
   final String persistSessionKey;
 
   @override
-  Future<void> initialize() async {}
+  Future<void> initialize() => initializeSessionStorage(persistSessionKey);
 
   @override
   Future<bool> hasAccessToken() => hasSessionItem(persistSessionKey);
