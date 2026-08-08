@@ -22,7 +22,18 @@ def set_google_cloud_env_vars():
 class GroqConfig:
     """Groq (free LLM) configuration — see https://console.groq.com/keys."""
 
+    # Primary key (backwards compatible).
     API_KEY = os.getenv("GROQ_API_KEY", "")
+    # Backup keys: comma-separated GROQ_API_KEYS="key1,key2,key3".
+    # The provider rotates to the next key when the current one is
+    # rate-limited (HTTP 429), so a busy day on one free key doesn't
+    # take the app down. The primary API_KEY is always tried first.
+    API_KEYS = [k.strip() for k in os.getenv("GROQ_API_KEYS", "").split(",") if k.strip()]
+    if API_KEY and API_KEY not in API_KEYS:
+        API_KEYS.insert(0, API_KEY)
+    elif not API_KEYS and API_KEY:
+        API_KEYS = [API_KEY]
+
     BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
     TEXT_MODEL = os.getenv("GROQ_TEXT_MODEL", "llama-3.3-70b-versatile")
     TRANSCRIPTION_MODEL = os.getenv("GROQ_TRANSCRIPTION_MODEL", "whisper-large-v3-turbo")
