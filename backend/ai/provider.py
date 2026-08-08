@@ -22,9 +22,7 @@ class ProviderError(RuntimeError):
 
 
 def is_configured() -> bool:
-    if config.AI_PROVIDER == "gemini":
-        return bool(config.GEMINI_API_KEY)
-    return bool(config.GROQ_API_KEY)
+    return bool(_providers())
 
 
 # --------------------------------------------------------------------------- #
@@ -59,22 +57,39 @@ def _gemini_chat(system: str, user: str, temperature: float = 0.4) -> str:
     return (resp.text or "").strip()
 
 
-def _call(system: str, user: str, temperature: float = 0.4) -> str:
-    if config.AI_PROVIDER == "gemini":
-        return _gemini_chat(system, user, temperature)
-    return _groq_chat(system, user, temperature)
+def _providers() -> list[str]:
+    """Active providers, preferred first."""
+    order = [config.AI_PROVIDER]
+    for other in ("groq", "gemini"):
+        if other not in order:
+            order.append(other)
+    return [p for p in order if {
+        "groq": config.GROQ_API_KEY,
+        "gemini": config.GEMINI_API_KEY,
+    }.get(p)]
 
 
 # --------------------------------------------------------------------------- #
 # Public helpers
 # --------------------------------------------------------------------------- #
 def chat(system: str, user: str, temperature: float = 0.4) -> str:
-    """Single text completion."""
-    if not is_configured():
+    """Single text completion. Auto-falls back across configured providers."""
+    provider = _providers() or []
+    if not provider:
         raise ProviderError(
-            f"AI not configured: set {config.AI_PROVIDER.upper()}_API_KEY in backend/.env"
+            f"AI not configured: set GROQ_API_KEY and/or GEMINI_API_KEY in backend/.env"
         )
-    return _call(system, user, temperature)
+    last_err: Exception | None = None
+    for name in provider:
+        try:
+            if name == "gemini":
+                return _gemini_chat(system, user, temperature)
+            return _groq_chat(system, user, temperature)
+        except Exception as exc:
+            last_err = exc
+            # Rate-limit / quota / auth → try the next provider.
+            continue
+    raise ProviderError(f"All AI providers failed (last: {last_err})") from last_err
 
 
 def extract_json(text: str) -> Any:

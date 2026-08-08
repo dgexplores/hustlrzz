@@ -43,3 +43,33 @@ def test_company_profile_generic_fallback():
 
 def test_requirements_parseable():
     assert Path("requirements.txt").exists() or Path("backend/requirements.txt").exists()
+
+
+def test_chat_falls_back_when_preferred_fails(monkeypatch):
+    """Preferred provider raises (rate-limit); other provider answers succeed."""
+    import backend.config as config
+    monkeypatch.setattr(config, "AI_PROVIDER", "groq")
+    monkeypatch.setattr(config, "GROQ_API_KEY", "g")
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "gm")
+
+    def boom(system, user, temperature=0.4):
+        raise RuntimeError("rate limit")
+
+    monkeypatch.setattr(provider, "_groq_chat", boom)
+    monkeypatch.setattr(provider, "_gemini_chat", lambda s, u, temperature=0.4: "gem ok")
+    assert provider.chat("s", "u") == "gem ok"
+
+
+def test_chat_raises_when_all_fail(monkeypatch):
+    """All configured providers failing surfaces a ProviderError."""
+    import backend.config as config
+    monkeypatch.setattr(config, "AI_PROVIDER", "groq")
+    monkeypatch.setattr(config, "GROQ_API_KEY", "g")
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "gm")
+    monkeypatch.setattr(provider, "_groq_chat",
+                        lambda s, u, temperature=0.4: (_ for _ in ()).throw(RuntimeError("x")))
+    monkeypatch.setattr(provider, "_gemini_chat",
+                        lambda s, u, temperature=0.4: (_ for _ in ()).throw(RuntimeError("x")))
+    import pytest
+    with pytest.raises(provider.ProviderError):
+        provider.chat("s", "u")
