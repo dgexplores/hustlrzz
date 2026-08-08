@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/api_config.dart';
+import '../utils/friendly_errors.dart';
 
 /// AuthService backed by Supabase (email/password + Google/Apple OAuth).
 ///
@@ -106,7 +107,7 @@ class AuthService extends ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
-      _setError('Google sign in failed: ${e.toString()}');
+      _setError(friendlyErrorMessage(e));
       _setLoading(false);
       if (kDebugMode) {
         print('Google sign in error: $e');
@@ -130,7 +131,7 @@ class AuthService extends ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
-      _setError('Apple sign in failed: ${e.toString()}');
+      _setError(friendlyErrorMessage(e));
       _setLoading(false);
       if (kDebugMode) {
         print('Apple sign in error: $e');
@@ -169,7 +170,7 @@ class AuthService extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      _setError('Registration failed: ${e.toString()}');
+      _setError(friendlyErrorMessage(e));
       _setLoading(false);
       if (kDebugMode) {
         print('Email sign up error: $e');
@@ -218,7 +219,7 @@ class AuthService extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      _setError('Login failed: ${e.toString()}');
+      _setError(friendlyErrorMessage(e));
       _setLoading(false);
       if (kDebugMode) {
         print('Email sign in error: $e');
@@ -314,7 +315,7 @@ class AuthService extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      _setError('Failed to send reset email: ${e.toString()}');
+      _setError(friendlyErrorMessage(e));
       _setLoading(false);
       if (kDebugMode) {
         print('Password reset error: $e');
@@ -398,7 +399,7 @@ class AuthService extends ChangeNotifier {
 
       return true;
     } catch (e) {
-      _setError('Failed to delete account: ${e.toString()}');
+      _setError(friendlyErrorMessage(e));
       _setLoading(false);
       if (kDebugMode) {
         print('Delete account error: $e');

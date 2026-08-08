@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/api_config.dart';
+import '../utils/friendly_errors.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -70,7 +71,8 @@ class InterviewService {
       final respJson = json.decode(respStr);
       return InterviewPrepareResponse.fromJson(respJson);
     } catch (e) {
-      throw Exception('Failed to submit interview preparation: $e');
+      debugPrint('❌ Failed to submit interview preparation: $e');
+      throw friendlyError(e);
     }
   }
 
@@ -106,7 +108,7 @@ class InterviewService {
       }
     } catch (e) {
       debugPrint('❌ Failed to start interview session: $e');
-      rethrow;
+      throw friendlyError(e);
     }
   }
 
@@ -137,7 +139,7 @@ class InterviewService {
       }
     } catch (e) {
       debugPrint('❌ Failed to get interview feedback: $e');
-      rethrow;
+      throw friendlyError(e);
     }
   }
 
@@ -170,7 +172,7 @@ class InterviewService {
       }
     } catch (e) {
       debugPrint('❌ Failed to get interview history: $e');
-      rethrow;
+      throw friendlyError(e);
     }
   }
 
@@ -240,7 +242,7 @@ class InterviewService {
         },
         onError: (error) {
           _wsConnected = false;
-          _onError?.call(error.toString());
+          _onError?.call(friendlyErrorMessage(error));
         },
       );
       
@@ -248,7 +250,7 @@ class InterviewService {
     } catch (e) {
       _wsConnected = false;
       debugPrint('❌ WebSocket connection failed: $e');
-      throw Exception('Failed to connect WebSocket: $e');
+      throw friendlyError(e);
     }
   }
 
@@ -263,7 +265,9 @@ class InterviewService {
       _channel!.sink.add(json.encode(messageData));
       debugPrint('📤 Message sent via WebSocket: $message');
     } else {
-      throw Exception('WebSocket not connected');
+      throw const FriendlyException(
+        'Connection lost. Please start the interview again.',
+      );
     }
   }
 

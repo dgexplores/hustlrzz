@@ -2,6 +2,7 @@ import '../models/workflow.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config/api_config.dart';
+import '../utils/friendly_errors.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 
@@ -51,7 +52,7 @@ class WorkflowService {
       }
     } catch (e) {
       debugPrint('❌ Failed to load workflows: $e');
-      rethrow;
+      throw friendlyError(e);
     }
   }
 
@@ -85,7 +86,7 @@ class WorkflowService {
       }
     } catch (e) {
       debugPrint('❌ Failed to load recommended QAs: $e');
-      rethrow;
+      throw friendlyError(e);
     }
   }
 } 
