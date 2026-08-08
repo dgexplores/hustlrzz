@@ -19,6 +19,9 @@ __pycache__/
 credentials/
 .tokens/*.json
 
+# local tool data (Freebuff) — contains chat/workspace state, never commit
+.freebuff/
+
 
 # leetcode data files
 backend/scripts/leetcode_problems.json
