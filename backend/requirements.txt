@@ -7,7 +7,7 @@
 # --- Web framework ---
 fastapi==0.115.14
 uvicorn[standard]==0.34.3
-python-multipart==0.0.20
+python-multipart==0.0.31  # CVE-2026-24486/40347/42561/53537-40 (7 Dependabot advisories)
 pydantic[email]==2.13.4
 email-validator==2.2.0
 
@@ -16,7 +16,7 @@ supabase==2.31.0
 
 # --- HTTP clients ---
 httpx==0.28.1
-requests==2.32.3
+requests==2.33.0  # CVE-2024-47081, CVE-2026-25645
 PyJWT==2.13.0
 
 # --- PDF resume parsing ---
@@ -24,9 +24,9 @@ PyMuPDF==1.25.3
 
 # --- Web search & scraping ---
 beautifulsoup4==4.13.3
-lxml==5.3.1
+lxml==6.1.0  # CVE-2026-41066 (XXE in iterparse/ETCompatXMLParser)
 playwright==1.52.0
 duckduckgo-search==8.1.1
 
 # --- Misc ---
-python-dotenv==1.1.0
+python-dotenv==1.2.2  # CVE-2026-28684 (symlink in set_key)
