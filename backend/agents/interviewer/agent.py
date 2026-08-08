@@ -205,12 +205,18 @@ def _transcribe_audio(base64_data: str) -> str:
 async def _finalize_session(websocket, session, goodbye: str = ""):
     """Save the transcript, generate feedback, notify the client and close."""
     try:
-        if goodbye:
-            await websocket.send_text(json.dumps({"mime_type": "text/plain", "data": goodbye}))
-            await websocket.send_text(json.dumps({"turn_complete": True, "interrupted": False}))
+        # Notify the client if it is still connected. A closed socket (abrupt
+        # tab close / network drop) must never prevent the transcript and
+        # feedback from being saved, so these sends are isolated and best-effort.
+        try:
+            if goodbye:
+                await websocket.send_text(json.dumps({"mime_type": "text/plain", "data": goodbye}))
+                await websocket.send_text(json.dumps({"turn_complete": True, "interrupted": False}))
 
-        end_message = {"type": "end", "data": "Conversation ended. Thank you for participating!"}
-        await websocket.send_text(json.dumps(end_message))
+            end_message = {"type": "end", "data": "Conversation ended. Thank you for participating!"}
+            await websocket.send_text(json.dumps(end_message))
+        except Exception as send_exc:
+            print(f"[WARN] Client already gone; skipping goodbye for session {session.id}: {send_exc}")
 
         # Duration for the record
         start_time = session.state.get("start_time")
@@ -224,7 +230,10 @@ async def _finalize_session(websocket, session, goodbye: str = ""):
         await _run_judge_from_session(session)
         print(f"[FEEDBACK] Feedback generated for session {session.id}")
 
-        await websocket.close(code=1000)
+        try:
+            await websocket.close(code=1000)
+        except Exception:
+            pass
     except Exception as exc:
         print(f"[ERROR] finalize failed for session {session.id}: {exc}")
     finally:
