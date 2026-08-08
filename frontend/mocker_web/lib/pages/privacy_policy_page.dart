@@ -91,7 +91,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                 _buildSection(
                   '3. Data Storage and Security',
                   'We implement appropriate technical and organizational measures to protect your personal data:\n\n'
-                      '• Data is stored securely using Firebase and Google Cloud Platform\n'
+                      '• Data is stored securely using Supabase (hosted Postgres with row-level security) and Google Cloud Platform\n'
                       '• We use encryption for data transmission and storage\n'
                       '• Access to personal data is restricted to authorized personnel only\n'
                       '• We regularly review and update our security measures',
@@ -101,9 +101,9 @@ class PrivacyPolicyPage extends StatelessWidget {
                 _buildSection(
                   '4. Third-Party Services',
                   'We use the following third-party services:\n\n'
-                      '• Firebase Authentication: For secure user authentication\n'
-                      '• Google Cloud AI: For AI-powered interview features\n'
-                      '• Firebase Firestore: For secure data storage\n\n'
+                      '• Supabase Authentication: For secure user authentication\n'
+                      '• Groq AI: For AI-powered interview features\n'
+                      '• Supabase (Postgres): For secure data storage\n\n'
                       'These services have their own privacy policies governing the use of your information.',
                   isMobile,
                 ),

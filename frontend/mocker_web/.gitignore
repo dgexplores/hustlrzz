@@ -12,16 +12,24 @@
 .swiftpm/
 migrate_working_dir/
 
-# firebase
+# firebase (abandoned — app migrated to Supabase). Never commit generated config.
 .firebase/
 .firebaserc
+lib/firebase_options.dart
+google-services.json
+GoogleService-Info.plist
 
-# Firebase - contains API keys (should not be public)
-# Environment config with real Firebase secrets - never commit
+# Environment config with real secrets - never commit
 .dart_defines.env
 .env
 *.env
 !dart_defines.env.example
+
+# Credential / service-account files - never commit
+**/serviceAccount*.json
+**/*service-account*.json
+**/credentials*.json
+*.pem
 
 
 # IntelliJ related
