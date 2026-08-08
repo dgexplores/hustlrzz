@@ -1,16 +1,39 @@
-// Non-web fallback: keep sessions in memory only, so they die with the process.
-final Map<String, String> _memory = {};
+// Non-web fallback: both modes are in-memory maps, so sessions die with the
+// process. Kept API-identical to the web implementation.
+final Map<String, String> _persistentMemory = {};
+final Map<String, String> _sessionMemory = {};
 
-Future<void> initializeSessionStorage(String persistSessionKey) async {}
+/// localStorage key that stores the "remember me" preference ('1' / absent).
+const rememberMeStorageKey = 'hustlrzz_remember_me';
 
-Future<bool> hasSessionItem(String key) async => _memory.containsKey(key);
+bool getRememberMePreference() => false;
 
-Future<String?> getSessionItem(String key) async => _memory[key];
+void setRememberMePreference(bool value) {}
 
-Future<void> setSessionItem(String key, String value) async {
-  _memory[key] = value;
+// --- Persistent backend ---
+
+bool hasPersistentSession(String key) => _persistentMemory.containsKey(key);
+
+String? getPersistentSession(String key) => _persistentMemory[key];
+
+void setPersistentSession(String key, String value) {
+  _persistentMemory[key] = value;
 }
 
-Future<void> removeSessionItem(String key) async {
-  _memory.remove(key);
+void removePersistentSession(String key) {
+  _persistentMemory.remove(key);
+}
+
+// --- Session-only backend ---
+
+bool hasSessionSession(String key) => _sessionMemory.containsKey(key);
+
+String? getSessionSession(String key) => _sessionMemory[key];
+
+void setSessionSession(String key, String value) {
+  _sessionMemory[key] = value;
+}
+
+void removeSessionSession(String key) {
+  _sessionMemory.remove(key);
 }

@@ -26,12 +26,11 @@ void main() async {
     anonKey: SupabaseConfig.anonKey,
     authOptions: FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
-      // Store the session in sessionStorage instead of localStorage: the
-      // login survives page refreshes but is wiped when the tab/browser is
-      // closed, so leaving the site always asks for a fresh sign-in.
-      localStorage: SessionLocalStorage(
-        persistSessionKey:
-            'sb-${Uri.parse(SupabaseConfig.url).host.split('.').first}-auth-token',
+      // Session persistence follows the "Remember me" checkbox on the login
+      // page: checked = localStorage (login persists across visits),
+      // unchecked = sessionStorage (login dies when the tab/browser closes).
+      localStorage: RememberMeLocalStorage(
+        persistSessionKey: supabaseSessionPersistKey(SupabaseConfig.url),
       ),
     ),
   );

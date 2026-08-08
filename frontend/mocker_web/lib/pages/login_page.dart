@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../utils/validators.dart';
 import '../theme/app_theme.dart';
+import '../config/session_local_storage.dart';
+import '../config/supabase_config.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,6 +19,17 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _agreedToTerms = false;
+  bool _rememberMe = RememberMeLocalStorage.getRememberMe();
+
+  void _onRememberMeChanged(bool? value) {
+    setState(() {
+      _rememberMe = value ?? false;
+    });
+    RememberMeLocalStorage.setRememberMe(_rememberMe);
+    RememberMeLocalStorage.applyRememberMe(
+      persistSessionKey: supabaseSessionPersistKey(SupabaseConfig.url),
+    );
+  }
 
   @override
   void dispose() {
@@ -360,22 +373,52 @@ class _LoginPageState extends State<LoginPage> {
 
                       SizedBox(height: isMobile ? 8 : 12),
 
-                      // Forgot Password Link
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pushNamed('/forgot-password');
-                          },
-                          child: Text(
-                            'Forgot password?',
-                            style: TextStyle(
-                              color: AppTheme.primaryBlue,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
+                      // Remember Me + Forgot Password
+                      Row(
+                        children: [
+                          // Remember Me Checkbox
+                          Expanded(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Checkbox(
+                                  value: _rememberMe,
+                                  onChanged: _onRememberMeChanged,
+                                  activeColor: AppTheme.primaryBlue,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                Flexible(
+                                  child: GestureDetector(
+                                    onTap: () =>
+                                        _onRememberMeChanged(!_rememberMe),
+                                    child: Text(
+                                      'Remember me',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: AppTheme.mediumGray,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
+                          // Forgot Password Link
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context)
+                                  .pushNamed('/forgot-password');
+                            },
+                            child: Text(
+                              'Forgot password?',
+                              style: TextStyle(
+                                color: AppTheme.primaryBlue,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
 
                       SizedBox(height: isMobile ? 8 : 12),
