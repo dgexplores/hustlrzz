@@ -135,7 +135,11 @@ async def start_workflow(
     )
     result["processing_time"] = round(time.time() - t0, 2)
     if not result.get("success"):
-        raise HTTPException(status_code=500, detail=result.get("error", "Workflow failed"))
+        err = str(result.get("error", "Workflow failed"))
+        # Surface provider quota limits as a retryable 429, not a 500.
+        if any(k in err for k in ("429", "Rate limit", "rate_limit")):
+            raise HTTPException(status_code=429, detail=err)
+        raise HTTPException(status_code=500, detail=err)
     # Persist workflow record (if db ready).
     if dbc.is_ready():
         try:

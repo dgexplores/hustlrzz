@@ -22,7 +22,7 @@ import traceback
 from typing import Optional
 
 from backend.ai import provider
-from backend.career import analysis, company_profiles
+from backend.career import company_profiles
 
 PERSONAL_SUMMARY_SYSTEM = (
     "You are a recruiting coach. Turn the candidate's raw materials into a crisp, "
@@ -135,27 +135,41 @@ async def run_preparation_workflow(
             asyncio.to_thread(provider.chat_json, PERSONAL_SUMMARY_SYSTEM, base_input)
         )
         search_task = asyncio.create_task(
-            asyncio.to_thread(lambda: _organize(job_title, job_description, _search_web(job_title, job_description)))
+            asyncio.to_thread(lambda: _organize_search(job_title, job_description, _search_web(job_title, job_description)))
         )
         personal_summary, industry_faqs = await asyncio.gather(summary_task, search_task)
 
-        # Step 2: match analysis (company flavor + JD vs resume).
-        match = analysis.analyze_match(job_description, resume_text)
+        # Step 2+3 (parallel): match analysis + question generation in one call.
+        def _do_questions():
+            quser = (
+                f"Company: {company_name or 'unknown'}\n"
+                f"Interview style: {company_profiles.company_profile(company_name).get('style', '')}\n"
+                f"Personal summary:\n{json.dumps(personal_summary, ensure_ascii=False)}\n"
+                f"Industry FAQs:\n{json.dumps(industry_faqs, ensure_ascii=False)}\n\n"
+                f"Generate exactly {num_questions} personalized questions as the JSON schema: "
+                '[{"type":"technical|project|behavioral|reverse-question","question":"...",'
+                '"tests":"...","difficulty":1-5,"answer_hint":"...","follow_up":"...","tags":[]}]\n\n'
+                "Also produce a short JD-vs-resume match summary. Return JSON:\n"
+                '{"questions": [...], "match": {"matched_skills":[],"gap_skills":[],'
+                '"resume_weaknesses":[],"overall_match_percent":0,"summary":""}}'
+            )
+            data = provider.chat_json_strict(QUESTION_SYSTEM, quser)
+            if not isinstance(data, dict):
+                return [], {}
+            questions = data.get("questions", [])
+            m = data.get("match", {}) if isinstance(data.get("match"), dict) else {}
+            if not isinstance(questions, list):
+                questions = []
+            return questions[:num_questions], {
+                "matched_skills": m.get("matched_skills", []) or [],
+                "gap_skills": m.get("gap_skills", []) or [],
+                "resume_weaknesses": m.get("resume_weaknesses", []) or [],
+                "overall_match_percent": m.get("overall_match_percent", 0) or 0,
+                "summary": m.get("summary", "") or "",
+            }
 
-        # Step 3: generate questions.
-        question_user = (
-            f"Company: {company_name or 'unknown'}\n"
-            f"Interview style: {company_config.company_profile(company_name).get('style', '')}\n"
-            f"Personal summary:\n{json.dumps(personal_summary, ensure_ascii=False)}\n"
-            f"Industry FAQs:\n{json.dumps(industry_faqs, ensure_ascii=False)}\n\n"
-            f"Generate exactly {num_questions} personalized questions as the JSON schema: "
-            '[{"type":"technical|project|behavioral|reverse-question","question":"...",'
-            '"tests":"...","difficulty":1-5,"answer_hint":"...","follow_up":"...","tags":[]}]'
-        )
-        questions = provider.chat_json_strict(QUESTION_SYSTEM, question_user)
-        if not isinstance(questions, list):
-            questions = questions.get("questions", []) if isinstance(questions, dict) else []
-        questions = questions[:num_questions]
+        question_task = asyncio.create_task(asyncio.to_thread(_do_questions))
+        questions, match = await question_task
 
         # Step 4: model answers.
         answers_user = (
@@ -163,10 +177,14 @@ async def run_preparation_workflow(
             f"Questions:\n{json.dumps(questions, ensure_ascii=False)}\n\n"
             'Return JSON list aligned to questions: [{"question":"...","answer":"...","tags":[]}]'
         )
-        answers_data = provider.chat_json_strict(ANSWER_SYSTEM, answers_user)
-        if not isinstance(answers_data, list):
-            answers_data = answers_data.get("answers", []) if isinstance(answers_data, dict) else []
-        answers_data = answers_data[: len(questions)]
+        try:
+            answers_data = provider.chat_json_strict(ANSWER_SYSTEM, answers_user)
+            if not isinstance(answers_data, list):
+                answers_data = answers_data.get("answers", []) if isinstance(answers_data, dict) else []
+            answers_data = answers_data[: len(questions)]
+        except Exception as exc:
+            print(f"[WARN] answer generation failed: {exc}")
+            answers_data = []
 
         return {
             "success": True,
