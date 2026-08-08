@@ -24,6 +24,25 @@ from backend.data.schemas import (
 from backend.tools.supabase_config import supabase
 
 
+def _json_safe(value):
+    """Recursively convert values to JSON-serializable forms for the Supabase
+    REST API (which serializes payloads with json.dumps).
+
+    Pydantic model_dump() yields ``datetime`` objects for timestamp fields;
+    passing them straight through raises ``TypeError: Object of type datetime
+    is not JSON serializable``, silently failing every write.
+    """
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, (HttpUrl, EmailStr)):
+        return str(value)
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return value
+
+
 class SupabaseDB:
     def __init__(self, client):
         """Initialize the Supabase Postgres client."""
@@ -35,11 +54,10 @@ class SupabaseDB:
         if not profile_data.createAt:
             profile_data.createAt = datetime.now(timezone.utc)
 
-        profile_dict = profile_data.model_dump(exclude_unset=True)
-        for key, value in profile_dict.items():
-            if isinstance(value, (HttpUrl, EmailStr)):
-                profile_dict[key] = str(value)
-
+        profile_dict = {
+            k: _json_safe(v)
+            for k, v in profile_data.model_dump(exclude_unset=True).items()
+        }
         profile_dict["user_id"] = user_id
         self.supabase.table("users").upsert(
             profile_dict, on_conflict="user_id"
@@ -104,10 +122,10 @@ class SupabaseDB:
             "id": session_id,
             "user_id": user_id,
             "workflow_id": workflow_id,
-            "transcript": payload.get("transcript"),
+            "transcript": _json_safe(payload.get("transcript")),
             "duration_minutes": payload.get("duration_minutes"),
-            "feedback": payload.get("feedback"),
-            "createAt": payload.get("createAt"),
+            "feedback": _json_safe(payload.get("feedback")),
+            "createAt": _json_safe(payload.get("createAt")),
         }, on_conflict="id").execute()
         return {
             "message": f"Interview {session_id} successfully created for user {user_id}",
@@ -171,8 +189,8 @@ class SupabaseDB:
         self.supabase.table("workflows").upsert({
             "id": session_id,
             "user_id": user_id,
-            "title": payload.get("title"),
-            "createAt": payload.get("createAt"),
+            "title": _json_safe(payload.get("title")),
+            "createAt": _json_safe(payload.get("createAt")),
         }, on_conflict="id").execute()
 
         return {
@@ -231,7 +249,7 @@ class SupabaseDB:
     # --- Personal Experience in Workflow ---
     def set_personal_experience(self, user_id: str, workflow_id: str, experience: PersonalExperience) -> Dict[str, str]:
         self.supabase.table("workflows").update({
-            "personalExperience": experience.model_dump()
+            "personalExperience": _json_safe(experience.model_dump())
         }).eq("id", workflow_id).eq("user_id", user_id).execute()
         return {
             "message": f"Personal experience for user {user_id}, workflow {workflow_id} set successfully",
@@ -260,7 +278,7 @@ class SupabaseDB:
     # --- Recommended QAs in Workflow ---
     def set_recommended_qas(self, user_id: str, workflow_id: str, qas: List[RecommendedQA]) -> Dict[str, str]:
         self.supabase.table("workflows").update({
-            "recommendedQAs": [qa.model_dump() for qa in qas]
+            "recommendedQAs": _json_safe([qa.model_dump() for qa in qas])
         }).eq("id", workflow_id).eq("user_id", user_id).execute()
         return {
             "message": f"Recommended QAs for user {user_id}, workflow {workflow_id} set successfully",
@@ -310,7 +328,7 @@ class SupabaseDB:
     # --- Feedback Operations ---
     def set_feedback(self, user_id: str, workflow_id: str, interview_id: str, feedback: Feedback) -> Dict[str, str]:
         self.supabase.table("interviews").update({
-            "feedback": feedback.model_dump()
+            "feedback": _json_safe(feedback.model_dump())
         }).eq("id", interview_id).eq("user_id", user_id).execute()
         return {
             "message": f"Feedback set for interview {interview_id} successfully",
@@ -383,7 +401,7 @@ class SupabaseDB:
     def set_coding_problems(self, problems: List[CodingProblems]) -> Dict[str, str]:
         """Set coding problems (upsert by id)."""
         rows = [
-            dict(p.model_dump(), **{"id": str(p.id)})
+            _json_safe(dict(p.model_dump(), **{"id": str(p.id)}))
             for p in problems
         ]
         BATCH_SIZE = 500
