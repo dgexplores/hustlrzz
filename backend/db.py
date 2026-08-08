@@ -54,7 +54,7 @@ def select_where(table: str, match: dict = None, order: str = None) -> list[dict
     if order:
         q = q.order(order, desc=True)
     resp = q.execute()
-    return resp.get("data", [])
+    return resp.data
 
 
 def _single(match: dict):
