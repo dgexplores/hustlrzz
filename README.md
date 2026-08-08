@@ -29,19 +29,24 @@ I went with Groq mostly because it's actually free — no credit card, roughly a
 
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+python -m venv venv            # requires Python 3.10+ (see note below)
+source venv/bin/activate       # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env              # then fill in your keys
+cp .env.example .env           # then fill in your keys
 uvicorn backend.app:app --reload --port 8000
 ```
 
 You'll need:
 
-- A **Groq API key** (free) from https://console.groq.com
+- A **Groq API key** (free) from https://console.groq.com — add extra keys as a
+  comma-separated `GROQ_API_KEYS` list for automatic failover on rate limits
 - A **Supabase project** (free, no credit card) from https://supabase.com — run
   `supabase_schema.sql` (repo root) in its SQL editor once, then copy the project
   URL + keys from *Project Settings → API*
+
+> **Python 3.10+ is required** — `python-multipart` (file uploads) needs it.
+> If your system Python is older, install a newer one (e.g. `brew install
+> python@3.11`) and point `python -m venv` at it.
 
 API docs land at http://localhost:8000/docs once it's running.
 
@@ -77,8 +82,20 @@ The backend deploys to Render via the `render.yaml` blueprint at the repo root (
 - **Secrets** — never committed. The public Supabase keys are injected at
   build time (`frontend/mocker_web/dart_defines.env`, gitignored); the backend
   reads `GROQ_API_KEY` / `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` from the
-  environment (Render / `.env`). The service-role key is backend-only and
-  never exposed to the browser.
+  environment (Render / `.env`). A comma-separated `GROQ_API_KEYS` list adds
+  backup Groq keys: on a rate limit (HTTP 429) the provider automatically
+  rotates to the next key, so a busy day on one free key doesn't take the app
+  down. The service-role key is backend-only and never exposed to the browser.
+- **CI / repository security** — every push and PR runs the backend test
+  suite (Python 3.10 & 3.11), flake8 lint, and CodeQL code scanning via
+  GitHub Actions. `main` is protected: direct pushes are blocked (even for
+  admins), so all changes land via pull requests with passing checks.
+  Dependabot is enabled and dependencies are pinned to exact versions.
+- **Honest failures** — workflow/PDF saves surface errors instead of silently
+  reporting success with an ID that was never persisted; the interview judge
+  logs the real reason when feedback can't be generated and retries with
+  backoff. Cross-user access to workflows/feedback returns 404 (ownership is
+  enforced both in queries and responses).
 - **Auth** — all API routes require a verified Supabase access token (JWT);
   interview WebSocket sessions are bound to the user who started them
   server-side with an opaque token.
@@ -122,7 +139,10 @@ The backend deploys to Render via the `render.yaml` blueprint at the repo root (
 
 - The free Render instance goes to sleep after ~15 minutes of inactivity, so the first request after a break can take 30–60 seconds to wake up.
 - Works best in Chrome.
-- Groq's free tier allows about 30 requests/minute — if you hammer the prep workflow you'll occasionally hit a rate limit and just need to retry.
+- Groq's free tier allows about 30 requests/minute — the backend rotates across
+  backup keys (`GROQ_API_KEYS`) on rate limits and retries with backoff, so
+  brief spikes are absorbed. Sustained hammering can still exhaust the quota;
+  the error message will tell you exactly that.
 
 
 feel free to colaborate fork this and add things you wish it can have .........
