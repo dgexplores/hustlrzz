@@ -11,6 +11,7 @@ import 'pages/privacy_policy_page.dart';
 import 'pages/terms_of_service_page.dart';
 import 'services/auth_service.dart';
 import 'config/supabase_config.dart';
+import 'config/session_local_storage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,8 +24,15 @@ void main() async {
   await Supabase.initialize(
     url: SupabaseConfig.url,
     anonKey: SupabaseConfig.anonKey,
-    authOptions: const FlutterAuthClientOptions(
+    authOptions: FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
+      // Store the session in sessionStorage instead of localStorage: the
+      // login survives page refreshes but is wiped when the tab/browser is
+      // closed, so leaving the site always asks for a fresh sign-in.
+      localStorage: SessionLocalStorage(
+        persistSessionKey:
+            'sb-${Uri.parse(SupabaseConfig.url).host.split('.').first}-auth-token',
+      ),
     ),
   );
 
