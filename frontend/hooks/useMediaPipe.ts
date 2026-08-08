@@ -75,12 +75,24 @@ export const useMediapipe = (
     let animationFrameId: number;
 
     const setupDetectors = async () => {
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-      );
-      handDetectorRef.current = await initializeHandDetection(vision);
-      faceDetectorRef.current = await initializeFaceDetection(vision);
-      poseDetectorRef.current = await initializePoseDetection(vision);
+      // TFLite/WASM prints benign INFO logs ("Created TensorFlow Lite XNNPACK
+      // delegate for CPU"). Swallow them so they don't flood the console.
+      const originalLog = console.log.bind(console);
+      const noisy = (msg: unknown) =>
+        typeof msg === "string" && msg.includes("TensorFlow Lite");
+      console.log = (...args: unknown[]) => {
+        if (!args.some(noisy)) originalLog(...args);
+      };
+      try {
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+        );
+        handDetectorRef.current = await initializeHandDetection(vision);
+        faceDetectorRef.current = await initializeFaceDetection(vision);
+        poseDetectorRef.current = await initializePoseDetection(vision);
+      } finally {
+        console.log = originalLog;
+      }
     };
 
     const detect = () => {

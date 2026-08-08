@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { useCamera } from "@/hooks/useCamera";
 import { useMediapipe } from "@/hooks/useMediaPipe";
+import { useAudio } from "@/hooks/useAudio";
 import { CameraPanel } from "@/components/interview/CameraPanel";
-import { Loader2, Mic, Send } from "lucide-react";
+import { Loader2, Mic, MicOff, Send, Volume2 } from "lucide-react";
 
 interface Turn { role: string; text: string }
 
@@ -23,7 +24,11 @@ export function InterviewPanel() {
   const [connected, setConnected] = useState(false);
   const [starting, setStarting] = useState(false);
   const [report, setReport] = useState<any>(null);
+  const [audioMode, setAudioMode] = useState(true);
   const wsRef = useRef<WebSocket | null>(null);
+
+  const { supported: audioSupported, listening, start: startMic, stop: stopMic, speak } =
+    useAudio((text) => send(text));
 
   useEffect(() => {
     api<{ data: any[] }>("/workflows").then(() => {}).catch(() => {});
@@ -35,7 +40,7 @@ export function InterviewPanel() {
     try {
       const r = await api<{ data: { session_id: string; websocket_parameter: string } }>("/interviews/start", {
         method: "POST",
-        body: JSON.stringify({ workflow_id: workflowId, duration }),
+        body: JSON.stringify({ workflow_id: workflowId, duration, is_audio: audioMode }),
       });
       setWsInfo(r.data);
       connectWs(r.data.session_id, r.data.websocket_parameter);
@@ -57,7 +62,10 @@ export function InterviewPanel() {
       if (msg.type === "question" || msg.type === "message") {
         const d = msg.data || {};
         const text = d.message || d.question || "";
-        if (text) setTurns((t) => [...t, { role: "interviewer", text }]);
+        if (text) {
+          setTurns((t) => [...t, { role: "interviewer", text }]);
+          if (audioMode) speak(text);
+        }
       } else if (msg.type === "report") {
         setReport(msg.data);
       }
@@ -66,10 +74,11 @@ export function InterviewPanel() {
     wsRef.current = ws;
   };
 
-  const send = () => {
-    if (!input.trim() || !wsRef.current) return;
-    wsRef.current.send(JSON.stringify({ type: "message", text: input }));
-    setTurns((t) => [...t, { role: "candidate", text: input }]);
+  const send = (textOverride?: string) => {
+    const text = textOverride ?? input;
+    if (!text.trim() || !wsRef.current) return;
+    wsRef.current.send(JSON.stringify({ type: "message", text }));
+    setTurns((t) => [...t, { role: "candidate", text }]);
     setInput("");
   };
 
@@ -91,6 +100,11 @@ export function InterviewPanel() {
             <div className="space-y-2">
               <Label>Duration (5–60 min)</Label>
               <Input type="number" min={5} max={60} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <input id="audioMode" type="checkbox" checked={audioMode} onChange={(e) => setAudioMode(e.target.checked)} />
+              <Label htmlFor="audioMode" className="mb-0">Audio mode (speak answers, hear questions)</Label>
+              {audioSupported ? null : <span className="text-muted-foreground text-xs">(not supported in this browser)</span>}
             </div>
             <Button onClick={begin} disabled={starting || !workflowId} className="w-full">
               {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : connected ? "Reconnect interviewer" : "Start interview"}
@@ -124,8 +138,18 @@ export function InterviewPanel() {
               ))}
             </div>
             <div className="flex gap-2">
+              {audioMode && audioSupported && (
+                <Button
+                  onClick={listening ? stopMic : startMic}
+                  disabled={!connected}
+                  variant={listening ? "destructive" : "secondary"}
+                  title={listening ? "Stop dictation" : "Hold to dictate"}
+                >
+                  {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
+              )}
               <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Type or speak your answer…" />
-              <Button onClick={send} disabled={!connected}><Send className="h-4 w-4" /></Button>
+              <Button onClick={() => send()} disabled={!connected}><Send className="h-4 w-4" /></Button>
             </div>
           </CardContent>
         </Card>
