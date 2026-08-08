@@ -141,7 +141,10 @@ def test_get_recommended_qas():
         {"question": "Why do you want this job?", "answer": "Because..."}
     ]
 
-    with patch("backend.data.database.firestore_db.get_recommended_qas", return_value={
+    # The workflow must belong to the authenticated user (ownership check).
+    with patch("backend.data.database.firestore_db.get_workflow", return_value={
+        "data": {"id": workflow_id, "user_id": "user123"}
+    }), patch("backend.data.database.firestore_db.get_recommended_qas", return_value={
         "message": "ok",
         "data": mock_qas
     }):
@@ -207,7 +210,10 @@ def test_get_all_interviews_for_workflow_empty():
 
 # --- Test POST /interviews/start ---
 def test_post_interview_start():
-    with patch("backend.coordinator.preparation_workflow.generate_session_id", return_value="session_abc"):
+    with patch("backend.coordinator.preparation_workflow.generate_session_id", return_value="session_abc"), \
+         patch("backend.data.database.firestore_db.get_workflow", return_value={
+             "data": {"id": "wf_001", "user_id": "user123"}
+         }):
         response = client.post(
             "/interviews/start",
             json={"workflow_id": "wf_001", "duration": 5, "is_audio": False},

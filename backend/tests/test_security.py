@@ -90,3 +90,60 @@ def test_websocket_rejects_unbound_session():
             "/ws/sess_not_bound?user_id=user123&workflow_id=wf1&duration=5&is_audio=false"
         ):
             pass
+
+
+def test_profile_rejects_ssrf_url():
+    """PUT /user must reject internal/private hosts in profile links."""
+    with patch("backend.data.database.firestore_db.create_or_update_profile",
+               return_value={"message": "ok", "data": {"name": "x"}}):
+        response = client.put(
+            "/user",
+            json={
+                "name": "Test User",
+                "email": "user@example.com",
+                "githubLink": "http://169.254.169.254/latest/meta-data/",
+            },
+            headers={"Authorization": "Bearer test-token"},
+        )
+    assert response.status_code == 422
+
+
+def test_profile_accepts_public_url():
+    """PUT /user with a public link must succeed (SSRF guard must not over-block)."""
+    with patch("backend.data.database.firestore_db.create_or_update_profile",
+               return_value={"message": "ok", "data": {"name": "Test User"}}):
+        response = client.put(
+            "/user",
+            json={
+                "name": "Test User",
+                "email": "user@example.com",
+                "githubLink": "https://github.com/octocat",
+            },
+            headers={"Authorization": "Bearer test-token"},
+        )
+    assert response.status_code == 200
+
+
+def test_recommended_qa_rejects_unknown_workflow():
+    """GET recommended-qa must 404 for workflows the user does not own."""
+    with patch("backend.data.database.firestore_db.get_workflow", return_value={"data": None}):
+        response = client.get(
+            "/workflows/wf_not_owned/recommended-qa",
+            headers={"Authorization": "Bearer test-token"},
+        )
+    assert response.status_code == 404
+
+
+def test_recommended_qa_allowed_for_owned_workflow():
+    """GET recommended-qa returns QAs for an owned workflow."""
+    qas = [{"question": "Tell me about yourself", "answer": "...", "tags": []}]
+    with patch("backend.data.database.firestore_db.get_workflow",
+               return_value={"data": {"id": "wf1", "user_id": "user123"}}), \
+         patch("backend.data.database.firestore_db.get_recommended_qas",
+               return_value={"message": "ok", "data": qas}):
+        response = client.get(
+            "/workflows/wf1/recommended-qa",
+            headers={"Authorization": "Bearer test-token"},
+        )
+    assert response.status_code == 200
+    assert response.json()["data"] == qas

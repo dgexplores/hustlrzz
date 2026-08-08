@@ -163,6 +163,17 @@ def get_user_info(user=Depends(verify_token)):
 
 @router.put("/user")
 def update_user_info(user=Depends(verify_token), updates: Profile = Body(...)):
+    # Apply the same SSRF host check used by workflow routes. Profile links are
+    # not fetched server-side today, but keeping the trust boundary consistent
+    # means a future feature can't accidentally scrape private/internal hosts.
+    normalized = {}
+    for field in ("linkedinLink", "githubLink", "portfolioLink"):
+        value = getattr(updates, field, None)
+        if value:
+            normalized[field] = _validate_optional_url(field, str(value))
+    if normalized:
+        updates = updates.model_copy(update=normalized)
+
     updated = firestore_db.create_or_update_profile(user["uid"], updates)
     return {
         "success": True if updated["data"] else False,
@@ -198,6 +209,12 @@ def get_all_workflows(user=Depends(verify_token)):
 
 @router.get("/workflows/{workflow_id}/recommended-qa")
 def get_recommended_qas(workflow_id: str, user=Depends(verify_token)):
+    # SECURITY: the workflow must belong to the authenticated user. Returning
+    # 404 (rather than 200 with null data) hides the workflow's existence from
+    # other users and matches the /interviews/start contract.
+    workflow = firestore_db.get_workflow(user["uid"], workflow_id)
+    if not (workflow.get("data")):
+        raise HTTPException(status_code=404, detail="Workflow not found")
     result = firestore_db.get_recommended_qas(user["uid"], workflow_id)
     return {
         "success": True if result["data"] else False,
@@ -277,9 +294,14 @@ async def websocket_endpoint(
             save_transcript(session)
             print(f"[SAVE]: Transcript saved for session {session_id}")
 
-            # Generate feedback
-            await _run_judge_from_session(session)
-            print(f"[FEEDBACK]: Feedback generated for session {session_id}")
+            # Generate feedback (report honestly if it failed — the judge
+            # records the reason in session.state["feedback_error"]).
+            feedback = await _run_judge_from_session(session)
+            if feedback is None:
+                reason = session.state.get("feedback_error", "unknown")
+                print(f"[WARN] Feedback NOT generated for session {session_id}: {reason}")
+            else:
+                print(f"[FEEDBACK]: Feedback generated for session {session_id}")
 
             # FINALIZE: close the session
             try:
@@ -461,7 +483,7 @@ async def start_workflow_with_pdf(
             )
             return {
                 "success": False,
-                "error": "Workflow execution failed",
+                "error": workflow_result.get("error", "Workflow execution failed"),
                 "user_id": user_id,
                 "processing_time": processing_time
             }
@@ -570,7 +592,7 @@ async def start_workflow_with_text(
             )
             return {
                 "success": False,
-                "error": "Workflow execution failed",
+                "error": workflow_result.get("error", "Workflow execution failed"),
                 "user_id": user_id,
                 "processing_time": processing_time
             }

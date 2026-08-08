@@ -244,14 +244,25 @@ async def run_preparation_workflow(
             "answers_data": answers_data,
         }
 
-        # Persist everything to Firestore.
-        await _save_workflow_results_to_database(user_id, session_id, session_state_updates)
+        # Persist everything to Postgres. Fail loudly (not silently) if the
+        # workflow row itself cannot be saved — see _save_workflow_results_to_database.
+        save_result = await _save_workflow_results_to_database(user_id, session_id, session_state_updates)
+        if not save_result.get("workflow_persisted"):
+            return {
+                "success": False,
+                "error": "Workflow results could not be saved to the database",
+                "user_id": user_id,
+                "session_id": session_id,
+                "workflow_id": workflow_id,
+                "save_errors": save_result.get("errors", []),
+            }
 
         warnings = []
         if not questions_data:
             warnings.append("No interview questions were generated — check the resume/job description.")
         if not answers_data:
             warnings.append("No model answers were generated.")
+        warnings.extend(save_result.get("errors", []))
 
         return {
             "success": True,
@@ -302,8 +313,18 @@ def _run_search_agent(job_description: str) -> dict:
         return {"searchQueries": [r.get("query", "") for r in results], "interviewProcess": {}}
 
 
-async def _save_workflow_results_to_database(user_id, session_id, session_state_updates):
-    """Save workflow results to Firestore."""
+async def _save_workflow_results_to_database(user_id, session_id, session_state_updates) -> dict:
+    """Save workflow results to Postgres.
+
+    Returns {"success": bool, "workflow_persisted": bool, "errors": [str]}.
+
+    The workflow row must always be created (fallback title when the AI omits
+    one), and failures must be reported rather than swallowed: a success
+    response carrying a workflow_id that was never persisted breaks every
+    later step (/interviews/start, dashboard, feedback).
+    """
+    errors: list = []
+    workflow_persisted = False
     try:
         personal_summary = session_state_updates.get("personal_summary", {})
         if personal_summary and isinstance(personal_summary, dict) and "error" not in personal_summary:
@@ -311,10 +332,14 @@ async def _save_workflow_results_to_database(user_id, session_id, session_state_
                 from backend.data.database import firestore_db
                 from backend.data.schemas import PersonalExperience, Workflow
 
-                title = personal_summary.get("title", "")
-                if title:
-                    firestore_db.create_or_update_workflow(user_id, session_id, Workflow(title=title))
-                    print(f"Saved workflow title '{title}' for user {user_id}, workflow {session_id}")
+                title = (personal_summary.get("title") or "").strip()
+                if not title:
+                    title = "Interview Preparation"
+                    print(f"[WARN] Summarizer returned no title for workflow {session_id}; using fallback.")
+
+                firestore_db.create_or_update_workflow(user_id, session_id, Workflow(title=title))
+                workflow_persisted = True
+                print(f"Saved workflow title '{title}' for user {user_id}, workflow {session_id}")
 
                 personal_experience = PersonalExperience(
                     resumeInfo=personal_summary.get("resumeInfo", ""),
@@ -327,7 +352,8 @@ async def _save_workflow_results_to_database(user_id, session_id, session_state_
                 firestore_db.set_personal_experience(user_id, session_id, personal_experience)
                 print(f"Saved personal experience for user {user_id}, workflow {session_id}")
             except Exception as exc:
-                print(f"[WARN] Could not save PersonalExperience: {exc}")
+                errors.append(f"Could not save workflow/personal experience: {exc}")
+                print(f"[WARN] Could not save workflow for user {user_id}, session {session_id}: {exc}")
 
         final_answers = session_state_updates.get("answers_data", [])
         if final_answers and isinstance(final_answers, list) and len(final_answers) > 0:
@@ -356,11 +382,18 @@ async def _save_workflow_results_to_database(user_id, session_id, session_state_
                 else:
                     print("[WARN] Answers missing 'answer' field; skipping QA save.")
             except Exception as exc:
-                print(f"[WARN] Could not save RecommendedQAs: {exc}")
+                errors.append(f"Could not save RecommendedQAs: {exc}")
+                print(f"[WARN] Could not save RecommendedQAs for user {user_id}, session {session_id}: {exc}")
         else:
             print("[WARN] No valid answers_data found for database storage.")
     except Exception as exc:
+        errors.append(str(exc))
         print(f"Error in database save operations: {exc}")
+    return {
+        "success": not errors and workflow_persisted,
+        "workflow_persisted": workflow_persisted,
+        "errors": errors,
+    }
 
 
 def run_preparation_workflow_sync(*args, **kwargs):

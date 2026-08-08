@@ -60,20 +60,39 @@ async def _run_judge_from_session(session):
         json.dumps(recommend_qas, ensure_ascii=False) if recommend_qas else "",
     )
 
-    try:
-        raw_feedback = groq_provider.chat_json(
-            get_interview_judge_instruction(), input_data, temperature=0.4
+    # Retry transient Groq failures (free-tier rate limits) a few times with
+    # backoff before giving up; record the real reason so callers can log it.
+    raw_feedback = None
+    last_error = None
+    for attempt in range(3):
+        try:
+            raw_feedback = groq_provider.chat_json(
+                get_interview_judge_instruction(), input_data, temperature=0.4
+            )
+            break
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "Judge generation attempt %d/3 failed for session %s: %s",
+                attempt + 1, session.id, exc,
+            )
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
+    if not raw_feedback:
+        reason = (
+            f"empty response after retries"
+            if last_error is None
+            else f"Groq error after 3 attempts: {last_error}"
         )
-        if not raw_feedback:
-            logger.warning("Judge returned empty feedback for session %s", session.id)
-            return None
-    except Exception as exc:
-        logger.error("Judge generation failed for session %s: %s", session.id, exc)
+        logger.error("Judge returned no feedback for session %s: %s", session.id, reason)
+        session.state["feedback_error"] = reason
         return None
 
     result = parse_and_validate_feedback(json.dumps(raw_feedback, ensure_ascii=False))
     if result["status"] != "valid":
-        logger.warning("Judge feedback invalid for session %s: %s", session.id, result.get("errors"))
+        reason = f"invalid feedback: {result.get('errors')}"
+        logger.warning("Judge feedback invalid for session %s: %s", session.id, reason)
+        session.state["feedback_error"] = reason
         return None
 
     feedback_json = result["data"]
@@ -88,7 +107,13 @@ async def _run_judge_from_session(session):
             resource["link"] = new_resource["link"]
 
     feedback_json = deduplicate_resources(feedback_json)
-    save_feedback_to_db(session, feedback_json)
+    try:
+        save_feedback_to_db(session, feedback_json)
+    except Exception as exc:
+        reason = f"feedback persist failed: {exc}"
+        logger.error("Failed to persist feedback for session %s: %s", session.id, exc)
+        session.state["feedback_error"] = reason
+        return None
 
     session.state["feedback"] = feedback_json
     session.state["feedback_generated"] = True

@@ -227,8 +227,14 @@ async def _finalize_session(websocket, session, goodbye: str = ""):
         save_transcript(session)
         print(f"[SAVE] Transcript saved for session {session.id}")
 
-        await _run_judge_from_session(session)
-        print(f"[FEEDBACK] Feedback generated for session {session.id}")
+        # Report honestly: the judge stores the reason on failure so the
+        # misleading "Feedback generated" log can't hide a lost interview.
+        feedback = await _run_judge_from_session(session)
+        if feedback is None:
+            reason = session.state.get("feedback_error", "unknown")
+            print(f"[WARN] Feedback NOT generated for session {session.id}: {reason}")
+        else:
+            print(f"[FEEDBACK] Feedback generated for session {session.id}")
 
         try:
             await websocket.close(code=1000)
