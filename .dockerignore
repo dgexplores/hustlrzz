@@ -1,0 +1,10 @@
+.git
+.venv
+backend/.venv
+**/__pycache__
+*.pyc
+frontend
+supabase
+.env
+*.log
+.DS_Store
