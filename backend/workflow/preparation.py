@@ -22,6 +22,7 @@ import traceback
 from typing import Optional
 
 from backend.ai import provider
+from backend import config
 from backend.career import company_profiles
 
 PERSONAL_SUMMARY_SYSTEM = (
@@ -97,6 +98,13 @@ def _organize_search(job_title: str, job_description: str, results: list[dict]) 
         return {"real_questions": [], "interview_process": {}}
 
 
+def _industry_faqs(job_title: str, job_description: str) -> dict:
+    """Optional web context. Never make a preparation request depend on it."""
+    if not config.ENABLE_WEB_SEARCH:
+        return {"real_questions": [], "interview_process": {}}
+    return _organize_search(job_title, job_description, _search_web(job_title, job_description))
+
+
 async def run_preparation_workflow(
     user_id: str,
     resume_text: str,
@@ -134,10 +142,15 @@ async def run_preparation_workflow(
         summary_task = asyncio.create_task(
             asyncio.to_thread(provider.chat_json, PERSONAL_SUMMARY_SYSTEM, base_input)
         )
-        search_task = asyncio.create_task(
-            asyncio.to_thread(lambda: _organize_search(job_title, job_description, _search_web(job_title, job_description)))
-        )
-        personal_summary, industry_faqs = await asyncio.gather(summary_task, search_task)
+        search_task = asyncio.create_task(asyncio.to_thread(_industry_faqs, job_title, job_description))
+        try:
+            personal_summary = await asyncio.wait_for(summary_task, timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            return {"success": False, "error": "Profile analysis timed out. Please try again.", "session_id": workflow_id}
+        try:
+            industry_faqs = await asyncio.wait_for(search_task, timeout=config.WEB_SEARCH_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            industry_faqs = {"real_questions": [], "interview_process": {}}
 
         # Step 2+3 (parallel): match analysis + question generation in one call.
         def _do_questions():
@@ -169,7 +182,10 @@ async def run_preparation_workflow(
             }
 
         question_task = asyncio.create_task(asyncio.to_thread(_do_questions))
-        questions, match = await question_task
+        try:
+            questions, match = await asyncio.wait_for(question_task, timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            return {"success": False, "error": "Question generation timed out. Please try again.", "session_id": workflow_id}
 
         # Step 4: model answers.
         answers_user = (
@@ -178,7 +194,10 @@ async def run_preparation_workflow(
             'Return JSON list aligned to questions: [{"question":"...","answer":"...","tags":[]}]'
         )
         try:
-            answers_data = provider.chat_json_strict(ANSWER_SYSTEM, answers_user)
+            answers_data = await asyncio.wait_for(
+                asyncio.to_thread(provider.chat_json_strict, ANSWER_SYSTEM, answers_user),
+                timeout=config.AI_REQUEST_TIMEOUT_SECONDS,
+            )
             if not isinstance(answers_data, list):
                 answers_data = answers_data.get("answers", []) if isinstance(answers_data, dict) else []
             answers_data = answers_data[: len(questions)]

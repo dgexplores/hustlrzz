@@ -28,7 +28,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
   const [company, setCompany] = useState("");
   const [portfolioText, setPortfolioText] = useState("");
   const [notesText, setNotesText] = useState("");
-  const [numQuestions, setNumQuestions] = useState(50);
+  const [numQuestions, setNumQuestions] = useState(12);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FlowResult | null>(null);
@@ -112,7 +112,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="nq">Number of questions</Label>
-              <Input id="nq" type="number" min={1} max={200} value={numQuestions} onChange={(e) => setNumQuestions(Number(e.target.value))} />
+              <Input id="nq" type="number" min={1} max={50} value={numQuestions} onChange={(e) => setNumQuestions(Number(e.target.value))} />
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>

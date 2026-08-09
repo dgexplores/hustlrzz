@@ -53,6 +53,13 @@ def test_preview_cors_pattern_matches_frontend_preview_only():
     assert not re.fullmatch(config.CORS_ORIGIN_REGEX, "https://malicious.example.com")
 
 
+def test_industry_faqs_skips_external_search_when_disabled(monkeypatch):
+    from backend.workflow import preparation
+    monkeypatch.setattr(preparation.config, "ENABLE_WEB_SEARCH", False)
+    monkeypatch.setattr(preparation, "_search_web", lambda *_: (_ for _ in ()).throw(AssertionError("should not search")))
+    assert preparation._industry_faqs("Engineer", "Build reliable APIs") == {"real_questions": [], "interview_process": {}}
+
+
 def test_chat_falls_back_when_preferred_fails(monkeypatch):
     """Preferred provider raises (rate-limit); other provider answers succeed."""
     import backend.config as config
