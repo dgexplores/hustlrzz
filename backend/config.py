@@ -35,7 +35,7 @@ CORS_ORIGINS = os.getenv(
 # expression narrow: it permits only this team's `frontend` Vercel hosts.
 CORS_ORIGIN_REGEX = os.getenv(
     "CORS_ORIGIN_REGEX",
-    r"https://frontend-[a-z0-9-]+-deepaklearn7878-6255s-projects\.vercel\.app",
+    r"https://frontend(?:-[a-z0-9-]+)?-deepaklearn7878-6255s-projects\.vercel\.app",
 )
 
 MIN_RESUME_TEXT_LENGTH = int(os.getenv("MIN_RESUME_TEXT_LENGTH", "120"))

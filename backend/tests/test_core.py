@@ -49,6 +49,7 @@ def test_preview_cors_pattern_matches_frontend_preview_only():
     import re
     from backend import config
     assert re.fullmatch(config.CORS_ORIGIN_REGEX, "https://frontend-b6fqy2gmn-deepaklearn7878-6255s-projects.vercel.app")
+    assert re.fullmatch(config.CORS_ORIGIN_REGEX, "https://frontend-deepaklearn7878-6255s-projects.vercel.app")
     assert not re.fullmatch(config.CORS_ORIGIN_REGEX, "https://malicious.example.com")
 
 
