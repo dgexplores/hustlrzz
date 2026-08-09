@@ -4,38 +4,38 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 224 71% 4%;
+    --background: 210 33% 98%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 224 71% 4%;
-    --primary: 262 83% 58%;
+    --card-foreground: 222 47% 11%;
+    --primary: 207 87% 38%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 9% 20%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 262 83% 96%;
-    --accent-foreground: 262 83% 30%;
+    --secondary: 210 29% 95%;
+    --secondary-foreground: 222 30% 18%;
+    --muted: 210 29% 95%;
+    --muted-foreground: 215 16% 34%;
+    --accent: 204 67% 94%;
+    --accent-foreground: 207 87% 27%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 262 83% 58%;
-    --radius: 0.5rem;
+    --border: 214 20% 88%;
+    --input: 214 20% 82%;
+    --ring: 207 87% 38%;
+    --radius: 0.75rem;
   }
   .dark {
     --background: 224 71% 4%;
     --foreground: 210 20% 98%;
     --card: 224 71% 4%;
     --card-foreground: 210 20% 98%;
-    --primary: 262 83% 62%;
+    --primary: 201 94% 67%;
     --primary-foreground: 224 71% 4%;
     --secondary: 217 33% 12%;
     --secondary-foreground: 210 20% 98%;
     --muted: 217 33% 12%;
     --muted-foreground: 215 20% 65%;
     --accent: 217 33% 16%;
-    --accent-foreground: 262 83% 62%;
+    --accent-foreground: 201 94% 67%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 210 20% 98%;
     --border: 217 33% 18%;
@@ -50,5 +50,18 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+
+  ::selection { @apply bg-primary/20 text-foreground; }
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+}
+
+@layer utilities {
+  .surface-transition { transition: color 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms cubic-bezier(0.23, 1, 0.32, 1), border-color 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 160ms cubic-bezier(0.23, 1, 0.32, 1), transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

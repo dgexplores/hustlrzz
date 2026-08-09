@@ -41,7 +41,7 @@ def build_interviewer_system(
     )
 
 
-def interviewer_turn(system: str, transcript: list[dict], candidate_message: str) -> dict:
+def interviewer_turn(system: str, transcript: list[dict], candidate_message: str, retrieval_context: str = "") -> dict:
     messages = _transcript_to_messages(transcript)
     messages.append({"role": "user", "content": candidate_message})
     system_messages = [{"role": "system", "content": system}]
@@ -51,7 +51,14 @@ def interviewer_turn(system: str, transcript: list[dict], candidate_message: str
         f"{'Candidate' if m['role'] == 'user' else 'Interviewer'}: {m['content']}"
         for m in messages
     )
-    raw = provider.chat("Follow the interviewer system below and output the JSON format.\n\n" + system, context + "\n\nReply in the JSON response format.")
+    grounded_system = system
+    if retrieval_context:
+        grounded_system += (
+            "\n\nCANDIDATE-OWNED REFERENCE CONTEXT:\n"
+            + retrieval_context
+            + "\nUse this only when it is relevant. Do not invent facts beyond it."
+        )
+    raw = provider.chat("Follow the interviewer system below and output the JSON format.\n\n" + grounded_system, context + "\n\nReply in the JSON response format.")
     data = provider.extract_json(raw)
     if not isinstance(data, dict) or "message" not in data:
         return {"message": "Could you say that again?", "reflection": False}

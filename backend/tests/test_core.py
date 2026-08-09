@@ -73,3 +73,15 @@ def test_chat_raises_when_all_fail(monkeypatch):
     import pytest
     with pytest.raises(provider.ProviderError):
         provider.chat("s", "u")
+
+
+def test_interviewer_turn_adds_retrieval_context(monkeypatch):
+    from backend.agents import interviewer
+    seen = {}
+    monkeypatch.setattr(interviewer.provider, "chat", lambda system, user: seen.update({"system": system}) or '{"message":"Next question"}')
+    reply = interviewer.interviewer_turn(
+        "base system", [], "My answer", retrieval_context="[Source: Resume]\nBuilt FastAPI services"
+    )
+    assert reply["message"] == "Next question"
+    assert "CANDIDATE-OWNED REFERENCE CONTEXT" in seen["system"]
+    assert "Built FastAPI services" in seen["system"]

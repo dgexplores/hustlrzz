@@ -17,6 +17,16 @@ AI_PROVIDER = os.getenv("AI_PROVIDER", "groq").lower()
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
+# Retrieval is intentionally independent of chat-provider selection. Gemini's
+# embedding endpoint is used only when a key is configured; the core interview
+# workflow stays available without knowledge-base search.
+RAG_EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", "models/text-embedding-004")
+RAG_EMBEDDING_DIMENSIONS = int(os.getenv("RAG_EMBEDDING_DIMENSIONS", "768"))
+RAG_MAX_DOCUMENT_CHARS = int(os.getenv("RAG_MAX_DOCUMENT_CHARS", "200000"))
+RAG_CHUNK_CHARS = int(os.getenv("RAG_CHUNK_CHARS", "900"))
+RAG_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "120"))
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
+
 CORS_ORIGINS = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:3000,https://hustlrzzv2.vercel.app",
