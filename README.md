@@ -1,11 +1,12 @@
 # Hustlrzz V2 — AI Mock Interview Coach
 
-English-native AI mock interview coach. Combines the best of three earlier
-projects into one advanced platform:
+English-native AI mock interview coach for deliberate, role-specific practice.
+It turns a candidate's own material into a preparation plan, runs live mock
+interviews, and saves practical feedback for the next session.
 
 | Project | What it contributes |
 | --- | --- |
-| **hustlrzz** | Prep workflow (resume + JD → personalized questions + model answers via web-searched real questions), WebSocket live interviewer, judge scoring, Saved history |
+| **hustlrzz** | Resume + JD preparation workflow, WebSocket live interviewer, judge scoring, saved history |
 | **interview-skills** | Company-style interview profiles (Google, Amazon, Meta, Microsoft...), JD-vs-resume match + resume gap analysis, salary negotiation coaching |
 | **AI-Interview-Coach** | Next.js 15 UI, MediaPipe in-browser body-language tracking (eye contact, posture, hand gestures), scored coaching report |
 
@@ -18,13 +19,34 @@ projects into one advanced platform:
 - **Camera analysis:** MediaPipe runs fully in-browser (video never leaves device)
 - **Candidate knowledge (optional):** Gemini embeddings + Supabase pgvector, scoped to each candidate and used to ground interview follow-ups
 
+## What it can do
+
+- **Prepare a role-specific interview pack:** paste a resume and job description
+  to generate a JD match, focused questions, answer hints, follow-ups, and model
+  answers. Preparation defaults to 12 questions for a responsive live workflow.
+- **Run a live mock interview:** a WebSocket interviewer asks prepared questions,
+  accepts typed or browser-dictated answers, and returns a final coaching report.
+- **Give private camera feedback:** MediaPipe tracks pose, eye contact, posture,
+  and gestures in the browser; camera frames are not uploaded by this app.
+- **Coach salary conversations:** create a structured negotiation script from a
+  candidate's role, current compensation, target range, and offer context.
+- **Track progress:** retain preparation packs, transcripts, and scored reports in
+  a candidate-owned Supabase account.
+- **Ground follow-ups with RAG:** optionally index resume text, portfolio details,
+  practice notes, and previous reports in pgvector. Retrieved context is
+  user-scoped, source-labelled, and never required for the main interview flow.
+- **Stay resilient:** Groq is the primary chat provider and Gemini is a fallback;
+  optional web research is disabled by default and time-bounded when enabled, so
+  it cannot leave preparation stuck loading.
+
 ## Project layout
 
 ```
-backend/         FastAPI app (prep workflow, live interviewer, judge, coaching), requirements, Dockerfile
+backend/         FastAPI app (prep workflow, live interviewer, judge, coaching, RAG), requirements, Dockerfile
 frontend/        Next.js app (auth, prepare, interview, coaching, dashboard)
-supabase/        schema.sql to run once in Supabase SQL editor
-Dockerfile       backend image (Render)
+supabase/        schema, migrations, and hosted Auth configuration
+docs/            operational guidance, including future verified-email setup
+Dockerfile       backend image for Railway/any Docker host
 ```
 
 ## Local setup
@@ -52,7 +74,25 @@ npm install
 cp .env.local.example .env.local   # Supabase URL + anon + API_URL=http://localhost:8000
 npm run dev
 ```
-Open http://localhost:3000, sign up, grant camera + microphone, prepare a role, start an interview.
+Open http://localhost:3000, sign up, grant camera + microphone, prepare a role,
+then start an interview. Demo configuration creates a session immediately after
+email/password signup; see [email setup](docs/EMAIL_SETUP.md) to enable verified
+email later through Resend.
+
+## Deployment notes
+
+- **Vercel:** set the project root directory to `frontend`. Configure
+  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
+  `NEXT_PUBLIC_API_URL` for both Preview and Production.
+- **Railway:** deploy the repository Dockerfile, expose the service port supplied
+  by Railway, and set `CORS_ORIGINS` for custom/local origins. The backend also
+  has a narrow `CORS_ORIGIN_REGEX` for this Vercel project's generated URLs.
+- **Supabase:** apply `supabase/schema.sql` for a fresh project, or apply the
+  RAG migration to an existing project. Keep `SUPABASE_SERVICE_ROLE_KEY` on the
+  backend only; it must never be exposed as a frontend environment variable.
+- **Production check:** `GET /health` reports backend, AI-provider, and database
+  readiness. A failed optional RAG operation does not stop preparation or live
+  interviews.
 
 ## Feature endpoints (English)
 
