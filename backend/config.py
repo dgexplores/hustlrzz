@@ -31,6 +31,12 @@ CORS_ORIGINS = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:3000,https://hustlrzzv2.vercel.app",
 ).split(",")
+# Vercel creates a unique Preview hostname for every deployment. Keep the
+# expression narrow: it permits only this team's `frontend` Vercel hosts.
+CORS_ORIGIN_REGEX = os.getenv(
+    "CORS_ORIGIN_REGEX",
+    r"https://frontend-[a-z0-9-]+-deepaklearn7878-6255s-projects\.vercel\.app",
+)
 
 MIN_RESUME_TEXT_LENGTH = int(os.getenv("MIN_RESUME_TEXT_LENGTH", "120"))
 MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", "5242880"))  # 5 MB
