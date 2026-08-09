@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 from backend import config, db as dbc
 from backend.ai import provider
 from backend.career import analysis, company_profiles
+from backend.rag import service as rag
 from backend.session import registry
 from backend.workflow.preparation import run_preparation_workflow
 
@@ -42,6 +43,7 @@ app = FastAPI(title="Hustlrzz V2", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,
+    allow_origin_regex=config.CORS_ORIGIN_REGEX or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -122,6 +124,23 @@ async def start_workflow(
     user: dict = Depends(get_user),
 ):
     t0 = time.time()
+    rag_status = {"available": rag.is_ready(), "indexed": False}
+    # Indexing is additive. An embedding outage must never prevent a candidate
+    # from preparing for an interview with the configured chat provider.
+    if rag_status["available"]:
+        try:
+            indexed = await rag.ingest_document(
+                user_id=user["uid"],
+                title="Resume context",
+                source_type="resume",
+                content=resume_text,
+            )
+            rag_status.update(indexed)
+            rag_status["indexed"] = True
+        except (ValueError, rag.RAGUnavailable) as exc:
+            rag_status["warning"] = str(exc)
+        except Exception:
+            rag_status["warning"] = "Resume knowledge indexing is temporarily unavailable."
     result = await run_preparation_workflow(
         user_id=user["uid"],
         resume_text=resume_text,
@@ -134,6 +153,7 @@ async def start_workflow(
         num_questions=num_questions,
     )
     result["processing_time"] = round(time.time() - t0, 2)
+    result["knowledge"] = rag_status
     if not result.get("success"):
         err = str(result.get("error", "Workflow failed"))
         # Surface provider quota limits as a retryable 429, not a 500.
@@ -234,6 +254,60 @@ async def analyze(job_description: str = Body(...), resume_text: str = Body(...)
 
 
 # --------------------------------------------------------------------------- #
+# Candidate knowledge base (RAG)
+# --------------------------------------------------------------------------- #
+class KnowledgeIngestRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=config.MIN_RESUME_TEXT_LENGTH, max_length=config.RAG_MAX_DOCUMENT_CHARS)
+    source_type: str = Field(default="notes", pattern="^(resume|portfolio|notes|session_report)$")
+
+
+class KnowledgeSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=4000)
+    top_k: int = Field(default=5, ge=1, le=10)
+
+
+@router.get("/knowledge/status")
+def knowledge_status(user: dict = Depends(get_user)):
+    return {"success": True, "data": {"available": rag.is_ready()}}
+
+
+@router.post("/knowledge/documents")
+async def ingest_knowledge(payload: KnowledgeIngestRequest, user: dict = Depends(get_user)):
+    try:
+        data = await rag.ingest_document(
+            user_id=user["uid"],
+            title=payload.title,
+            source_type=payload.source_type,
+            content=payload.content,
+        )
+        return {"success": True, "data": data}
+    except rag.RAGUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception:
+        raise HTTPException(status_code=503, detail="Knowledge indexing is temporarily unavailable.")
+
+
+@router.post("/knowledge/search")
+async def search_knowledge(payload: KnowledgeSearchRequest, user: dict = Depends(get_user)):
+    try:
+        chunks = await rag.retrieve(user_id=user["uid"], query=payload.query, top_k=payload.top_k)
+        return {"success": True, "data": [{
+            "content": item.content,
+            "source_title": item.source_title,
+            "source_type": item.source_type,
+            "document_id": item.document_id,
+            "similarity": item.similarity,
+        } for item in chunks]}
+    except rag.RAGUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception:
+        raise HTTPException(status_code=503, detail="Knowledge search is temporarily unavailable.")
+
+
+# --------------------------------------------------------------------------- #
 # Live interview (WebSocket)
 # --------------------------------------------------------------------------- #
 def _now() -> str:
@@ -314,7 +388,16 @@ async def interview_ws(
             if msg.get("type") == "message":
                 text = msg.get("text", "")
                 transcript.append({"from": "candidate", "text": text})
-                reply = interviewer_turn(system, transcript, text)
+                retrieval_context = ""
+                if rag.is_ready():
+                    try:
+                        chunks = await rag.retrieve(user_id=user_id, query=text, top_k=3)
+                        retrieval_context = rag.format_context(chunks, max_chars=3500)
+                    except Exception:
+                        # A coaching session should continue if retrieval is slow
+                        # or unavailable; the prepared question script remains.
+                        retrieval_context = ""
+                reply = interviewer_turn(system, transcript, text, retrieval_context=retrieval_context)
                 transcript.append({"from": "interviewer", "text": reply.get("message") or reply.get("question") or ""})
                 await websocket.send_json({"type": "message", "data": reply})
             elif msg.get("type") == "end":
@@ -322,10 +405,6 @@ async def interview_ws(
     except WebSocketDisconnect:
         pass
     finally:
-        try:
-            await websocket.close()
-        except Exception:
-            pass
         # Judge + persist session report.
         report = {}
         if transcript:
@@ -346,6 +425,27 @@ async def interview_ws(
                 }])
             except Exception as exc:
                 print("persist interview failed:", exc)
+        if report and rag.is_ready():
+            try:
+                await rag.ingest_document(
+                    user_id=user_id,
+                    title="Interview coaching report",
+                    source_type="session_report",
+                    content=json.dumps(report, ensure_ascii=False),
+                )
+            except Exception:
+                # History persistence is already complete; RAG enrichment should
+                # not affect the completed interview result.
+                pass
+        if report:
+            try:
+                await websocket.send_json({"type": "report", "data": report})
+            except Exception:
+                pass
+        try:
+            await websocket.close()
+        except Exception:
+            pass
         await registry.delete("hustlrzzv2", user_id, session_id)
 
 

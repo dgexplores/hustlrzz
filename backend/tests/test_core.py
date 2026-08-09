@@ -45,6 +45,13 @@ def test_requirements_parseable():
     assert Path("requirements.txt").exists() or Path("backend/requirements.txt").exists()
 
 
+def test_preview_cors_pattern_matches_frontend_preview_only():
+    import re
+    from backend import config
+    assert re.fullmatch(config.CORS_ORIGIN_REGEX, "https://frontend-b6fqy2gmn-deepaklearn7878-6255s-projects.vercel.app")
+    assert not re.fullmatch(config.CORS_ORIGIN_REGEX, "https://malicious.example.com")
+
+
 def test_chat_falls_back_when_preferred_fails(monkeypatch):
     """Preferred provider raises (rate-limit); other provider answers succeed."""
     import backend.config as config
@@ -73,3 +80,15 @@ def test_chat_raises_when_all_fail(monkeypatch):
     import pytest
     with pytest.raises(provider.ProviderError):
         provider.chat("s", "u")
+
+
+def test_interviewer_turn_adds_retrieval_context(monkeypatch):
+    from backend.agents import interviewer
+    seen = {}
+    monkeypatch.setattr(interviewer.provider, "chat", lambda system, user: seen.update({"system": system}) or '{"message":"Next question"}')
+    reply = interviewer.interviewer_turn(
+        "base system", [], "My answer", retrieval_context="[Source: Resume]\nBuilt FastAPI services"
+    )
+    assert reply["message"] == "Next question"
+    assert "CANDIDATE-OWNED REFERENCE CONTEXT" in seen["system"]
+    assert "Built FastAPI services" in seen["system"]

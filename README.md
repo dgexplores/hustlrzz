@@ -16,6 +16,7 @@ projects into one advanced platform:
 - **AI (multi-provider):** Groq (Llama 3.3, free tier) default · Gemini optional
 - **Auth & storage:** Supabase Auth + Postgres with Row-Level Security
 - **Camera analysis:** MediaPipe runs fully in-browser (video never leaves device)
+- **Candidate knowledge (optional):** Gemini embeddings + Supabase pgvector, scoped to each candidate and used to ground interview follow-ups
 
 ## Project layout
 
@@ -30,7 +31,7 @@ Dockerfile       backend image (Render)
 
 ### 1. Supabase
 1. Create a project at supabase.com.
-2. In **SQL Editor**, run the contents of `supabase/schema.sql`.
+2. In **SQL Editor**, run the contents of `supabase/schema.sql`. It includes the pgvector-backed candidate knowledge schema. Existing deployments can instead run `supabase/migrations/20260809110000_rag_knowledge.sql`.
 3. Optional: enable Google sign-in in Authentication → Providers.
 4. Copy project URL + `anon` and `service_role` keys from Project Settings → API.
 
@@ -60,4 +61,22 @@ Open http://localhost:3000, sign up, grant camera + microphone, prepare a role, 
 - `GET /companies` — company interview profiles
 - `POST /coaching/salary` — structured salary negotiation script
 - `POST /coaching/analyze` — JD-vs-resume match
+- `GET /knowledge/status`, `POST /knowledge/documents`, `POST /knowledge/search` — optional candidate-owned RAG knowledge base
 - `WS /ws/{session_id}` — live interviewer + judge report
+
+## Candidate knowledge flow (RAG)
+
+RAG is optional and deliberately additive: the interview continues when the
+embedding provider or knowledge database is unavailable. When configured, the
+backend validates and chunks candidate-owned material, embeds it with Gemini,
+and stores the vectors in `knowledge_chunks`. Each retrieval query is filtered
+by `user_id` in both the API call and the database function. During a live
+interview the three most relevant, source-labelled chunks are added to the
+interviewer prompt; the model is instructed to use them only when relevant and
+not invent candidate experience. Final reports are also indexed to support
+future practice.
+
+For a production deployment, set `GEMINI_API_KEY`, run the included Supabase
+schema/migration, and monitor embedding-provider quotas. The application
+returns an explicit knowledge-unavailable state while retaining preparation and
+interview functionality.

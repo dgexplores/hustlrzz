@@ -57,6 +57,11 @@ def select_where(table: str, match: dict = None, order: str = None) -> list[dict
     return resp.data
 
 
+def delete_where(table: str, match: dict) -> None:
+    client = get_client()
+    client.table(table).delete().eq(*_single(match)).execute()
+
+
 def _single(match: dict):
     if len(match) != 1:
         raise ValueError("Only single-column matches supported")
