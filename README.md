@@ -1,122 +1,184 @@
-# Hustlrzz V2 — AI Mock Interview Coach
+# HUSTLRZZ V2
 
-English-native AI mock interview coach for deliberate, role-specific practice.
-It turns a candidate's own material into a preparation plan, runs live mock
-interviews, and saves practical feedback for the next session.
+### Your private, real-time AI mock interview coach
 
-| Project | What it contributes |
+> Prepare from your own resume. Practice with a live AI interviewer. Improve what you say — and how you say it.
+
+[**Launch the live app ↗**](https://frontend-deepaklearn7878-6255s-projects.vercel.app) &nbsp;·&nbsp;
+[Backend health ↗](https://hustlrzzv2-production.up.railway.app/health) &nbsp;·&nbsp;
+[Explore the code](https://github.com/dgexplores/hustlrzzv2)
+
+---
+
+## The problem
+
+Interview preparation is usually fragmented: static question banks do not know
+the candidate, generic tools cannot probe a real answer, and most feedback
+ignores confidence, posture, and delivery.
+
+**HUSTLRZZ V2 closes that gap.** It turns a resume and job description into a
+focused practice plan, conducts a conversational mock interview, and gives the
+candidate an actionable report — all in one private workspace.
+
+## One product, end-to-end practice
+
+```mermaid
+flowchart LR
+    A["Resume + job description"] --> B["Prepare\nRole fit · questions · answer hints"]
+    B --> C["Practice live\nVoice or typed WebSocket interview"]
+    C --> D["Improve\nScored report · posture feedback · next steps"]
+    A -. optional knowledge .-> E["RAG knowledge base\nCandidate-owned, source-labelled context"]
+    E -. grounded follow-ups .-> C
+```
+
+| Step | Candidate experience | What HUSTLRZZ does |
+| --- | --- | --- |
+| **01 — Prepare** | Add a resume and target job description | Finds role fit, highlights gaps, creates focused questions, model answers, and answer hints. |
+| **02 — Practice** | Respond by typing or voice | Runs a live, follow-up capable AI interview over WebSocket. |
+| **03 — Improve** | Review the session | Delivers a scored report, practical recommendations, and presentation signals. |
+
+## What makes it different
+
+### Context-aware interview preparation
+
+Rather than serving a generic list of questions, the system starts from the
+candidate's own resume and target role. It produces a responsive, focused pack
+of 12 questions by default, with company-matching analysis and model answers.
+
+### A real conversational mock interview
+
+The interviewer works live over WebSocket. Candidates answer in text or with
+browser speech input; the coach can respond, probe further, and build a final
+coaching report from the session.
+
+### Content *and* presence feedback
+
+MediaPipe runs in the browser to estimate posture, eye contact, and gestures.
+Camera frames are not uploaded by this application, keeping body-language
+practice private and avoiding server-side video processing.
+
+### Career coaching beyond the interview
+
+HUSTLRZZ also includes job-description versus resume analysis, interview-style
+company profiles, saved practice history, and structured salary-negotiation
+coaching.
+
+## Designed for reliable AI practice
+
+| Layer | Production approach |
 | --- | --- |
-| **hustlrzz** | Resume + JD preparation workflow, WebSocket live interviewer, judge scoring, saved history |
-| **interview-skills** | Company-style interview profiles (Google, Amazon, Meta, Microsoft...), JD-vs-resume match + resume gap analysis, salary negotiation coaching |
-| **AI-Interview-Coach** | Next.js 15 UI, MediaPipe in-browser body-language tracking (eye contact, posture, hand gestures), scored coaching report |
+| **Interface** | Next.js 15, TypeScript, Tailwind, accessible responsive UI |
+| **Live service** | Python FastAPI and WebSockets |
+| **AI resilience** | Groq primary provider with optional Gemini fallback |
+| **Data & identity** | Supabase Auth + PostgreSQL with Row-Level Security |
+| **Voice & camera** | Browser-native Web Speech and in-browser MediaPipe |
+| **Deployment** | Vercel frontend + Railway API |
 
-## Stack
+## Retrieval-Augmented Generation (RAG)
 
-- **Frontend:** Next.js 15 + Tailwind + shadcn-style UI
-- **Backend:** Python · FastAPI · WebSockets
-- **AI (multi-provider):** Groq (Llama 3.3, free tier) default · Gemini optional
-- **Auth & storage:** Supabase Auth + Postgres with Row-Level Security
-- **Camera analysis:** MediaPipe runs fully in-browser (video never leaves device)
-- **Candidate knowledge (optional):** Gemini embeddings + Supabase pgvector, scoped to each candidate and used to ground interview follow-ups
+RAG is implemented as an optional, safe enhancement — it never blocks an
+interview if embeddings or the knowledge database are unavailable.
 
-## What it can do
+1. Candidate-owned material (resume, portfolio notes, practice notes, or prior
+   reports) is validated, chunked, embedded with Gemini, and stored in
+   Supabase pgvector.
+2. Every query is filtered by `user_id` at the API and database levels.
+3. During a live interview, the three most relevant **source-labelled** chunks
+   can ground a follow-up question or feedback without inventing experience.
+4. Final reports can be indexed to make future practice sessions progressively
+   more useful.
 
-- **Prepare a role-specific interview pack:** paste a resume and job description
-  to generate a JD match, focused questions, answer hints, follow-ups, and model
-  answers. Preparation defaults to 12 questions for a responsive live workflow.
-- **Run a live mock interview:** a WebSocket interviewer asks prepared questions,
-  accepts typed or browser-dictated answers, and returns a final coaching report.
-- **Give private camera feedback:** MediaPipe tracks pose, eye contact, posture,
-  and gestures in the browser; camera frames are not uploaded by this app.
-- **Coach salary conversations:** create a structured negotiation script from a
-  candidate's role, current compensation, target range, and offer context.
-- **Track progress:** retain preparation packs, transcripts, and scored reports in
-  a candidate-owned Supabase account.
-- **Ground follow-ups with RAG:** optionally index resume text, portfolio details,
-  practice notes, and previous reports in pgvector. Retrieved context is
-  user-scoped, source-labelled, and never required for the main interview flow.
-- **Stay resilient:** Groq is the primary chat provider and Gemini is a fallback;
-  optional web research is disabled by default and time-bounded when enabled, so
-  it cannot leave preparation stuck loading.
+## Built-in safeguards
+
+- Candidate data is protected by Supabase Row-Level Security.
+- The service-role key stays backend-only.
+- Camera analysis stays in the browser; the app does not upload video frames.
+- Optional web research is off by default and time-bounded when enabled.
+- Timeouts and non-fatal RAG failures keep preparation and interviews responsive.
+- `GET /health` reports API, AI-provider, and database readiness.
+
+---
+
+## For evaluators: demo flow
+
+1. Open the [live application](https://frontend-deepaklearn7878-6255s-projects.vercel.app) and create an account.
+2. In **Prepare**, add a short resume and a target job description.
+3. Review the tailored question pack, then begin an interview.
+4. Answer using text or microphone and enable the camera for local posture signals.
+5. End the interview to view the scored coaching report and saved history.
 
 ## Project layout
 
+```text
+backend/         FastAPI: preparation, live interviewer, judge, coaching, RAG
+frontend/        Next.js: auth, prepare, interview, coaching, dashboard
+supabase/        schema, migrations, hosted Auth configuration
+docs/            operations guidance, including future verified-email setup
+Dockerfile       backend image for Railway or another Docker host
 ```
-backend/         FastAPI app (prep workflow, live interviewer, judge, coaching, RAG), requirements, Dockerfile
-frontend/        Next.js app (auth, prepare, interview, coaching, dashboard)
-supabase/        schema, migrations, and hosted Auth configuration
-docs/            operational guidance, including future verified-email setup
-Dockerfile       backend image for Railway/any Docker host
-```
 
-## Local setup
+## Run it locally
 
-### 1. Supabase
-1. Create a project at supabase.com.
-2. In **SQL Editor**, run the contents of `supabase/schema.sql`. It includes the pgvector-backed candidate knowledge schema. Existing deployments can instead run `supabase/migrations/20260809110000_rag_knowledge.sql`.
-3. Optional: enable Google sign-in in Authentication → Providers.
-4. Copy project URL + `anon` and `service_role` keys from Project Settings → API.
+### 1. Create Supabase resources
 
-### 2. Backend
+1. Create a project at [supabase.com](https://supabase.com).
+2. For a fresh project, run `supabase/schema.sql` in the SQL editor. Existing
+   installations can apply `supabase/migrations/20260809110000_rag_knowledge.sql`.
+3. Copy the project URL, `anon` key, and `service_role` key from **Project Settings → API**.
+
+### 2. Start the API
+
 ```bash
 cd backend
 uv venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # fill GROQ_API_KEY (free) or GEMINI_API_KEY + SUPABASE keys
+cp .env.example .env
+# Configure GROQ_API_KEY (or GEMINI_API_KEY) and the Supabase server keys.
 uvicorn backend.app:app --reload --port 8000
 ```
-API docs → http://localhost:8000/docs
 
-### 3. Frontend
+API documentation is available at <http://localhost:8000/docs>.
+
+### 3. Start the web app
+
 ```bash
 cd frontend
 npm install
-cp .env.local.example .env.local   # Supabase URL + anon + API_URL=http://localhost:8000
+cp .env.local.example .env.local
+# Set NEXT_PUBLIC_API_URL=http://localhost:8000 and Supabase public values.
 npm run dev
 ```
-Open http://localhost:3000, sign up, grant camera + microphone, prepare a role,
-then start an interview. Demo configuration creates a session immediately after
-email/password signup; see [email setup](docs/EMAIL_SETUP.md) to enable verified
-email later through Resend.
 
-## Deployment notes
+Open <http://localhost:3000>, sign up, prepare a role, and start practicing.
+The demo configuration creates a session immediately after email/password
+signup. See [email setup](docs/EMAIL_SETUP.md) before enabling verified-email
+delivery with Resend.
 
-- **Vercel:** set the project root directory to `frontend`. Configure
+## Deployment checklist
+
+- **Vercel:** set the project root to `frontend`; configure
   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
-  `NEXT_PUBLIC_API_URL` for both Preview and Production.
-- **Railway:** deploy the repository Dockerfile, expose the service port supplied
-  by Railway, and set `CORS_ORIGINS` for custom/local origins. The backend also
-  has a narrow `CORS_ORIGIN_REGEX` for this Vercel project's generated URLs.
-- **Supabase:** apply `supabase/schema.sql` for a fresh project, or apply the
-  RAG migration to an existing project. Keep `SUPABASE_SERVICE_ROLE_KEY` on the
-  backend only; it must never be exposed as a frontend environment variable.
-- **Production check:** `GET /health` reports backend, AI-provider, and database
-  readiness. A failed optional RAG operation does not stop preparation or live
-  interviews.
+  `NEXT_PUBLIC_API_URL` for Preview and Production.
+- **Railway:** deploy the repository Dockerfile; configure provider and
+  Supabase server keys; add permitted custom origins to `CORS_ORIGINS`.
+- **Supabase:** apply the schema or RAG migration. Never expose
+  `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
+- **RAG:** configure `GEMINI_API_KEY` to enable embeddings; the app remains
+  fully usable if candidate knowledge retrieval is unavailable.
 
-## Feature endpoints (English)
+## Key API routes
 
-- `POST /workflows/start` — resume + JD → questions + answers + company match
-- `GET /workflows` / `GET /interviews` — history
-- `GET /companies` — company interview profiles
-- `POST /coaching/salary` — structured salary negotiation script
-- `POST /coaching/analyze` — JD-vs-resume match
-- `GET /knowledge/status`, `POST /knowledge/documents`, `POST /knowledge/search` — optional candidate-owned RAG knowledge base
-- `WS /ws/{session_id}` — live interviewer + judge report
+| Route | Purpose |
+| --- | --- |
+| `POST /workflows/start` | Resume + JD → tailored interview pack |
+| `WS /ws/{session_id}` | Live interviewer and judge report |
+| `GET /workflows`, `GET /interviews` | Candidate history |
+| `POST /coaching/analyze` | JD-versus-resume analysis |
+| `POST /coaching/salary` | Salary negotiation coaching |
+| `GET /knowledge/status`, `POST /knowledge/documents`, `POST /knowledge/search` | Candidate-owned RAG knowledge |
 
-## Candidate knowledge flow (RAG)
+---
 
-RAG is optional and deliberately additive: the interview continues when the
-embedding provider or knowledge database is unavailable. When configured, the
-backend validates and chunks candidate-owned material, embeds it with Gemini,
-and stores the vectors in `knowledge_chunks`. Each retrieval query is filtered
-by `user_id` in both the API call and the database function. During a live
-interview the three most relevant, source-labelled chunks are added to the
-interviewer prompt; the model is instructed to use them only when relevant and
-not invent candidate experience. Final reports are also indexed to support
-future practice.
-
-For a production deployment, set `GEMINI_API_KEY`, run the included Supabase
-schema/migration, and monitor embedding-provider quotas. The application
-returns an explicit knowledge-unavailable state while retaining preparation and
-interview functionality.
+**HUSTLRZZ V2** brings role relevance, live practice, and private delivery
+feedback together so candidates can enter interviews prepared to communicate —
+not just to answer.
