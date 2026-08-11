@@ -5,7 +5,7 @@ import { useCamera } from "@/hooks/useCamera";
 import { useMediapipe } from "@/hooks/useMediaPipe";
 import { Button } from "@/components/ui/button";
 import { Badge, Switch } from "@/components/ui/badge";
-import { Hand, Eye, Activity, CameraOff } from "lucide-react";
+import { Hand, Eye, Activity, CameraOff, Loader2 } from "lucide-react";
 
 export function CameraPanel() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -24,8 +24,10 @@ export function CameraPanel() {
     badPostureDetectionCounter,
     badPostureDuration,
     isHandOnScreenRef,
-    notFacingRef,
+    isEyeContactRef,
     hasBadPostureRef,
+    ready,
+    processingError,
   } = useMediapipe(videoRef, canvasRef, overlay, live);
 
   return (
@@ -54,29 +56,30 @@ export function CameraPanel() {
         <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover z-10" />
         <canvas ref={canvasRef} width={600} height={480} className="absolute inset-0 w-full h-full z-20" style={{ backgroundColor: "transparent" }} />
         {status !== "live" && <p className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground z-30">Camera off</p>}
+        {live && !ready && !processingError && <p className="absolute inset-0 flex items-center justify-center gap-2 bg-background/50 text-sm text-muted-foreground z-30"><Loader2 className="h-4 w-4 animate-spin" /> Starting private posture feedback…</p>}
       </div>
 
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">Overlay</span>
+        <span className="text-xs text-muted-foreground">Show posture and hand guide</span>
         <Switch checked={overlay} onCheckedChange={setOverlay} />
       </div>
+      {processingError && <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">{processingError}</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Metric icon={<Hand className="h-4 w-4" />} title="Gesture" on={isHandOnScreenRef.current} count={handDetectionCounter} dur={handDetectionDuration} />
-        <Metric icon={<Eye className="h-4 w-4" />} title="Eye contact" on={!notFacingRef.current} count={notFacingCounter} dur={notFacingDuration} invert />
-        <Metric icon={<Activity className="h-4 w-4" />} title="Bad posture" on={hasBadPostureRef.current} count={badPostureDetectionCounter} dur={badPostureDuration} />
+        <Metric icon={<Hand className="h-4 w-4" />} title="Gesture" good={isHandOnScreenRef.current} activeLabel="detected" idleLabel="not detected" count={handDetectionCounter} dur={handDetectionDuration} />
+        <Metric icon={<Eye className="h-4 w-4" />} title="Eye contact" good={isEyeContactRef.current} activeLabel="contact" idleLabel="looking away" count={notFacingCounter} dur={notFacingDuration} />
+        <Metric icon={<Activity className="h-4 w-4" />} title="Posture" good={!hasBadPostureRef.current} activeLabel="steady" idleLabel="adjust" count={badPostureDetectionCounter} dur={badPostureDuration} />
       </div>
     </div>
   );
 }
 
-function Metric({ icon, title, on, count, dur, invert }: { icon: React.ReactNode; title: string; on: boolean; count: number; dur: number; invert?: boolean }) {
-  const good = invert ? !on : on;
+function Metric({ icon, title, good, activeLabel, idleLabel, count, dur }: { icon: React.ReactNode; title: string; good: boolean; activeLabel: string; idleLabel: string; count: number; dur: number }) {
   return (
     <div className="rounded-lg border p-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium flex items-center gap-1">{icon}{title}</span>
-        <Badge className={good ? "bg-green-500" : "bg-red-500"}>{on ? (invert ? "away" : "detected") : (invert ? "contact" : "none")}</Badge>
+        <Badge className={good ? "bg-green-500" : "bg-amber-500"}>{good ? activeLabel : idleLabel}</Badge>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{count} events · {dur.toFixed(1)}s</p>
     </div>

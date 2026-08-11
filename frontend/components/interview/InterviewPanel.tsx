@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, wsUrl } from "@/lib/api";
+import { downloadJson } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
@@ -9,7 +10,7 @@ import { useCamera } from "@/hooks/useCamera";
 import { useMediapipe } from "@/hooks/useMediaPipe";
 import { useAudio } from "@/hooks/useAudio";
 import { CameraPanel } from "@/components/interview/CameraPanel";
-import { AlertCircle, Loader2, Mic, MicOff, Send } from "lucide-react";
+import { AlertCircle, Download, Loader2, Mic, MicOff, Send } from "lucide-react";
 
 interface Turn { role: string; text: string }
 
@@ -74,6 +75,8 @@ export function InterviewPanel() {
         }
       } else if (msg.type === "report") {
         setReport(msg.data);
+      } else if (msg.type === "error") {
+        setSessionError(msg.data?.message || "The interviewer could not process that answer. Please try again.");
       }
     };
     ws.onerror = () => setSessionError("The interview connection was interrupted. Your saved preparation pack is unaffected.");
@@ -171,7 +174,7 @@ export function InterviewPanel() {
 
 function ReportPanel({ report }: { report: any }) {
   const scores = Object.entries(report?.scores || {}) as [string, number][];
-  return <Card><CardHeader><CardTitle>Your coaching report</CardTitle><p className="text-sm text-muted-foreground">Use this feedback to choose the next practice focus.</p></CardHeader><CardContent className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+  return <Card><CardHeader className="flex-row items-start justify-between space-y-0"><div><CardTitle>Your coaching report</CardTitle><p className="mt-1 text-sm text-muted-foreground">Use this feedback to choose the next practice focus.</p></div><Button size="sm" variant="outline" onClick={() => downloadJson("hustlrzz-coaching-report.json", report)}><Download className="h-4 w-4" /> Export report</Button></CardHeader><CardContent className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
     <div className="grid grid-cols-2 gap-3">{scores.map(([label, score]) => <div key={label} className="rounded-lg bg-secondary p-3"><p className="text-xs font-medium text-muted-foreground capitalize">{label.replace(/_/g, " ")}</p><p className="mt-1 text-2xl font-semibold">{score}<span className="text-sm text-muted-foreground">/100</span></p></div>)}</div>
     <div className="space-y-4"><div><h3 className="font-semibold">Summary</h3><p className="mt-1 text-sm leading-6 text-muted-foreground">{report?.summary || "Your report has been saved to history."}</p></div>{report?.improvements?.length ? <div><h3 className="font-semibold">Next focus</h3><ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground">{report.improvements.slice(0, 3).map((item: string) => <li key={item}>{item}</li>)}</ul></div> : null}</div>
   </CardContent></Card>;

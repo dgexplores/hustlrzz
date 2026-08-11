@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { downloadJson } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Brain, Database, FileText, ShieldCheck } from "lucide-react";
+import { Loader2, Brain, Database, Download, FileText, ShieldCheck, Upload } from "lucide-react";
 import type { Question } from "@/lib/types";
 
 interface FlowResult {
@@ -24,6 +25,7 @@ interface FlowResult {
 
 export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
   const [resumeText, setResumeText] = useState("");
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState("");
   const [company, setCompany] = useState("");
   const [portfolioText, setPortfolioText] = useState("");
@@ -32,18 +34,25 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FlowResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const run = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     const fd = new FormData();
-    fd.set("resume_text", resumeText);
     fd.set("job_description", jobDescription);
     fd.set("company_name", company);
     fd.set("num_questions", String(numQuestions));
     try {
-      const res = await api<{ success: boolean } & FlowResult>("/workflows/start", {
+      let endpoint = "/workflows/start";
+      if (resumeFile) {
+        fd.set("file", resumeFile);
+        endpoint = "/workflows/upload";
+      } else {
+        fd.set("resume_text", resumeText);
+      }
+      const res = await api<{ success: boolean } & FlowResult>(endpoint, {
         method: "POST",
         body: fd,
       });
@@ -80,7 +89,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
             <Brain className="h-5 w-5" /> Prepare your interview
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Paste your resume and a job description. The coach generates personalized
+            Upload a PDF/DOCX resume or paste its text. The coach generates personalized
             questions, model answers, and a JD-vs-resume match report.
           </p>
         </CardHeader>
@@ -102,9 +111,43 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
                 <div className="space-y-2"><Label htmlFor="notes">Practice notes</Label><Textarea id="notes" rows={3} value={notesText} onChange={(e) => setNotesText(e.target.value)} placeholder="Areas to improve, previous feedback, target stories…" /></div>
               </div>
             </details>
-            <div className="space-y-2">
-              <Label htmlFor="resume">Resume</Label>
-              <Textarea id="resume" rows={8} placeholder="Paste your resume text…" value={resumeText} onChange={(e) => setResumeText(e.target.value)} required />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="resume">Resume</Label>
+                <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4" /> {resumeFile ? "Replace file" : "Upload PDF or DOCX"}
+                </Button>
+              </div>
+              <input
+                ref={fileInputRef}
+                id="resume-file"
+                className="sr-only"
+                type="file"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  if (!file) return;
+                  if (!/\.(pdf|docx)$/i.test(file.name)) {
+                    setError("Upload a PDF or DOCX resume.");
+                    e.currentTarget.value = "";
+                    return;
+                  }
+                  if (file.size > 5 * 1024 * 1024) {
+                    setError("Resume files must be 5 MB or smaller.");
+                    e.currentTarget.value = "";
+                    return;
+                  }
+                  setError(null);
+                  setResumeFile(file);
+                }}
+              />
+              {resumeFile ? (
+                <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                  <span className="flex min-w-0 items-center gap-2"><FileText className="h-4 w-4 shrink-0 text-primary" /><span className="truncate">{resumeFile.name}</span></span>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => { setResumeFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>Use pasted text</Button>
+                </div>
+              ) : <Textarea id="resume" rows={8} placeholder="Paste your resume text…" value={resumeText} onChange={(e) => setResumeText(e.target.value)} required={!resumeFile} />}
+              <p className="text-xs text-muted-foreground">PDF and DOCX text is extracted securely for this preparation. Maximum file size: 5 MB.</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="jd">Job description</Label>
@@ -115,7 +158,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
               <Input id="nq" type="number" min={1} max={50} value={numQuestions} onChange={(e) => setNumQuestions(Number(e.target.value))} />
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || (!resumeFile && !resumeText.trim())}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate interview pack"}
             </Button>
           </form>
@@ -123,8 +166,9 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
       </Card>
 
       <Card className="min-h-[620px]">
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle>Generated pack</CardTitle>
+          {result && <Button size="sm" variant="outline" onClick={() => downloadJson("hustlrzz-interview-pack.json", result)}><Download className="h-4 w-4" /> Export pack</Button>}
         </CardHeader>
         <CardContent className="space-y-4">
           {!result && (

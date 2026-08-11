@@ -8,4 +8,7 @@ export const initializeHandDetection = async (vision: any): Promise<HandLandmark
     },
     numHands: 2,
     runningMode: "VIDEO",
+    minHandDetectionConfidence: 0.6,
+    minHandPresenceConfidence: 0.6,
+    minTrackingConfidence: 0.6,
   });

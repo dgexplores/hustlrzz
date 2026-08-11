@@ -10,8 +10,12 @@ from __future__ import annotations
 
 import secrets
 import time
+import zipfile
+from io import BytesIO
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
+from xml.etree import ElementTree
 
 from fastapi import (
     APIRouter,
@@ -120,9 +124,10 @@ async def start_workflow(
     github_link: str = Form(""),
     portfolio_link: str = Form(""),
     additional_info: str = Form(""),
-    num_questions: int = Form(50),
+    num_questions: int = Form(config.DEFAULT_QUESTION_COUNT),
     user: dict = Depends(get_user),
 ):
+    num_questions = max(1, min(num_questions, 50))
     t0 = time.time()
     rag_status = {"available": rag.is_ready(), "indexed": False}
     # Indexing is additive. An embedding outage must never prevent a candidate
@@ -186,18 +191,17 @@ async def start_workflow_upload(
     linkedin_link: str = Form(""),
     github_link: str = Form(""),
     portfolio_link: str = Form(""),
-    num_questions: int = Form(50),
+    additional_info: str = Form(""),
+    num_questions: int = Form(config.DEFAULT_QUESTION_COUNT),
     user: dict = Depends(get_user),
 ):
-    """Upload a PDF resume and run the same prep workflow."""
+    """Upload a PDF or DOCX resume and run the same preparation workflow."""
     content = await file.read()
     if len(content) > config.MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large")
-    if not (file.filename or "").lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF resumes supported (or paste text).")
-    resume_text = _extract_pdf_text(content)
+    resume_text = _extract_resume_text(file.filename or "", content)
     if not resume_text or len(resume_text.strip()) < config.MIN_RESUME_TEXT_LENGTH:
-        raise HTTPException(status_code=400, detail="Could not extract enough text from PDF.")
+        raise HTTPException(status_code=400, detail="Could not extract enough text from this PDF or DOCX file.")
     return await start_workflow(
         resume_text=resume_text,
         job_description=job_description,
@@ -205,19 +209,44 @@ async def start_workflow_upload(
         linkedin_link=linkedin_link,
         github_link=github_link,
         portfolio_link=portfolio_link,
+        additional_info=additional_info,
         num_questions=num_questions,
         user=user,
     )
 
 
+def _extract_resume_text(filename: str, content: bytes) -> str:
+    suffix = Path(filename).suffix.lower()
+    if suffix == ".pdf":
+        return _extract_pdf_text(content)
+    if suffix == ".docx":
+        return _extract_docx_text(content)
+    raise HTTPException(status_code=400, detail="Upload a PDF or DOCX resume, or paste the text instead.")
+
+
 def _extract_pdf_text(content: bytes) -> str:
     from pypdf import PdfReader
-    from io import BytesIO
 
     try:
         reader = PdfReader(BytesIO(content))
         return "\n".join((page.extract_text() or "") for page in reader.pages)
     except Exception:
+        return ""
+
+
+def _extract_docx_text(content: bytes) -> str:
+    """Read the main DOCX document XML without adding a document-parser dependency."""
+    try:
+        with zipfile.ZipFile(BytesIO(content)) as archive:
+            root = ElementTree.fromstring(archive.read("word/document.xml"))
+        namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+        paragraphs = []
+        for node in root.iter(f"{namespace}p"):
+            parts = [text.text or "" for text in node.iter(f"{namespace}t")]
+            if parts:
+                paragraphs.append("".join(parts))
+        return "\n".join(paragraphs)
+    except (KeyError, zipfile.BadZipFile, ElementTree.ParseError):
         return ""
 
 
@@ -382,12 +411,18 @@ async def interview_ws(
     try:
         # Opening question.
         opener = {"question": questions[0]["question"] if questions else "Tell me about yourself.", "message": ""}
+        transcript.append({"from": "interviewer", "text": opener["question"]})
         await websocket.send_json({"type": "question", "data": opener})
         while True:
             msg = await websocket.receive_json()
             if msg.get("type") == "message":
-                text = msg.get("text", "")
-                transcript.append({"from": "candidate", "text": text})
+                text = str(msg.get("text", "")).strip()
+                if not text:
+                    await websocket.send_json({"type": "error", "data": {"message": "Please send an answer before continuing."}})
+                    continue
+                if len(text) > 12000:
+                    await websocket.send_json({"type": "error", "data": {"message": "Please keep one answer under 12,000 characters."}})
+                    continue
                 retrieval_context = ""
                 if rag.is_ready():
                     try:
@@ -397,7 +432,12 @@ async def interview_ws(
                         # A coaching session should continue if retrieval is slow
                         # or unavailable; the prepared question script remains.
                         retrieval_context = ""
-                reply = interviewer_turn(system, transcript, text, retrieval_context=retrieval_context)
+                try:
+                    reply = interviewer_turn(system, transcript, text, retrieval_context=retrieval_context)
+                except provider.ProviderError:
+                    await websocket.send_json({"type": "error", "data": {"message": "The interviewer is temporarily unavailable. Please try your answer again in a moment."}})
+                    continue
+                transcript.append({"from": "candidate", "text": text})
                 transcript.append({"from": "interviewer", "text": reply.get("message") or reply.get("question") or ""})
                 await websocket.send_json({"type": "message", "data": reply})
             elif msg.get("type") == "end":

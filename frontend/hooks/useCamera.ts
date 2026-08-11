@@ -33,7 +33,7 @@ export const useCamera = (
           return;
         }
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 600 }, height: { ideal: 480 } },
+          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         });
         if (cancelled) return stopStream();

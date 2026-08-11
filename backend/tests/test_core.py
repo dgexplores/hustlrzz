@@ -2,6 +2,8 @@
 
 import importlib
 import sys
+import zipfile
+from io import BytesIO
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -100,3 +102,17 @@ def test_interviewer_turn_adds_retrieval_context(monkeypatch):
     assert reply["message"] == "Next question"
     assert "CANDIDATE-OWNED REFERENCE CONTEXT" in seen["system"]
     assert "Built FastAPI services" in seen["system"]
+
+
+def test_extract_docx_resume_text_without_extra_dependency():
+    from backend.app import _extract_resume_text
+
+    content = BytesIO()
+    with zipfile.ZipFile(content, "w") as archive:
+        archive.writestr(
+            "word/document.xml",
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:body><w:p><w:r><w:t>Built FastAPI services</w:t></w:r></w:p>'
+            '<w:p><w:r><w:t>Improved latency</w:t></w:r></w:p></w:body></w:document>',
+        )
+    assert _extract_resume_text("resume.docx", content.getvalue()) == "Built FastAPI services\nImproved latency"
