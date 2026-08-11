@@ -72,14 +72,20 @@ def test_company_sources_are_unique_and_attributable():
     assert len(sources) == 1
     assert sources[0]["id"] == "S1"
     assert sources[0]["domain"] == "example.com"
+    assert sources[0]["category"] == "general"
 
 
 def test_company_research_discards_unknown_citations(monkeypatch):
     from backend.workflow import preparation
     monkeypatch.setattr(preparation.provider, "chat_json_strict", lambda *_: {
         "summary": "Evidence-based brief",
-        "hiring_priorities": ["Reliable systems"],
-        "interview_intelligence": [],
+        "role_demands": [
+            {"demand": "Reliable systems", "source_ids": ["S1"]},
+            {"demand": "Unsupported demand", "source_ids": ["S99"]},
+        ],
+        "interview_structure": [{"stage": "Technical", "source_ids": ["S1"]}],
+        "question_patterns": [{"example": "Design an API", "source_ids": ["S1", "S99"]}],
+        "evaluation_criteria": [{"criterion": "Clarity", "source_ids": ["S99"]}],
         "recent_signals": [
             {"signal": "Supported", "source_ids": ["S1"]},
             {"signal": "Unsupported", "source_ids": ["S99"]},
@@ -91,6 +97,10 @@ def test_company_research_discards_unknown_citations(monkeypatch):
         "domain": "example.com", "snippet": "Hiring engineers.", "published_at": "",
     }])
     assert [signal["signal"] for signal in result["recent_signals"]] == ["Supported"]
+    assert [item["demand"] for item in result["role_demands"]] == ["Reliable systems"]
+    assert result["hiring_priorities"] == ["Reliable systems"]
+    assert result["question_patterns"][0]["source_ids"] == ["S1"]
+    assert result["evaluation_criteria"] == []
 
 
 def test_chat_falls_back_when_preferred_fails(monkeypatch):

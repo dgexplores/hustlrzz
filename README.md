@@ -45,9 +45,13 @@ Rather than serving a generic list of questions, the system starts from the
 candidate's own resume and target role. It produces a responsive, focused pack
 of 12 questions by default, with company-matching analysis and model answers.
 When a target company is supplied, a separate evidence-first research step
-retrieves current careers, strategy, and recent-news signals. The brief records
-its retrieval time, confidence, and clickable source IDs; unsupported citations
-are removed before results reach the interface.
+searches the public web on demand—only when the preparation is run. It covers
+official role requirements, hiring stages, candidate-reported question patterns,
+evaluation criteria, company values, engineering/product signals, annual reports,
+and recent news. The resulting interview blueprint records its retrieval time,
+confidence, and clickable source IDs; unsupported citations are removed before
+results reach the interface. Public reports are treated as likely patterns, never
+as a guaranteed private hiring process.
 
 ### A real conversational mock interview
 
@@ -166,8 +170,9 @@ delivery with Resend.
   `NEXT_PUBLIC_API_URL` for Preview and Production.
 - **Railway:** deploy the repository Dockerfile; configure provider and
   Supabase server keys; add permitted custom origins to `CORS_ORIGINS`.
-  Set `ENABLE_WEB_SEARCH=true` for current company intelligence (enabled by
-  default in new deployments).
+  Set `ENABLE_WEB_SEARCH=true` for on-demand company intelligence (enabled by
+  default in new deployments). `WEB_SEARCH_TIMEOUT_SECONDS=15` keeps broad web
+  research bounded and lets preparation fall back safely when sources are slow.
 - **Supabase:** apply the schema or RAG migration. Never expose
   `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
 - **RAG:** configure `GEMINI_API_KEY` to enable embeddings; the app remains

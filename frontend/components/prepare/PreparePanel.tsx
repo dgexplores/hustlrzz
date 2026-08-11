@@ -29,6 +29,10 @@ interface FlowResult {
     summary: string;
     hiring_priorities: string[];
     interview_intelligence: string[];
+    role_demands: Array<{ demand: string; evidence?: string; source_ids: string[] }>;
+    interview_structure: Array<{ stage: string; what_to_expect?: string; source_ids: string[] }>;
+    question_patterns: Array<{ category?: string; example: string; why_asked?: string; source_ids: string[] }>;
+    evaluation_criteria: Array<{ criterion: string; how_to_demonstrate?: string; source_ids: string[] }>;
     recent_signals: Array<{ signal: string; why_it_matters?: string; source_ids: string[] }>;
     preparation_actions: string[];
     sources: Array<{ id: string; title: string; url: string; domain: string; published_at?: string }>;
@@ -114,7 +118,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
             <div className="space-y-2">
               <Label htmlFor="company">Target company</Label>
               <Input id="company" placeholder="e.g. Google, Amazon, Meta" value={company} onChange={(e) => setCompany(e.target.value)} />
-              <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><Radio className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />Used to research current hiring priorities, market signals, and interview patterns with visible sources.</p>
+              <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><Radio className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />Searched on demand to build a current, cited blueprint of role demands, interview stages, question patterns, evaluation criteria, culture, and market signals.</p>
             </div>
             <details className="rounded-lg border border-input bg-secondary/25 p-3">
               <summary className="cursor-pointer text-sm font-semibold text-foreground">Add optional knowledge sources</summary>
@@ -223,8 +227,17 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
                 </span>
               </div>
               <p className="text-sm leading-6 text-muted-foreground">{result.company_research.summary}</p>
-              {result.company_research.hiring_priorities.length > 0 && (
-                <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Likely priorities</p><div className="mt-2 flex flex-wrap gap-2">{result.company_research.hiring_priorities.slice(0, 6).map((item) => <span key={item} className="rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground">{item}</span>)}</div></div>
+              {(result.company_research.role_demands?.length ?? 0) > 0 && (
+                <div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What this role demands</p><div className="grid gap-2 sm:grid-cols-2">{result.company_research.role_demands.slice(0, 6).map((item, index) => <div key={`${item.demand}-${index}`} className="rounded-lg border bg-secondary/25 p-3"><p className="text-sm font-medium">{item.demand}</p>{item.evidence && <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.evidence}</p>}<p className="mt-1 text-[11px] font-semibold text-primary">{item.source_ids.join(" · ")}</p></div>)}</div></div>
+              )}
+              {(result.company_research.interview_structure?.length ?? 0) > 0 && (
+                <div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Likely interview loop</p><div className="space-y-2">{result.company_research.interview_structure.slice(0, 6).map((item, index) => <div key={`${item.stage}-${index}`} className="flex gap-3 rounded-lg bg-secondary/35 p-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{index + 1}</span><div><p className="text-sm font-medium">{item.stage}</p>{item.what_to_expect && <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{item.what_to_expect}</p>}<p className="mt-1 text-[11px] font-semibold text-primary">{item.source_ids.join(" · ")}</p></div></div>)}</div></div>
+              )}
+              {(result.company_research.question_patterns?.length ?? 0) > 0 && (
+                <details className="rounded-lg border p-3" open><summary className="cursor-pointer text-sm font-semibold">Question patterns ({result.company_research.question_patterns.length})</summary><div className="mt-3 space-y-2">{result.company_research.question_patterns.slice(0, 8).map((item, index) => <div key={`${item.example}-${index}`} className="rounded-md bg-secondary/30 p-3"><div className="flex items-start justify-between gap-2"><p className="text-sm font-medium">{item.example}</p>{item.category && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{item.category}</span>}</div>{item.why_asked && <p className="mt-1 text-xs leading-5 text-muted-foreground">Why they ask: {item.why_asked}</p>}<p className="mt-1 text-[11px] font-semibold text-primary">{item.source_ids.join(" · ")}</p></div>)}</div></details>
+              )}
+              {(result.company_research.evaluation_criteria?.length ?? 0) > 0 && (
+                <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">How you may be evaluated</p><div className="mt-2 flex flex-wrap gap-2">{result.company_research.evaluation_criteria.slice(0, 6).map((item, index) => <span key={`${item.criterion}-${index}`} title={item.how_to_demonstrate} className="rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground">{item.criterion} <span className="font-semibold text-primary">{item.source_ids.join("/")}</span></span>)}</div></div>
               )}
               {result.company_research.recent_signals.length > 0 && (
                 <div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent signals</p>{result.company_research.recent_signals.slice(0, 4).map((item, index) => <div key={`${item.signal}-${index}`} className="rounded-lg border bg-secondary/30 p-3"><p className="text-sm font-medium">{item.signal}</p>{item.why_it_matters && <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.why_it_matters}</p>}<p className="mt-1 text-[11px] font-medium text-primary">{item.source_ids.join(" · ")}</p></div>)}</div>

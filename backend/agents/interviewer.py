@@ -42,6 +42,9 @@ def build_interviewer_system(
                 "retrieved_at": company_context.get("retrieved_at"),
                 "summary": company_context.get("summary"),
                 "hiring_priorities": company_context.get("hiring_priorities", []),
+                "interview_structure": company_context.get("interview_structure", [])[:6],
+                "question_patterns": company_context.get("question_patterns", [])[:8],
+                "evaluation_criteria": company_context.get("evaluation_criteria", [])[:6],
                 "recent_signals": company_context.get("recent_signals", []),
             }, ensure_ascii=False)
             + "\nUse this only to shape relevant questions; do not present uncertain signals as facts.\n"
