@@ -8,6 +8,8 @@
 [Backend health ↗](https://hustlrzzv2-production.up.railway.app/health) &nbsp;·&nbsp;
 [Explore the code](https://github.com/dgexplores/hustlrzzv2)
 
+[Launch readiness, privacy boundaries, and rollout gates](docs/LAUNCH_READINESS.md)
+
 ---
 
 ## The problem
@@ -37,11 +39,13 @@ flowchart LR
 | **02 — Practice** | Respond by typing or voice | Runs a live, follow-up capable AI interview over WebSocket. |
 | **03 — Improve** | Review the session | Delivers a scored report, practical recommendations, and presentation signals. |
 
-The Coaching Lab also includes a realistic **Practice Room**: rehearse behavioral,
-leadership, introduction, or offer-negotiation scenarios by voice or keyboard while
-camera-based gesture, gaze, and posture signals run privately in the browser. The
-coach combines the editable transcript with directional presence metrics to return
-separate content and delivery feedback, a stronger answer, and a focused next drill.
+The Coaching Lab also includes a consent-first, multi-turn **Practice Room**:
+rehearse behavioral, leadership, introduction, or offer-negotiation conversations
+against realistic follow-ups and objections by voice or keyboard. Camera-based
+gesture, gaze, and posture signals run privately in the browser and permissions are
+requested only after the user enters the studio. The final report combines the
+approved transcript with session-normalized presence metrics, transcript-linked
+feedback, a stronger answer, a focused next drill, and browser-local attempt history.
 
 ## What makes it different
 
@@ -194,6 +198,7 @@ delivery with Resend.
 | `POST /coaching/analyze` | JD-versus-resume analysis |
 | `POST /coaching/salary` | Salary negotiation coaching |
 | `POST /coaching/practice` | Typed/voice rehearsal → combined content and delivery coaching |
+| `POST /coaching/practice/turn` | Secure multi-turn coaching follow-up or objection |
 | `GET /knowledge/status`, `POST /knowledge/documents`, `POST /knowledge/search` | Candidate-owned RAG knowledge |
 
 ---

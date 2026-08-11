@@ -11,9 +11,10 @@ from __future__ import annotations
 import secrets
 import time
 import zipfile
+import math
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
@@ -287,6 +288,20 @@ class CoachingPracticeRequest(BaseModel):
     presence_metrics: dict = Field(default_factory=dict)
 
 
+class CoachingTurnMessage(BaseModel):
+    role: Literal["candidate", "coach"]
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class CoachingTurnRequest(BaseModel):
+    scenario: str = Field(min_length=1, max_length=100)
+    difficulty: Literal["supportive", "realistic", "challenging"] = "realistic"
+    coach_style: Literal["recruiter", "hiring-manager", "negotiator"] = "recruiter"
+    opening_prompt: str = Field(min_length=10, max_length=2000)
+    history: list[CoachingTurnMessage] = Field(default_factory=list, max_length=10)
+    candidate_answer: str = Field(min_length=10, max_length=4000)
+
+
 @router.post("/coaching/salary")
 def salary_script(payload: SalaryRequest, user: dict = Depends(get_user)):
     try:
@@ -307,14 +322,19 @@ async def analyze(payload: MatchAnalysisRequest, user: dict = Depends(get_user))
 
 @router.post("/coaching/practice")
 def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(get_user)):
-    allowed_metrics = {
-        key: max(0, float(value))
-        for key, value in payload.presence_metrics.items()
-        if key in {
+    allowed_metrics: dict[str, float] = {}
+    allowed_keys = {
             "handDetectionCounter", "handDetectionDuration", "notFacingCounter",
             "notFacingDuration", "badPostureDetectionCounter", "badPostureDuration",
-        } and isinstance(value, (int, float))
+            "sessionDurationSeconds", "eyeContactConsistency", "postureStability",
+            "gestureRatePerMinute",
     }
+    for key, value in payload.presence_metrics.items():
+        if key not in allowed_keys or isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        numeric = float(value)
+        if math.isfinite(numeric):
+            allowed_metrics[key] = min(max(0, numeric), 100_000)
     try:
         result = analysis.evaluate_coaching_practice(
             scenario=payload.scenario,
@@ -328,6 +348,25 @@ def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(get
     except provider.ProviderError as exc:
         status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
         raise HTTPException(status_code=status, detail="The practice coach is temporarily busy. Please retry shortly.")
+
+
+@router.post("/coaching/practice/turn")
+def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depends(get_user)):
+    try:
+        result = analysis.coaching_practice_turn(
+            scenario=payload.scenario,
+            difficulty=payload.difficulty,
+            coach_style=payload.coach_style,
+            opening_prompt=payload.opening_prompt,
+            history=[item.model_dump() for item in payload.history],
+            candidate_answer=payload.candidate_answer,
+        )
+        if result.get("error"):
+            raise HTTPException(status_code=502, detail="The coach returned an incomplete response. Please retry.")
+        return {"success": True, "data": result}
+    except provider.ProviderError as exc:
+        status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
+        raise HTTPException(status_code=status, detail="The live coach is temporarily busy. Your transcript remains available.")
 
 
 # --------------------------------------------------------------------------- #

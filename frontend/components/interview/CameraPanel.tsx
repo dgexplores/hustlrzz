@@ -13,7 +13,7 @@ export function CameraPanel() {
   const [overlay, setOverlay] = useState(true);
   const [retryKey, setRetryKey] = useState(0);
 
-  const { status, errorName } = useCamera(videoRef, retryKey);
+  const { status } = useCamera(videoRef, retryKey);
   const live = status === "live";
 
   const {
@@ -23,9 +23,9 @@ export function CameraPanel() {
     notFacingDuration,
     badPostureDetectionCounter,
     badPostureDuration,
-    isHandOnScreenRef,
-    isEyeContactRef,
-    hasBadPostureRef,
+    handVisible,
+    eyeContact,
+    postureGood,
     ready,
     processingError,
   } = useMediapipe(videoRef, canvasRef, overlay, live);
@@ -66,9 +66,9 @@ export function CameraPanel() {
       {processingError && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-foreground">{processingError}</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Metric icon={<Hand className="h-4 w-4" />} title="Gesture" good={isHandOnScreenRef.current} activeLabel="detected" idleLabel="not detected" count={handDetectionCounter} dur={handDetectionDuration} />
-        <Metric icon={<Eye className="h-4 w-4" />} title="Eye contact" good={isEyeContactRef.current} activeLabel="contact" idleLabel="looking away" count={notFacingCounter} dur={notFacingDuration} />
-        <Metric icon={<Activity className="h-4 w-4" />} title="Posture" good={!hasBadPostureRef.current} activeLabel="steady" idleLabel="adjust" count={badPostureDetectionCounter} dur={badPostureDuration} />
+        <Metric icon={<Hand className="h-4 w-4" />} title="Gesture" good={handVisible} activeLabel="detected" idleLabel="not detected" count={handDetectionCounter} dur={handDetectionDuration} />
+        <Metric icon={<Eye className="h-4 w-4" />} title="Eye contact" good={eyeContact} activeLabel="contact" idleLabel="looking away" count={notFacingCounter} dur={notFacingDuration} />
+        <Metric icon={<Activity className="h-4 w-4" />} title="Posture" good={postureGood} activeLabel="steady" idleLabel="adjust" count={badPostureDetectionCounter} dur={badPostureDuration} />
       </div>
     </div>
   );

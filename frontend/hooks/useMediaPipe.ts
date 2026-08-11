@@ -26,6 +26,9 @@ export const useMediapipe = (
   const [notFacingDuration, setNotFacingDuration] = useState(0);
   const [badPostureDetectionCounter, setBadPostureDetectionCounter] = useState(0);
   const [badPostureDuration, setBadPostureDuration] = useState(0);
+  const [handVisible, setHandVisible] = useState(false);
+  const [eyeContact, setEyeContact] = useState(true);
+  const [postureGood, setPostureGood] = useState(true);
   const isHandOnScreenRef = useRef(false);
   const isEyeContactRef = useRef(true);
   const notFacingRef = useRef(false);
@@ -71,13 +74,13 @@ export const useMediapipe = (
         eyeContactFramesRef.current += 1; eyeAwayFramesRef.current = 0;
         if (notFacingRef.current && eyeContactFramesRef.current >= CONFIRM_FRAMES) {
           setNotFacingDuration((value) => value + (now - eyeAwayStartRef.current) / 1000);
-          notFacingRef.current = false; isEyeContactRef.current = true;
+          notFacingRef.current = false; isEyeContactRef.current = true; setEyeContact(true);
         }
       } else {
         eyeAwayFramesRef.current += 1; eyeContactFramesRef.current = 0;
         if (!notFacingRef.current && eyeAwayFramesRef.current >= CONFIRM_FRAMES) {
           setNotFacingCounter((value) => value + 1);
-          eyeAwayStartRef.current = now; notFacingRef.current = true; isEyeContactRef.current = false;
+          eyeAwayStartRef.current = now; notFacingRef.current = true; isEyeContactRef.current = false; setEyeContact(false);
         }
       }
     };
@@ -87,13 +90,13 @@ export const useMediapipe = (
         poorPostureFramesRef.current += 1; goodPostureFramesRef.current = 0;
         if (!hasBadPostureRef.current && poorPostureFramesRef.current >= CONFIRM_FRAMES) {
           setBadPostureDetectionCounter((value) => value + 1);
-          postureStartRef.current = now; hasBadPostureRef.current = true;
+          postureStartRef.current = now; hasBadPostureRef.current = true; setPostureGood(false);
         }
       } else {
         goodPostureFramesRef.current += 1; poorPostureFramesRef.current = 0;
         if (hasBadPostureRef.current && goodPostureFramesRef.current >= CONFIRM_FRAMES) {
           setBadPostureDuration((value) => value + (now - postureStartRef.current) / 1000);
-          hasBadPostureRef.current = false;
+          hasBadPostureRef.current = false; setPostureGood(true);
         }
       }
     };
@@ -114,8 +117,8 @@ export const useMediapipe = (
       const hand = handDetectorRef.current?.detectForVideo(video, now);
       if (hand) {
         const visible = hand.landmarks.length > 0;
-        if (visible && !isHandOnScreenRef.current) { handStartRef.current = now; isHandOnScreenRef.current = true; }
-        if (!visible && isHandOnScreenRef.current) { setHandDetectionDuration((value) => value + (now - handStartRef.current) / 1000); isHandOnScreenRef.current = false; }
+        if (visible && !isHandOnScreenRef.current) { handStartRef.current = now; isHandOnScreenRef.current = true; setHandVisible(true); }
+        if (!visible && isHandOnScreenRef.current) { setHandDetectionDuration((value) => value + (now - handStartRef.current) / 1000); isHandOnScreenRef.current = false; setHandVisible(false); }
         const wrists = hand.landmarks.map((landmarks) => landmarks[0]).filter(Boolean);
         const moved = wrists.some((wrist, index) => {
           const previous = handWristRef.current[index];
@@ -146,5 +149,5 @@ export const useMediapipe = (
     };
   }, [canvasRef, enabled, overlayEnabled, videoRef, ready]);
 
-  return { ready, processingError, handDetectionCounter, handDetectionDuration, notFacingCounter, notFacingDuration, badPostureDetectionCounter, badPostureDuration, isHandOnScreenRef, isEyeContactRef, hasBadPostureRef };
+  return { ready, processingError, handDetectionCounter, handDetectionDuration, notFacingCounter, notFacingDuration, badPostureDetectionCounter, badPostureDuration, handVisible, eyeContact, postureGood };
 };
