@@ -33,7 +33,7 @@ export function CameraPanel() {
   return (
     <div className="space-y-4">
       {status === "no-device" && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
           <p className="font-semibold flex items-center gap-2"><CameraOff className="h-4 w-4" /> No camera detected (browser reports 0 devices).</p>
           <p className="mt-1">Open the MacBook lid or check System Settings → Privacy &amp; Security → Camera so your browser is enabled, then reload.</p>
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setRetryKey((k) => k + 1)}>Retry camera</Button>
@@ -46,13 +46,13 @@ export function CameraPanel() {
         </div>
       )}
       {status === "in-use" && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
           Camera busy — close Zoom/FaceTime/Meet, then retry.
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setRetryKey((k) => k + 1)}>Retry</Button>
         </div>
       )}
 
-      <div className="relative w-full h-72 bg-slate-100 rounded-xl overflow-hidden">
+      <div className="relative w-full h-72 bg-secondary rounded-xl overflow-hidden">
         <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover z-10" />
         <canvas ref={canvasRef} width={600} height={480} className="absolute inset-0 w-full h-full z-20" style={{ backgroundColor: "transparent" }} />
         {status !== "live" && <p className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground z-30">Camera off</p>}
@@ -63,7 +63,7 @@ export function CameraPanel() {
         <span className="text-xs text-muted-foreground">Show posture and hand guide</span>
         <Switch checked={overlay} onCheckedChange={setOverlay} />
       </div>
-      {processingError && <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">{processingError}</p>}
+      {processingError && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-foreground">{processingError}</p>}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Metric icon={<Hand className="h-4 w-4" />} title="Gesture" good={isHandOnScreenRef.current} activeLabel="detected" idleLabel="not detected" count={handDetectionCounter} dur={handDetectionDuration} />

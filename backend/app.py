@@ -168,6 +168,10 @@ async def start_workflow(
     # Persist workflow record (if db ready).
     if dbc.is_ready():
         try:
+            persisted_match = {
+                **(result.get("company_match") or {}),
+                "company_research": result.get("company_research") or {},
+            }
             dbc.insert("workflows", [{
                 "workflow_id": result["workflow_id"],
                 "user_id": user["uid"],
@@ -175,7 +179,7 @@ async def start_workflow(
                 "company": company_name,
                 "questions": result.get("questions", []),
                 "answers": result.get("answers", []),
-                "match": result.get("company_match", {}),
+                "match": persisted_match,
                 "created_at": _now(),
             }])
         except Exception as e:
@@ -404,11 +408,13 @@ async def interview_ws(
     except Exception:
         pass
 
+    stored_match = workflow_record.get("match") if isinstance(workflow_record.get("match"), dict) else {}
     system = build_interviewer_system(
         workflow_record.get("company") or "the target company",
         workflow_record.get("title") or "the target role",
         questions,
         duration,
+        company_context=stored_match.get("company_research") if isinstance(stored_match, dict) else None,
     )
     transcript: list[dict] = []
 

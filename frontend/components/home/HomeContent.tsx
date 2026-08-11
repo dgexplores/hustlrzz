@@ -78,8 +78,8 @@ export function HomeContent() {
           {FEATURES.map(({ icon: Icon, title, description }) => (
             <div key={title} className="rounded-xl border bg-card p-6 surface-transition hover:border-primary/30">
               <Icon className="h-6 w-6 text-primary mb-3" />
-              <h3 className="font-semibold text-slate-900">{title}</h3>
-              <p className="mt-1 text-sm text-slate-600">{description}</p>
+              <h3 className="font-semibold text-foreground">{title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
             </div>
           ))}
         </div>

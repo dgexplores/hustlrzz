@@ -6,7 +6,7 @@ import { downloadJson } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Brain, Database, Download, FileText, ShieldCheck, Upload } from "lucide-react";
+import { Building2, Clock3, ExternalLink, Loader2, Brain, Database, Download, FileText, Radio, ShieldCheck, Upload } from "lucide-react";
 import type { Question } from "@/lib/types";
 
 interface FlowResult {
@@ -21,6 +21,18 @@ interface FlowResult {
     summary: string;
   };
   knowledge?: { available: boolean; indexed: boolean; warning?: string; chunk_count?: number };
+  company_research?: {
+    status: "live" | "fallback" | "not_requested";
+    company: string;
+    retrieved_at: string;
+    confidence: "high" | "medium" | "low" | "none";
+    summary: string;
+    hiring_priorities: string[];
+    interview_intelligence: string[];
+    recent_signals: Array<{ signal: string; why_it_matters?: string; source_ids: string[] }>;
+    preparation_actions: string[];
+    sources: Array<{ id: string; title: string; url: string; domain: string; published_at?: string }>;
+  };
 }
 
 export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
@@ -100,8 +112,9 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
           </div>
           <form onSubmit={run} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="company">Company (for interview style)</Label>
+              <Label htmlFor="company">Target company</Label>
               <Input id="company" placeholder="e.g. Google, Amazon, Meta" value={company} onChange={(e) => setCompany(e.target.value)} />
+              <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><Radio className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />Used to research current hiring priorities, market signals, and interview patterns with visible sources.</p>
             </div>
             <details className="rounded-lg border border-input bg-secondary/25 p-3">
               <summary className="cursor-pointer text-sm font-semibold text-foreground">Add optional knowledge sources</summary>
@@ -157,7 +170,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
               <Label htmlFor="nq">Number of questions</Label>
               <Input id="nq" type="number" min={1} max={50} value={numQuestions} onChange={(e) => setNumQuestions(Number(e.target.value))} />
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading || (!resumeFile && !resumeText.trim())}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate interview pack"}
             </Button>
@@ -175,7 +188,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
             <div className="py-20 text-center"><Database className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-3 text-sm font-medium">Your practice pack will appear here.</p><p className="mt-1 text-sm text-muted-foreground">Include a role, resume, and job description to begin.</p></div>
           )}
           {result?.knowledge && (
-            <div className={`rounded-lg border p-3 text-sm ${result.knowledge.indexed ? "border-primary/30 bg-accent/50" : "border-amber-300 bg-amber-50 text-amber-950"}`}>
+            <div className={`rounded-lg border p-3 text-sm ${result.knowledge.indexed ? "border-primary/30 bg-accent/50" : "border-amber-500/40 bg-amber-500/10 text-foreground"}`}>
               <div className="flex items-center gap-2 font-semibold"><FileText className="h-4 w-4" /> {result.knowledge.indexed ? "Knowledge context is ready" : "Knowledge context is unavailable"}</div>
               <p className="mt-1 text-xs leading-5">{result.knowledge.indexed ? `${result.knowledge.chunk_count ?? 0} searchable resume sections are available for future interview follow-ups.` : result.knowledge.warning ?? "The interview pack still works without semantic retrieval."}</p>
             </div>
@@ -190,6 +203,38 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
               <p className="text-sm"><span className="font-medium">Match:</span> {result.company_match.matched_skills.join(", ") || "—"}</p>
               <p className="text-sm"><span className="font-medium">Gaps:</span> {result.company_match.gap_skills.join(", ") || "—"}</p>
               <p className="text-sm"><span className="font-medium">Weaknesses:</span> {result.company_match.resume_weaknesses.join(", ") || "—"}</p>
+            </div>
+          )}
+          {result?.company_research && result.company_research.status !== "not_requested" && (
+            <div className="rounded-xl border bg-card p-4 space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex gap-3">
+                  <div className="rounded-lg bg-primary/10 p-2 text-primary"><Building2 className="h-5 w-5" /></div>
+                  <div>
+                    <h3 className="font-semibold">Current company brief</h3>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Clock3 className="h-3.5 w-3.5" />
+                      {result.company_research.retrieved_at ? `Researched ${new Date(result.company_research.retrieved_at).toLocaleString()}` : "Built-in profile"}
+                    </p>
+                  </div>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${result.company_research.status === "live" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}>
+                  {result.company_research.status === "live" ? `${result.company_research.confidence} confidence · live sources` : "Fallback profile"}
+                </span>
+              </div>
+              <p className="text-sm leading-6 text-muted-foreground">{result.company_research.summary}</p>
+              {result.company_research.hiring_priorities.length > 0 && (
+                <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Likely priorities</p><div className="mt-2 flex flex-wrap gap-2">{result.company_research.hiring_priorities.slice(0, 6).map((item) => <span key={item} className="rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground">{item}</span>)}</div></div>
+              )}
+              {result.company_research.recent_signals.length > 0 && (
+                <div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recent signals</p>{result.company_research.recent_signals.slice(0, 4).map((item, index) => <div key={`${item.signal}-${index}`} className="rounded-lg border bg-secondary/30 p-3"><p className="text-sm font-medium">{item.signal}</p>{item.why_it_matters && <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.why_it_matters}</p>}<p className="mt-1 text-[11px] font-medium text-primary">{item.source_ids.join(" · ")}</p></div>)}</div>
+              )}
+              {result.company_research.preparation_actions.length > 0 && (
+                <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">How to prepare</p><ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">{result.company_research.preparation_actions.slice(0, 5).map((item) => <li key={item} className="flex gap-2"><span className="text-primary">•</span><span>{item}</span></li>)}</ul></div>
+              )}
+              {result.company_research.sources.length > 0 && (
+                <details className="rounded-lg border p-3"><summary className="cursor-pointer text-sm font-semibold">View research sources ({result.company_research.sources.length})</summary><div className="mt-3 space-y-2">{result.company_research.sources.map((source) => <a key={source.id} href={source.url} target="_blank" rel="noreferrer" className="flex items-start justify-between gap-3 rounded-md p-2 text-sm hover:bg-accent"><span><span className="font-semibold text-primary">{source.id}</span> · {source.title}<span className="mt-0.5 block text-xs text-muted-foreground">{source.domain}{source.published_at ? ` · ${source.published_at}` : ""}</span></span><ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" /></a>)}</div></details>
+              )}
             </div>
           )}
           {result && (

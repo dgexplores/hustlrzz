@@ -7,6 +7,7 @@ end, the judge produces a structured coaching report.
 
 from __future__ import annotations
 
+import json
 import time
 from datetime import datetime, timezone
 
@@ -26,17 +27,32 @@ def build_interviewer_system(
     role: str,
     questions: list[dict],
     duration_minutes: int,
+    company_context: dict | None = None,
 ) -> str:
     q_text = "\n".join(
         f"- [{q.get('type', 'question')}] {q.get('question', '')}"
         for q in (questions or [])
     )
+    context_text = ""
+    if company_context:
+        context_text = (
+            "\nCURRENT COMPANY CONTEXT (source-aware preparation brief):\n"
+            + json.dumps({
+                "status": company_context.get("status"),
+                "retrieved_at": company_context.get("retrieved_at"),
+                "summary": company_context.get("summary"),
+                "hiring_priorities": company_context.get("hiring_priorities", []),
+                "recent_signals": company_context.get("recent_signals", []),
+            }, ensure_ascii=False)
+            + "\nUse this only to shape relevant questions; do not present uncertain signals as facts.\n"
+        )
     return (
         INTERVIEWER_SYSTEM
         + f"\n\nCompany: {company or 'unknown'}\nRole: {role or 'unknown'}\n"
         f"Session duration: {duration_minutes} minutes.\n\nPREPARED QUESTIONS:\n{q_text}\n\n"
         "Use the prepared questions in order. About midway, your follow-up can go deeper.\n"
-        "RESPONSE FORMAT: return JSON {\"question\":\"...\",\"message\":\"...\",\"done\":false|true}."
+        + context_text
+        + "RESPONSE FORMAT: return JSON {\"question\":\"...\",\"message\":\"...\",\"done\":false|true}."
     )
 
 

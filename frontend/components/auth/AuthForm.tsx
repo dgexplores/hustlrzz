@@ -68,7 +68,7 @@ export function AuthForm() {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="flex rounded-lg bg-slate-100 p-1 mb-4">
+        <div className="flex rounded-lg bg-secondary p-1 mb-4">
           {(["signin", "signup"] as Mode[]).map((m) => (
             <button
               key={m}
@@ -79,7 +79,7 @@ export function AuthForm() {
                 setMessage(null);
               }}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                mode === m ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-800"
+                mode === m ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {m === "signin" ? "Sign In" : "Sign Up"}
@@ -96,7 +96,7 @@ export function AuthForm() {
             <Label htmlFor="password">Password</Label>
             <Input id="password" type="password" required minLength={6} autoComplete={mode === "signin" ? "current-password" : "new-password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
           {message && <p className="text-sm text-green-600">{message}</p>}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : mode === "signin" ? "Sign In" : "Create Account"}

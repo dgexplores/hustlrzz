@@ -42,6 +42,6 @@ MIN_RESUME_TEXT_LENGTH = int(os.getenv("MIN_RESUME_TEXT_LENGTH", "120"))
 MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", "5242880"))  # 5 MB
 
 DEFAULT_QUESTION_COUNT = int(os.getenv("DEFAULT_QUESTION_COUNT", "12"))
-ENABLE_WEB_SEARCH = os.getenv("ENABLE_WEB_SEARCH", "false").lower() in {"1", "true", "yes"}
+ENABLE_WEB_SEARCH = os.getenv("ENABLE_WEB_SEARCH", "true").lower() in {"1", "true", "yes"}
 AI_REQUEST_TIMEOUT_SECONDS = int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "60"))
 WEB_SEARCH_TIMEOUT_SECONDS = int(os.getenv("WEB_SEARCH_TIMEOUT_SECONDS", "8"))

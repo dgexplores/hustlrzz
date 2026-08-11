@@ -62,6 +62,37 @@ def test_industry_faqs_skips_external_search_when_disabled(monkeypatch):
     assert preparation._industry_faqs("Engineer", "Build reliable APIs") == {"real_questions": [], "interview_process": {}}
 
 
+def test_company_sources_are_unique_and_attributable():
+    from backend.workflow import preparation
+    sources = preparation._clean_web_results([
+        {"title": "Careers", "href": "https://example.com/careers", "body": "Hiring engineers."},
+        {"title": "Duplicate", "href": "https://example.com/careers", "body": "Duplicate."},
+        {"title": "Unsafe", "href": "javascript:alert(1)", "body": "Unsafe."},
+    ])
+    assert len(sources) == 1
+    assert sources[0]["id"] == "S1"
+    assert sources[0]["domain"] == "example.com"
+
+
+def test_company_research_discards_unknown_citations(monkeypatch):
+    from backend.workflow import preparation
+    monkeypatch.setattr(preparation.provider, "chat_json_strict", lambda *_: {
+        "summary": "Evidence-based brief",
+        "hiring_priorities": ["Reliable systems"],
+        "interview_intelligence": [],
+        "recent_signals": [
+            {"signal": "Supported", "source_ids": ["S1"]},
+            {"signal": "Unsupported", "source_ids": ["S99"]},
+        ],
+        "preparation_actions": [],
+    })
+    result = preparation._organize_company_research("Example", "Engineer", [{
+        "id": "S1", "title": "Careers", "url": "https://example.com/careers",
+        "domain": "example.com", "snippet": "Hiring engineers.", "published_at": "",
+    }])
+    assert [signal["signal"] for signal in result["recent_signals"]] == ["Supported"]
+
+
 def test_chat_falls_back_when_preferred_fails(monkeypatch):
     """Preferred provider raises (rate-limit); other provider answers succeed."""
     import backend.config as config

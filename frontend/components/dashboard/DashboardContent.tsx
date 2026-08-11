@@ -23,12 +23,12 @@ export function DashboardContent() {
     });
   }, []);
 
-  if (loading) return <div className="p-16 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>;
+  if (loading) return <div className="p-16 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       <section className="max-w-2xl"><p className="text-sm font-semibold text-primary">Practice history</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">See the evidence behind your progress.</h1><p className="mt-2 text-muted-foreground">Prepared packs and interview reports stay together so you can pick a specific focus for the next session.</p></section>
-      {error && <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{error}</p>}
+      {error && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">{error}</p>}
       <section>
         <div className="mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Prepared packs</h2></div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

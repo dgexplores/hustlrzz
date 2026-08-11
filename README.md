@@ -24,7 +24,7 @@ candidate an actionable report — all in one private workspace.
 
 ```mermaid
 flowchart LR
-    A["Resume + job description"] --> B["Prepare\nRole fit · questions · answer hints"]
+    A["Resume + job description"] --> B["Prepare\nRole fit · current company research · questions"]
     B --> C["Practice live\nVoice or typed WebSocket interview"]
     C --> D["Improve\nScored report · posture feedback · next steps"]
     A -. optional knowledge .-> E["RAG knowledge base\nCandidate-owned, source-labelled context"]
@@ -33,7 +33,7 @@ flowchart LR
 
 | Step | Candidate experience | What HUSTLRZZ does |
 | --- | --- | --- |
-| **01 — Prepare** | Add a resume and target job description | Finds role fit, highlights gaps, creates focused questions, model answers, and answer hints. |
+| **01 — Prepare** | Add a PDF/DOCX resume, company, and target job description | Finds role fit, researches current company signals with visible sources, and creates focused questions, model answers, and answer hints. |
 | **02 — Practice** | Respond by typing or voice | Runs a live, follow-up capable AI interview over WebSocket. |
 | **03 — Improve** | Review the session | Delivers a scored report, practical recommendations, and presentation signals. |
 
@@ -44,6 +44,10 @@ flowchart LR
 Rather than serving a generic list of questions, the system starts from the
 candidate's own resume and target role. It produces a responsive, focused pack
 of 12 questions by default, with company-matching analysis and model answers.
+When a target company is supplied, a separate evidence-first research step
+retrieves current careers, strategy, and recent-news signals. The brief records
+its retrieval time, confidence, and clickable source IDs; unsupported citations
+are removed before results reach the interface.
 
 ### A real conversational mock interview
 
@@ -67,7 +71,7 @@ coaching.
 
 | Layer | Production approach |
 | --- | --- |
-| **Interface** | Next.js 15, TypeScript, Tailwind, accessible responsive UI |
+| **Interface** | Next.js 15, TypeScript, Tailwind, accessible responsive UI with light, dark, and system themes |
 | **Live service** | Python FastAPI and WebSockets |
 | **AI resilience** | Groq primary provider with optional Gemini fallback |
 | **Data & identity** | Supabase Auth + PostgreSQL with Row-Level Security |
@@ -93,7 +97,7 @@ interview if embeddings or the knowledge database are unavailable.
 - Candidate data is protected by Supabase Row-Level Security.
 - The service-role key stays backend-only.
 - Camera analysis stays in the browser; the app does not upload video frames.
-- Optional web research is off by default and time-bounded when enabled.
+- Source-aware web research is time-bounded, ignores instructions found in source snippets, and falls back to a labelled built-in profile when unavailable.
 - Timeouts and non-fatal RAG failures keep preparation and interviews responsive.
 - `GET /health` reports API, AI-provider, and database readiness.
 
@@ -161,6 +165,8 @@ delivery with Resend.
   `NEXT_PUBLIC_API_URL` for Preview and Production.
 - **Railway:** deploy the repository Dockerfile; configure provider and
   Supabase server keys; add permitted custom origins to `CORS_ORIGINS`.
+  Set `ENABLE_WEB_SEARCH=true` for current company intelligence (enabled by
+  default in new deployments).
 - **Supabase:** apply the schema or RAG migration. Never expose
   `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
 - **RAG:** configure `GEMINI_API_KEY` to enable embeddings; the app remains
