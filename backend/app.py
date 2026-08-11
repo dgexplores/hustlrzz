@@ -394,16 +394,21 @@ async def interview_ws(
     import json
 
     questions = []
+    workflow_record: dict = {}
     try:
-        rows = dbc.select_where("workflows", {"workflow_id": workflow_id})
+        rows = dbc.select_where("workflows", {"workflow_id": workflow_id, "user_id": user_id})
         for r in rows:
+            workflow_record = r
             if isinstance(r.get("questions"), list):
                 questions.extend(r["questions"])
     except Exception:
         pass
 
     system = build_interviewer_system(
-        "hustlrzzv2", "the role", questions, duration
+        workflow_record.get("company") or "the target company",
+        workflow_record.get("title") or "the target role",
+        questions,
+        duration,
     )
     transcript: list[dict] = []
 
@@ -449,7 +454,7 @@ async def interview_ws(
         report = {}
         if transcript:
             try:
-                report = judge_report(system, transcript, "", "")
+                report = judge_report(questions, transcript, "", "")
             except Exception as exc:
                 print("judge failed:", exc)
         if dbc.is_ready() and transcript:

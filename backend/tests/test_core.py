@@ -104,6 +104,24 @@ def test_interviewer_turn_adds_retrieval_context(monkeypatch):
     assert "Built FastAPI services" in seen["system"]
 
 
+def test_judge_question_context_uses_prepared_questions(monkeypatch):
+    from backend.agents import interviewer
+    seen = {}
+    monkeypatch.setattr(
+        interviewer.provider,
+        "chat_json_strict",
+        lambda system, user: seen.update({"user": user}) or {"summary": "ok"},
+    )
+    report = interviewer.judge_report(
+        [{"question": "Describe a FastAPI service you built."}],
+        [{"from": "candidate", "text": "I built an API."}],
+        "",
+        "",
+    )
+    assert report == {"summary": "ok"}
+    assert "Describe a FastAPI service you built." in seen["user"]
+
+
 def test_extract_docx_resume_text_without_extra_dependency():
     from backend.app import _extract_resume_text
 

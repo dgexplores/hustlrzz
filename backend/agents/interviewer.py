@@ -7,7 +7,6 @@ end, the judge produces a structured coaching report.
 
 from __future__ import annotations
 
-import json
 import time
 from datetime import datetime, timezone
 
@@ -73,7 +72,7 @@ def _transcript_to_messages(transcript: list[dict]) -> list[dict]:
     return msgs
 
 
-def judge_report(system_path: list[dict], transcript: list[dict], resume_text: str, job_description: str) -> dict:
+def judge_report(questions: list[dict], transcript: list[dict], resume_text: str, job_description: str) -> dict:
     """Score a completed interview transcript into a coaching report."""
     judge_system = (
         "You are a senior interview coach. Review the interview transcript below and "
@@ -83,8 +82,8 @@ def judge_report(system_path: list[dict], transcript: list[dict], resume_text: s
         f"{t.get('from', '')}: {t.get('text', '')}" for t in transcript
     )
     user = (
-        "JUDGE THE FOLLOWING INTERVIEW.\n\nQuestions this role:\n"
-        f"{job_description}\n\nCandidate background:\n{questions_text(system)}\n\n"
+        "JUDGE THE FOLLOWING INTERVIEW.\n\nPrepared questions for this role:\n"
+        f"{questions_text(questions)}\n\n"
         "TRANSCRIPT:\n"
         + transcript_txt
         + "\n\nPERFORMANCE AREAS: communication, structure, depth, behavioral_star, "
@@ -96,14 +95,8 @@ def judge_report(system_path: list[dict], transcript: list[dict], resume_text: s
     return data if isinstance(data, dict) else {}
 
 
-def questions_text(system: str) -> str:
-    try:
-        data = json.loads(system)
-        return "\n".join(
-            f"- {q.get('question', '')}" for q in data.get("questions", [])
-        ) or system
-    except Exception:
-        return system
+def questions_text(questions: list[dict]) -> str:
+    return "\n".join(f"- {q.get('question', '')}" for q in questions) or "No prepared questions available."
 
 
 def now_iso() -> str:

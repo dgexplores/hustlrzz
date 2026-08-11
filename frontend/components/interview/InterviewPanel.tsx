@@ -56,6 +56,7 @@ export function InterviewPanel() {
   };
 
   const connectWs = async (sid: string, qs: string) => {
+    wsRef.current?.close();
     const ws = new WebSocket(wsUrl(`/ws/${sid}${qs}`, {}));
     ws.onopen = () => { setConnected(true); };
     ws.onmessage = (ev) => {
@@ -88,6 +89,7 @@ export function InterviewPanel() {
     const text = textOverride ?? input;
     if (!text.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     wsRef.current.send(JSON.stringify({ type: "message", text }));
+    setSessionError(null);
     setTurns((t) => [...t, { role: "candidate", text }]);
     setInput("");
   };

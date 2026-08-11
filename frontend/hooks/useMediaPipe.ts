@@ -9,6 +9,8 @@ import { useMetrics } from "@/context/MetricsContext";
 
 const FRAME_INTERVAL_MS = 1000 / 15;
 const CONFIRM_FRAMES = 8;
+const GESTURE_DISTANCE = 0.035;
+const GESTURE_COOLDOWN_MS = 500;
 
 export const useMediapipe = (
   videoRef: React.RefObject<HTMLVideoElement>,
@@ -29,6 +31,8 @@ export const useMediapipe = (
   const notFacingRef = useRef(false);
   const hasBadPostureRef = useRef(false);
   const handStartRef = useRef(0);
+  const handWristRef = useRef<Array<{ x: number; y: number }>>([]);
+  const lastGestureAtRef = useRef(0);
   const eyeAwayStartRef = useRef(0);
   const postureStartRef = useRef(0);
   const eyeAwayFramesRef = useRef(0);
@@ -110,8 +114,18 @@ export const useMediapipe = (
       const hand = handDetectorRef.current?.detectForVideo(video, now);
       if (hand) {
         const visible = hand.landmarks.length > 0;
-        if (visible && !isHandOnScreenRef.current) { setHandDetectionCounter((value) => value + 1); handStartRef.current = now; isHandOnScreenRef.current = true; }
+        if (visible && !isHandOnScreenRef.current) { handStartRef.current = now; isHandOnScreenRef.current = true; }
         if (!visible && isHandOnScreenRef.current) { setHandDetectionDuration((value) => value + (now - handStartRef.current) / 1000); isHandOnScreenRef.current = false; }
+        const wrists = hand.landmarks.map((landmarks) => landmarks[0]).filter(Boolean);
+        const moved = wrists.some((wrist, index) => {
+          const previous = handWristRef.current[index];
+          return previous && Math.hypot(wrist.x - previous.x, wrist.y - previous.y) >= GESTURE_DISTANCE;
+        });
+        if (moved && now - lastGestureAtRef.current >= GESTURE_COOLDOWN_MS) {
+          setHandDetectionCounter((value) => value + 1);
+          lastGestureAtRef.current = now;
+        }
+        handWristRef.current = wrists.map((wrist) => ({ x: wrist.x, y: wrist.y }));
         if (overlayEnabled && canvas) drawHandLandmarks(canvas, hand.landmarks);
       }
       const face = faceDetectorRef.current?.detectForVideo(video, now);
