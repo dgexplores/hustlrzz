@@ -3,7 +3,7 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hustlrzz V2",
+  title: "Hustlrzz — AI interview rehearsal studio",
   description: "AI mock interview coach — camera body-language tracking, live interviewer, scored coaching reports",
 };
 
@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
-      <body className="antialiased min-h-screen bg-background" suppressHydrationWarning>
+      <body className="min-h-screen bg-background antialiased" suppressHydrationWarning>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

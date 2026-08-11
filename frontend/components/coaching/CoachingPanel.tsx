@@ -75,13 +75,13 @@ export function CoachingPanel() {
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 md:px-6">
-      <section className="max-w-3xl">
-        <p className="text-sm font-semibold text-primary">Career coaching lab</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight md:text-4xl">Turn uncertainty into a prepared conversation.</h1>
-        <p className="mt-2 max-w-2xl leading-7 text-muted-foreground">Diagnose role fit, understand interview styles, and rehearse a composed offer negotiation from one workspace.</p>
+      <section className="motion-enter grid gap-4 border-b border-foreground/20 pb-7 md:grid-cols-[90px_1fr]">
+        <p className="font-mono text-sm font-semibold text-primary">03 / COACH</p>
+        <div className="max-w-3xl"><h1 className="font-display text-4xl font-semibold leading-tight tracking-tight md:text-5xl">Turn uncertainty into a prepared conversation.</h1>
+        <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">Diagnose role fit, understand interview styles, and rehearse a composed offer negotiation from one focused workspace.</p></div>
       </section>
 
-      <nav aria-label="Coaching workspaces" className="grid gap-2 rounded-xl border bg-card p-2 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+      <nav aria-label="Coaching workspaces" className="motion-enter motion-enter-delay-1 grid border-y border-foreground/20 sm:grid-cols-2 lg:grid-cols-4">
         <WorkspaceButton active={workspace === "fit"} onClick={() => setWorkspace("fit")} icon={<Target className="h-4 w-4" />} title="Role fit" description="Find evidence and gaps" />
         <WorkspaceButton active={workspace === "company"} onClick={() => setWorkspace("company")} icon={<Building2 className="h-4 w-4" />} title="Company playbooks" description="Understand interview style" />
         <WorkspaceButton active={workspace === "salary"} onClick={() => setWorkspace("salary")} icon={<CircleDollarSign className="h-4 w-4" />} title="Offer negotiation" description="Build your exact script" />
@@ -99,7 +99,7 @@ export function CoachingPanel() {
 }
 
 function WorkspaceButton({ active, onClick, icon, title, description }: { active: boolean; onClick: () => void; icon: React.ReactNode; title: string; description: string }) {
-  return <button type="button" onClick={onClick} aria-current={active ? "page" : undefined} className={`min-h-16 rounded-lg px-4 py-3 text-left surface-transition ${active ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-accent"}`}><span className="flex items-center gap-2 text-sm font-semibold">{icon}{title}</span><span className={`mt-1 block text-xs ${active ? "text-primary-foreground/75" : "text-muted-foreground"}`}>{description}</span></button>;
+  return <button type="button" onClick={onClick} aria-current={active ? "page" : undefined} className={`relative min-h-20 border-b border-foreground/15 px-4 py-4 text-left surface-transition sm:border-r lg:border-b-0 ${active ? "bg-foreground text-background dark:bg-primary dark:text-primary-foreground" : "hover:bg-accent"}`}><span className="flex items-center gap-2 text-sm font-bold">{icon}{title}</span><span className={`mt-1 block text-xs ${active ? "opacity-65" : "text-muted-foreground"}`}>{description}</span>{active && <span className="absolute inset-x-0 bottom-0 h-1 bg-primary" />}</button>;
 }
 
 function RoleFitWorkspace({ form, setForm, result, loading, onSubmit }: { form: any; setForm: (value: any) => void; result: any; loading: boolean; onSubmit: (event: React.FormEvent) => void }) {

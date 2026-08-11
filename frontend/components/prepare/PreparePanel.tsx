@@ -92,14 +92,14 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-      <section className="max-w-3xl">
-        <p className="text-sm font-semibold text-primary">Preparation workspace</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight">Build an interview plan from your real experience.</h1>
-        <p className="mt-2 text-base leading-7 text-muted-foreground">Your materials create a tailored practice pack. When knowledge search is configured, they also ground future interviewer follow-ups.</p>
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+      <section className="motion-enter grid gap-4 border-b border-foreground/20 pb-7 md:grid-cols-[90px_1fr]">
+        <p className="font-mono text-sm font-semibold text-primary">01 / PREPARE</p>
+        <div className="max-w-3xl"><h1 className="font-display text-4xl font-semibold leading-tight tracking-tight md:text-5xl">Build the evidence behind your answers.</h1>
+        <p className="mt-3 text-base leading-7 text-muted-foreground">Your resume, target role, and current company signals become a focused practice pack that grounds future follow-ups.</p></div>
       </section>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-6 items-start">
-      <Card className="overflow-hidden">
+      <Card className="motion-enter motion-enter-delay-1 overflow-hidden border-foreground/25">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5" /> Prepare your interview

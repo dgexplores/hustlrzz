@@ -4,43 +4,43 @@
 
 @layer base {
   :root {
-    --background: 210 33% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 207 87% 38%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 29% 95%;
-    --secondary-foreground: 222 30% 18%;
-    --muted: 210 29% 95%;
-    --muted-foreground: 215 16% 34%;
-    --accent: 204 67% 94%;
-    --accent-foreground: 207 87% 27%;
+    --background: 42 33% 96%;
+    --foreground: 214 38% 12%;
+    --card: 42 38% 99%;
+    --card-foreground: 214 38% 12%;
+    --primary: 35 91% 48%;
+    --primary-foreground: 214 42% 9%;
+    --secondary: 39 24% 91%;
+    --secondary-foreground: 214 32% 17%;
+    --muted: 39 24% 91%;
+    --muted-foreground: 215 13% 38%;
+    --accent: 36 57% 88%;
+    --accent-foreground: 214 38% 12%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 20% 88%;
-    --input: 214 20% 82%;
-    --ring: 207 87% 38%;
-    --radius: 0.75rem;
+    --border: 36 16% 78%;
+    --input: 36 16% 70%;
+    --ring: 35 91% 48%;
+    --radius: 0.5rem;
   }
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 210 20% 98%;
-    --card: 224 71% 4%;
-    --card-foreground: 210 20% 98%;
-    --primary: 201 94% 67%;
-    --primary-foreground: 224 71% 4%;
-    --secondary: 217 33% 12%;
-    --secondary-foreground: 210 20% 98%;
-    --muted: 217 33% 12%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 16%;
-    --accent-foreground: 201 94% 67%;
+    --background: 215 38% 8%;
+    --foreground: 42 35% 94%;
+    --card: 214 31% 11%;
+    --card-foreground: 42 35% 94%;
+    --primary: 37 94% 56%;
+    --primary-foreground: 215 42% 8%;
+    --secondary: 214 25% 16%;
+    --secondary-foreground: 42 35% 94%;
+    --muted: 214 25% 16%;
+    --muted-foreground: 38 12% 67%;
+    --accent: 214 25% 20%;
+    --accent-foreground: 42 35% 94%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 210 20% 98%;
-    --border: 217 33% 18%;
-    --input: 217 33% 18%;
-    --ring: 262 83% 62%;
+    --border: 214 18% 25%;
+    --input: 214 18% 31%;
+    --ring: 37 94% 56%;
   }
 }
 
@@ -51,6 +51,8 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background-image: radial-gradient(hsl(var(--foreground) / 0.045) 0.65px, transparent 0.65px);
+    background-size: 9px 9px;
   }
 
   ::selection { @apply bg-primary/20 text-foreground; }
@@ -59,8 +61,21 @@
 }
 
 @layer utilities {
-  .surface-transition { transition: color 160ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms cubic-bezier(0.23, 1, 0.32, 1), border-color 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 160ms cubic-bezier(0.23, 1, 0.32, 1), transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+  .font-display { font-family: Iowan Old Style, Baskerville, "Times New Roman", serif; }
+  .surface-transition { transition: color 180ms cubic-bezier(0.23, 1, 0.32, 1), background-color 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1), transform 180ms cubic-bezier(0.23, 1, 0.32, 1); }
+  .motion-enter { animation: enter-up 680ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .motion-enter-delay-1 { animation-delay: 90ms; }
+  .motion-enter-delay-2 { animation-delay: 180ms; }
+  .motion-enter-delay-3 { animation-delay: 270ms; }
+  .interactive-lift:hover { transform: translateY(-3px); box-shadow: 0 14px 30px hsl(var(--foreground) / 0.09); }
+  .studio-grid { background-image: linear-gradient(hsl(var(--foreground) / .055) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground) / .055) 1px, transparent 1px); background-size: 32px 32px; }
+  .signal-pulse { animation: signal-pulse 2.2s ease-out infinite; }
+  .wave-bar { transform-origin: bottom; animation: wave 1.25s ease-in-out infinite alternate; }
 }
+
+@keyframes enter-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes signal-pulse { 0% { box-shadow: 0 0 0 0 hsl(var(--primary) / .42); } 70%, 100% { box-shadow: 0 0 0 12px hsl(var(--primary) / 0); } }
+@keyframes wave { from { transform: scaleY(.28); } to { transform: scaleY(1); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }

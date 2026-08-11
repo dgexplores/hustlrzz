@@ -168,11 +168,11 @@ export function InterviewPanel() {
 
   return (
     <main className="mx-auto max-w-[1440px] space-y-6 px-4 py-8 md:px-6">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-3xl">
-          <p className="text-sm font-semibold text-primary">Interview studio</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight md:text-4xl">Practice under realistic pressure—with private guidance.</h1>
-          <p className="mt-2 max-w-2xl leading-7 text-muted-foreground">Select a prepared pack, answer naturally, and receive a combined content and delivery review.</p>
+      <section className="motion-enter flex flex-col gap-4 border-b border-foreground/20 pb-7 lg:flex-row lg:items-end lg:justify-between">
+        <div className="grid max-w-4xl gap-4 md:grid-cols-[90px_1fr]">
+          <p className="font-mono text-sm font-semibold text-primary">02 / REHEARSE</p>
+          <div><h1 className="font-display text-4xl font-semibold leading-tight tracking-tight md:text-5xl">Practice under pressure, privately.</h1>
+          <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">Select a prepared pack, answer naturally, and receive a combined content and delivery review.</p></div>
         </div>
         <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-2 text-sm shadow-sm">
           <span className={`h-2 w-2 rounded-full ${phase === "live" ? "bg-emerald-500 animate-pulse" : phase === "connecting" || phase === "ending" ? "bg-amber-500" : "bg-muted-foreground/40"}`} />
