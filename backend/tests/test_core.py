@@ -184,3 +184,24 @@ def test_fallback_interview_report_keeps_session_completable():
     assert report["summary"]
     assert report["verdict"]
     assert report["improvements"]
+
+
+def test_coaching_practice_passes_answer_and_presence_metrics(monkeypatch):
+    from backend.career import analysis
+    seen = {}
+    monkeypatch.setattr(
+        analysis.provider,
+        "chat_json_strict",
+        lambda system, user: seen.update({"system": system, "user": user}) or {
+            "overall_score": 80, "summary": "Clear answer"
+        },
+    )
+    result = analysis.evaluate_coaching_practice(
+        "salary negotiation",
+        "Why should we increase the offer?",
+        "I would connect my delivery experience to the role and ask for a revised range.",
+        {"notFacingCounter": 2},
+    )
+    assert result["overall_score"] == 80
+    assert "Why should we increase the offer?" in seen["user"]
+    assert "notFacingCounter" in seen["user"]

@@ -280,6 +280,13 @@ class MatchAnalysisRequest(BaseModel):
     resume_text: str = Field(min_length=80, max_length=config.RAG_MAX_DOCUMENT_CHARS)
 
 
+class CoachingPracticeRequest(BaseModel):
+    scenario: str = Field(min_length=1, max_length=100)
+    prompt: str = Field(min_length=10, max_length=2000)
+    answer: str = Field(min_length=20, max_length=12000)
+    presence_metrics: dict = Field(default_factory=dict)
+
+
 @router.post("/coaching/salary")
 def salary_script(payload: SalaryRequest, user: dict = Depends(get_user)):
     try:
@@ -296,6 +303,31 @@ async def analyze(payload: MatchAnalysisRequest, user: dict = Depends(get_user))
     except provider.ProviderError as exc:
         status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
         raise HTTPException(status_code=status, detail="The role-fit coach is temporarily busy. Please retry shortly.")
+
+
+@router.post("/coaching/practice")
+def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(get_user)):
+    allowed_metrics = {
+        key: max(0, float(value))
+        for key, value in payload.presence_metrics.items()
+        if key in {
+            "handDetectionCounter", "handDetectionDuration", "notFacingCounter",
+            "notFacingDuration", "badPostureDetectionCounter", "badPostureDuration",
+        } and isinstance(value, (int, float))
+    }
+    try:
+        result = analysis.evaluate_coaching_practice(
+            scenario=payload.scenario,
+            prompt=payload.prompt,
+            answer=payload.answer,
+            presence_metrics=allowed_metrics,
+        )
+        if not result or result.get("error"):
+            raise HTTPException(status_code=502, detail="The coach returned incomplete feedback. Please retry.")
+        return {"success": True, "data": result}
+    except provider.ProviderError as exc:
+        status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
+        raise HTTPException(status_code=status, detail="The practice coach is temporarily busy. Please retry shortly.")
 
 
 # --------------------------------------------------------------------------- #

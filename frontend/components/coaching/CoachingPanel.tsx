@@ -7,13 +7,24 @@ import { downloadJson } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CameraPanel } from "@/components/interview/CameraPanel";
+import { useAudio } from "@/hooks/useAudio";
+import { useMetrics } from "@/context/MetricsContext";
 import {
   AlertCircle, ArrowRight, BriefcaseBusiness, Building2, CheckCircle2,
-  CircleDollarSign, Download, Lightbulb, Loader2, MessageSquareQuote,
-  Search, ShieldCheck, Sparkles, Target, TriangleAlert,
+  Camera, CircleDollarSign, Download, Keyboard, Lightbulb, Loader2,
+  MessageSquareQuote, Mic, MicOff, RotateCcw, Search, ShieldCheck,
+  Sparkles, Target, TriangleAlert, Volume2,
 } from "lucide-react";
 
-type Workspace = "fit" | "company" | "salary";
+type Workspace = "fit" | "company" | "salary" | "practice";
+
+const PRACTICE_PROMPTS: Record<string, string> = {
+  "behavioral interview": "Tell me about a difficult project, the action you personally took, and the measurable result.",
+  "salary negotiation": "The offer is fixed at the current amount. Why should we reconsider the compensation range?",
+  "leadership conversation": "Describe a time you influenced a decision without having formal authority.",
+  "career introduction": "Walk me through your background and why it makes you a strong fit for this opportunity.",
+};
 
 export function CoachingPanel() {
   const [workspace, setWorkspace] = useState<Workspace>("fit");
@@ -24,6 +35,8 @@ export function CoachingPanel() {
   const [fitForm, setFitForm] = useState({ job_description: "", resume_text: "" });
   const [salaryScript, setSalaryScript] = useState<any>(null);
   const [fitResult, setFitResult] = useState<any>(null);
+  const [practiceForm, setPracticeForm] = useState({ scenario: "behavioral interview", prompt: PRACTICE_PROMPTS["behavioral interview"], answer: "" });
+  const [practiceResult, setPracticeResult] = useState<any>(null);
   const [busy, setBusy] = useState<Workspace | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,6 +78,25 @@ export function CoachingPanel() {
     }
   };
 
+  const runPractice = async (event: React.FormEvent, presenceMetrics: Record<string, number>) => {
+    event.preventDefault();
+    setBusy("practice");
+    setError(null);
+    setPracticeResult(null);
+    try {
+      const response = await api<{ data: any }>("/coaching/practice", {
+        method: "POST",
+        body: JSON.stringify({ ...practiceForm, presence_metrics: presenceMetrics }),
+      });
+      if (!response.data || typeof response.data !== "object" || response.data.error) throw new Error(response.data?.error || "The coach returned incomplete practice feedback.");
+      setPracticeResult(response.data);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Practice feedback failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const chooseCompany = (company: any) => {
     setSelectedCompany(company);
     setSalaryForm((current) => ({ ...current, company: company.name === "generic" ? "" : company.name }));
@@ -80,10 +112,11 @@ export function CoachingPanel() {
         <p className="mt-2 max-w-2xl leading-7 text-muted-foreground">Diagnose role fit, understand interview styles, and rehearse a composed offer negotiation from one workspace.</p>
       </section>
 
-      <nav aria-label="Coaching workspaces" className="grid gap-2 rounded-xl border bg-card p-2 shadow-sm sm:grid-cols-3">
+      <nav aria-label="Coaching workspaces" className="grid gap-2 rounded-xl border bg-card p-2 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
         <WorkspaceButton active={workspace === "fit"} onClick={() => setWorkspace("fit")} icon={<Target className="h-4 w-4" />} title="Role fit" description="Find evidence and gaps" />
         <WorkspaceButton active={workspace === "company"} onClick={() => setWorkspace("company")} icon={<Building2 className="h-4 w-4" />} title="Company playbooks" description="Understand interview style" />
         <WorkspaceButton active={workspace === "salary"} onClick={() => setWorkspace("salary")} icon={<CircleDollarSign className="h-4 w-4" />} title="Offer negotiation" description="Build your exact script" />
+        <WorkspaceButton active={workspace === "practice"} onClick={() => setWorkspace("practice")} icon={<Camera className="h-4 w-4" />} title="Practice room" description="Speak or type with presence feedback" />
       </nav>
 
       {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>}
@@ -91,6 +124,7 @@ export function CoachingPanel() {
       {workspace === "fit" && <RoleFitWorkspace form={fitForm} setForm={setFitForm} result={fitResult} loading={busy === "fit"} onSubmit={runFit} />}
       {workspace === "company" && <CompanyWorkspace companies={filteredCompanies} query={companyQuery} setQuery={setCompanyQuery} selected={selectedCompany} onSelect={chooseCompany} onNegotiate={() => setWorkspace("salary")} />}
       {workspace === "salary" && <SalaryWorkspace form={salaryForm} setForm={setSalaryForm} script={salaryScript} loading={busy === "salary"} onSubmit={runSalary} />}
+      {workspace === "practice" && <PracticeWorkspace form={practiceForm} setForm={setPracticeForm} result={practiceResult} loading={busy === "practice"} onSubmit={runPractice} onReset={() => setPracticeResult(null)} />}
     </main>
   );
 }
@@ -126,6 +160,48 @@ function SalaryWorkspace({ form, setForm, script, loading, onSubmit }: { form: a
 
 function SalaryScript({ script }: { script: any }) {
   return <div className="space-y-6">{script.situation && <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Strongest leverage</p><p className="mt-2 text-sm leading-6">{script.situation.strongest_leverage}</p></div><div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Watch this risk</p><p className="mt-2 text-sm leading-6">{script.situation.biggest_risk}</p></div></div>}{script.strategy?.length ? <section><h3 className="text-sm font-semibold">Your strategy</h3><ol className="mt-3 grid gap-2 sm:grid-cols-2">{script.strategy.map((item: string, index: number) => <li key={`${item}-${index}`} className="flex gap-3 rounded-lg bg-secondary/50 p-3 text-sm leading-6"><span className="font-mono text-xs font-semibold text-primary">0{index + 1}</span>{item}</li>)}</ol></section> : null}<section><h3 className="text-sm font-semibold">Conversation scenarios</h3><div className="mt-3 space-y-3">{(script.scenarios || []).map((scenario: any, index: number) => <details key={`${scenario.name}-${index}`} open={index === 0} className="rounded-xl border bg-card p-4"><summary className="cursor-pointer font-semibold">{scenario.name}</summary><div className="mt-4 space-y-3"><div className="rounded-lg bg-primary/5 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-primary">Say this</p><p className="mt-1 text-sm leading-6">“{scenario.say_this}”</p></div>{scenario.why && <p className="text-sm leading-6 text-muted-foreground"><span className="font-semibold text-foreground">Why it works:</span> {scenario.why}</p>}{scenario.avoid && <p className="flex gap-2 text-sm leading-6 text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-1 h-4 w-4 shrink-0" /><span><span className="font-semibold">Avoid:</span> {scenario.avoid}</span></p>}</div></details>)}</div></section>{script.closing && <section className="rounded-xl border bg-secondary/25 p-4"><h3 className="text-sm font-semibold">Decision guardrails</h3><div className="mt-3 space-y-2 text-sm leading-6"><p><span className="font-semibold">Keep negotiating:</span> {script.closing.keep_negotiating}</p><p><span className="font-semibold">Accept when:</span> {script.closing.acceptable_to_accept}</p><p><span className="font-semibold">Exit politely:</span> {script.closing.polite_exit}</p></div></section>}</div>;
+}
+
+function PracticeWorkspace({ form, setForm, result, loading, onSubmit, onReset }: { form: any; setForm: (value: any) => void; result: any; loading: boolean; onSubmit: (event: React.FormEvent, metrics: Record<string, number>) => void; onReset: () => void }) {
+  const metrics = useMetrics((state) => state.metrics);
+  const resetMetrics = useMetrics((state) => state.reset);
+  const { supported, listening, start, stop, speak } = useAudio((text) => {
+    setForm((current: any) => ({ ...current, answer: `${current.answer}${current.answer ? " " : ""}${text}` }));
+  });
+
+  const resetAttempt = () => {
+    stop();
+    resetMetrics();
+    onReset();
+    setForm((current: any) => ({ ...current, answer: "" }));
+  };
+
+  return <div className="grid gap-6 xl:grid-cols-[minmax(360px,0.82fr)_minmax(0,1.18fr)]">
+    <div className="space-y-6">
+      <Card><CardHeader className="flex-row items-start justify-between space-y-0"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Private presence coach</p><CardTitle className="mt-1 text-xl">Rehearse on camera</CardTitle><p className="mt-1 text-sm leading-6 text-muted-foreground">Gesture, gaze, and posture are processed locally in your browser.</p></div><span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">Local only</span></CardHeader><CardContent><CameraPanel /></CardContent></Card>
+    </div>
+    <div className="space-y-6">
+      <Card><CardHeader><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Realistic rehearsal</p><CardTitle className="text-xl">Answer by voice or keyboard</CardTitle><p className="text-sm leading-6 text-muted-foreground">Speak naturally, edit the transcript if speech recognition misheard you, then request combined content and delivery feedback.</p></CardHeader><CardContent>
+        <form onSubmit={(event) => onSubmit(event, metrics)} className="space-y-5">
+          <div className="space-y-2"><Label htmlFor="practice-scenario">Scenario</Label><select id="practice-scenario" value={form.scenario} onChange={(event) => { const scenario = event.target.value; stop(); onReset(); setForm({ scenario, prompt: PRACTICE_PROMPTS[scenario], answer: "" }); }} className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring">{Object.keys(PRACTICE_PROMPTS).map((scenario) => <option key={scenario} value={scenario}>{scenario.replace(/\b\w/g, (letter) => letter.toUpperCase())}</option>)}</select></div>
+          <div className="rounded-xl border bg-secondary/25 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Coach prompt</p><p className="mt-2 text-base font-medium leading-7">{form.prompt}</p></div><Button type="button" size="icon" variant="outline" onClick={() => speak(form.prompt)} disabled={!supported} aria-label="Read prompt aloud"><Volume2 className="h-4 w-4" /></Button></div></div>
+          <div className="space-y-2"><div className="flex items-center justify-between gap-3"><Label htmlFor="practice-answer">Your answer</Label><span className="flex items-center gap-1 text-xs text-muted-foreground"><Keyboard className="h-3.5 w-3.5" />Editable transcript</span></div><Textarea id="practice-answer" rows={10} maxLength={12000} value={form.answer} onChange={(event) => setForm({ ...form, answer: event.target.value })} placeholder="Type here, or press the microphone and speak your answer…" required /><div className="flex items-center justify-between text-[11px] text-muted-foreground"><span>{listening ? "Listening—speak naturally…" : "Your audio is transcribed in the browser."}</span><span>{form.answer.length}/12,000</span></div></div>
+          <div className="grid gap-2 sm:grid-cols-[auto_1fr_auto]"><Button type="button" variant={listening ? "destructive" : "secondary"} onClick={listening ? stop : start} disabled={!supported || loading}>{listening ? <><MicOff className="h-4 w-4" />Stop listening</> : <><Mic className="h-4 w-4" />Answer by voice</>}</Button><Button type="submit" disabled={loading || form.answer.trim().length < 20}>{loading ? <><Loader2 className="h-4 w-4 animate-spin" />Reviewing attempt…</> : <><Sparkles className="h-4 w-4" />Coach my answer</>}</Button><Button type="button" size="icon" variant="outline" onClick={resetAttempt} disabled={loading} aria-label="Reset attempt"><RotateCcw className="h-4 w-4" /></Button></div>
+          {!supported && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-5">Voice recognition is not available in this browser. Camera feedback and typed answers still work fully; Chrome or Edge provides the best browser speech support.</p>}
+        </form>
+      </CardContent></Card>
+      {result && <PracticeFeedback result={result} onSpeak={() => speak(result.better_answer || result.summary || "")} />}
+    </div>
+  </div>;
+}
+
+function PracticeFeedback({ result, onSpeak }: { result: any; onSpeak: () => void }) {
+  const score = Math.max(0, Math.min(Number(result.overall_score) || 0, 100));
+  return <Card><CardHeader className="flex-row items-start justify-between space-y-0"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Attempt review</p><CardTitle className="mt-1 text-xl">Combined coaching feedback</CardTitle></div><div className="rounded-xl bg-primary px-4 py-2 text-center text-primary-foreground"><p className="text-2xl font-semibold">{score}</p><p className="text-[10px] uppercase tracking-wide opacity-75">overall</p></div></CardHeader><CardContent className="space-y-5"><p className="text-sm leading-6 text-muted-foreground">{result.summary}</p><div className="grid gap-3 sm:grid-cols-2"><FeedbackDimension title="Content" data={result.content} /><FeedbackDimension title="Delivery" data={result.delivery} /></div>{result.better_answer && <div className="rounded-xl border border-primary/30 bg-primary/5 p-4"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold">A stronger version</p><Button type="button" size="icon" variant="ghost" onClick={onSpeak} aria-label="Read stronger answer aloud"><Volume2 className="h-4 w-4" /></Button></div><p className="mt-2 text-sm leading-6">{result.better_answer}</p></div>}{result.next_drill && <div className="rounded-xl bg-secondary/50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Next drill</p><p className="mt-2 text-sm leading-6">{result.next_drill}</p></div>}<Button variant="outline" size="sm" onClick={() => downloadJson("hustlrzz-coaching-practice.json", result)}><Download className="h-4 w-4" />Export feedback</Button></CardContent></Card>;
+}
+
+function FeedbackDimension({ title, data }: { title: string; data: any }) {
+  return <div className="rounded-xl border p-4"><div className="flex items-center justify-between"><p className="font-semibold">{title}</p><span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold">{Number(data?.score) || 0}/10</span></div>{data?.strengths?.length ? <ul className="mt-3 space-y-1 text-xs leading-5 text-emerald-700 dark:text-emerald-300">{data.strengths.map((item: string) => <li key={item}>+ {item}</li>)}</ul> : null}{data?.improvements?.length ? <ul className="mt-3 space-y-1 text-xs leading-5 text-amber-700 dark:text-amber-300">{data.improvements.map((item: string) => <li key={item}>→ {item}</li>)}</ul> : null}</div>;
 }
 
 function EmptyResult({ icon, title, copy }: { icon: React.ReactNode; title: string; copy: string }) {

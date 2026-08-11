@@ -148,6 +148,21 @@ SALARY_SCHEMA = """{
   }
 }"""
 
+COACHING_PRACTICE_SYSTEM = (
+    "You are a practical communication coach reviewing one spoken or typed rehearsal. "
+    "Evaluate the answer itself and use the supplied browser-derived presence signals only "
+    "as directional coaching data, never as medical or psychological evidence. Return JSON only."
+)
+
+COACHING_PRACTICE_SCHEMA = """{
+  "overall_score": 0-100,
+  "summary": "short direct assessment",
+  "content": {"score": 0-10, "strengths": ["..."], "improvements": ["..."]},
+  "delivery": {"score": 0-10, "strengths": ["..."], "improvements": ["..."]},
+  "better_answer": "a stronger natural version that preserves the candidate's facts",
+  "next_drill": "one specific exercise for the next attempt"
+}"""
+
 
 def salary_script(
     company: str,
@@ -165,3 +180,22 @@ def salary_script(
     )
     data = provider.chat_json_strict(SALARY_SYSTEM, user)
     return data if isinstance(data, dict) else {"error": "salary script parse failed"}
+
+
+def evaluate_coaching_practice(
+    scenario: str,
+    prompt: str,
+    answer: str,
+    presence_metrics: dict | None = None,
+) -> dict:
+    metrics = presence_metrics or {}
+    user = (
+        f"Scenario: {scenario}\nPrompt: {prompt}\n\nCandidate answer:\n{answer}\n\n"
+        "Directional local-browser presence metrics (event counts and durations in seconds):\n"
+        f"{metrics}\n\n"
+        "Do not invent facts or penalize a missing camera. If metrics are zero or absent, assess "
+        "delivery only from the wording. Give concrete, kind, immediately usable feedback.\n"
+        + COACHING_PRACTICE_SCHEMA
+    )
+    data = provider.chat_json_strict(COACHING_PRACTICE_SYSTEM, user)
+    return data if isinstance(data, dict) else {"error": "practice feedback parse failed"}
