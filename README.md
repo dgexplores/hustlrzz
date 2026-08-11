@@ -64,8 +64,9 @@ practice private and avoiding server-side video processing.
 ### Career coaching beyond the interview
 
 HUSTLRZZ also includes job-description versus resume analysis, interview-style
-company profiles, saved practice history, and structured salary-negotiation
-coaching.
+company playbooks, saved practice history, and structured salary-negotiation
+coaching. The coaching lab presents role-fit evidence, skill gaps, exact
+negotiation wording, risky phrases to avoid, and decision guardrails.
 
 ## Designed for reliable AI practice
 

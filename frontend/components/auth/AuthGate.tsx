@@ -93,6 +93,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
             </Button>
           </div>
         </div>
+        <nav className="flex max-w-full items-center gap-1 overflow-x-auto border-t px-3 py-2 md:hidden" aria-label="Mobile navigation">
+          {nav.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold ${pathname === item.href ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
       </header>
       {children}
     </div>

@@ -40,7 +40,7 @@ export function CameraPanel() {
         </div>
       )}
       {status === "denied" && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           Camera permission blocked. Allow it in the browser address bar, then retry.
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setRetryKey((k) => k + 1)}>Retry</Button>
         </div>

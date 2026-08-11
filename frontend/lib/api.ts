@@ -31,7 +31,11 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     let message = `Request failed (${res.status})`;
     try {
       const body = await res.json();
-      if (body?.detail) message = String(body.detail);
+      if (Array.isArray(body?.detail) && body.detail[0]?.msg) {
+        message = String(body.detail[0].msg);
+      } else if (body?.detail) {
+        message = String(body.detail);
+      }
     } catch {
       /* non-JSON */
     }

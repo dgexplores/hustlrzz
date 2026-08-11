@@ -19,7 +19,6 @@ from xml.etree import ElementTree
 
 from fastapi import (
     APIRouter,
-    Body,
     Depends,
     FastAPI,
     File,
@@ -269,21 +268,34 @@ def list_companies():
 
 
 class SalaryRequest(BaseModel):
-    company: str = ""
-    role: str = ""
-    current_salary: str = ""
-    target_range: str = ""
-    has_offer: str = ""
+    company: str = Field(min_length=1, max_length=160)
+    role: str = Field(min_length=1, max_length=200)
+    current_salary: str = Field(default="", max_length=200)
+    target_range: str = Field(min_length=1, max_length=200)
+    has_offer: str = Field(default="", max_length=2000)
+
+
+class MatchAnalysisRequest(BaseModel):
+    job_description: str = Field(min_length=80, max_length=60000)
+    resume_text: str = Field(min_length=80, max_length=config.RAG_MAX_DOCUMENT_CHARS)
 
 
 @router.post("/coaching/salary")
 def salary_script(payload: SalaryRequest, user: dict = Depends(get_user)):
-    return {"success": True, "data": analysis.salary_script(**payload.model_dump())}
+    try:
+        return {"success": True, "data": analysis.salary_script(**payload.model_dump())}
+    except provider.ProviderError as exc:
+        status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
+        raise HTTPException(status_code=status, detail="The negotiation coach is temporarily busy. Please retry shortly.")
 
 
 @router.post("/coaching/analyze")
-async def analyze(job_description: str = Body(...), resume_text: str = Body(...), user: dict = Depends(get_user)):
-    return {"success": True, "data": analysis.analyze_match(job_description, resume_text)}
+async def analyze(payload: MatchAnalysisRequest, user: dict = Depends(get_user)):
+    try:
+        return {"success": True, "data": analysis.analyze_match(payload.job_description, payload.resume_text)}
+    except provider.ProviderError as exc:
+        status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
+        raise HTTPException(status_code=status, detail="The role-fit coach is temporarily busy. Please retry shortly.")
 
 
 # --------------------------------------------------------------------------- #
@@ -353,6 +365,16 @@ class InterviewStart(BaseModel):
     workflow_id: str
     duration: int = Field(15, ge=5, le=60)
     is_audio: bool = False
+
+
+def _fallback_interview_report() -> dict:
+    return {
+        "scores": {},
+        "strengths": [],
+        "improvements": ["Review the saved transcript and retry scoring from a future session."],
+        "summary": "Your interview transcript was saved, but detailed AI scoring is temporarily unavailable.",
+        "verdict": "Session captured successfully; scoring can be retried when the provider is available.",
+    }
 
 
 @router.post("/interviews/start")
@@ -463,6 +485,7 @@ async def interview_ws(
                 report = judge_report(questions, transcript, "", "")
             except Exception as exc:
                 print("judge failed:", exc)
+                report = _fallback_interview_report()
         if dbc.is_ready() and transcript:
             try:
                 dbc.insert("interview_sessions", [{

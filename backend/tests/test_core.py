@@ -165,3 +165,12 @@ def test_extract_docx_resume_text_without_extra_dependency():
             '<w:p><w:r><w:t>Improved latency</w:t></w:r></w:p></w:body></w:document>',
         )
     assert _extract_resume_text("resume.docx", content.getvalue()) == "Built FastAPI services\nImproved latency"
+
+
+def test_fallback_interview_report_keeps_session_completable():
+    from backend.app import _fallback_interview_report
+
+    report = _fallback_interview_report()
+    assert report["summary"]
+    assert report["verdict"]
+    assert report["improvements"]
