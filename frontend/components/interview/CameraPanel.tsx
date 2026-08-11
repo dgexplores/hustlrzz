@@ -47,7 +47,7 @@ export function CameraPanel() {
       )}
       {status === "in-use" && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
-          Camera busy — close Zoom/FaceTime/Meet, then retry.
+          Camera busy. Close Zoom, FaceTime, or Meet, then retry.
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setRetryKey((k) => k + 1)}>Retry</Button>
         </div>
       )}

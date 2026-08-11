@@ -35,7 +35,7 @@ export function AuthForm() {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        setMessage(data.session ? "Account created — signed in." : "Check your email to confirm your account.");
+        setMessage(data.session ? "Account created. You are signed in." : "Check your email to confirm your account.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
@@ -62,9 +62,9 @@ export function AuthForm() {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">AI Interview Coach</CardTitle>
+        <CardTitle className="text-2xl tracking-[-0.02em]">Welcome to Hustlrzz</CardTitle>
         <p className="text-sm text-muted-foreground mt-1">
-          {mode === "signin" ? "Sign in to continue your practice" : "Create a free account to start practicing"}
+          {mode === "signin" ? "Continue your interview practice." : "Create an account to start practising."}
         </p>
       </CardHeader>
       <CardContent>

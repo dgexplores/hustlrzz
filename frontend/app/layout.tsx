@@ -3,8 +3,8 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hustlrzz — AI interview rehearsal studio",
-  description: "AI mock interview coach — camera body-language tracking, live interviewer, scored coaching reports",
+  title: "Hustlrzz | AI interview coach",
+  description: "Prepare from your resume, practise live interviews, and review answer and body-language feedback.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -168,11 +168,10 @@ export function InterviewPanel() {
 
   return (
     <main className="mx-auto max-w-[1440px] space-y-6 px-4 py-8 md:px-6">
-      <section className="motion-enter flex flex-col gap-4 border-b border-foreground/20 pb-7 lg:flex-row lg:items-end lg:justify-between">
-        <div className="grid max-w-4xl gap-4 md:grid-cols-[90px_1fr]">
-          <p className="font-mono text-sm font-semibold text-primary">02 / REHEARSE</p>
-          <div><h1 className="font-display text-4xl font-semibold leading-tight tracking-tight md:text-5xl">Practice under pressure, privately.</h1>
-          <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">Select a prepared pack, answer naturally, and receive a combined content and delivery review.</p></div>
+      <section className="motion-enter flex flex-col gap-4 pb-2 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-3xl">
+          <h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] md:text-5xl">Run a realistic interview.</h1>
+          <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">Choose a prepared pack, answer by voice or text, and review your content and delivery together.</p>
         </div>
         <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-2 text-sm shadow-sm">
           <span className={`h-2 w-2 rounded-full ${phase === "live" ? "bg-emerald-500 animate-pulse" : phase === "connecting" || phase === "ending" ? "bg-amber-500" : "bg-muted-foreground/40"}`} />
@@ -187,7 +186,7 @@ export function InterviewPanel() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
           <Card className="overflow-hidden">
             <CardHeader className="border-b bg-secondary/25">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Step 1</p>
+              <p className="text-sm font-medium text-primary">Interview brief</p>
               <CardTitle className="text-xl">Choose your interview brief</CardTitle>
               <p className="text-sm text-muted-foreground">The interviewer uses its questions, company context, and your candidate-owned knowledge.</p>
             </CardHeader>
@@ -196,7 +195,7 @@ export function InterviewPanel() {
                 <div className="space-y-2">
                   <Label htmlFor="workflow">Prepared pack</Label>
                   <select id="workflow" value={workflowId} onChange={(event) => setWorkflowId(event.target.value)} className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring">
-                    {workflows.map((workflow) => <option key={workflow.workflow_id} value={workflow.workflow_id}>{workflow.company ? `${workflow.company} — ` : ""}{workflow.title || "Prepared interview"}</option>)}
+                    {workflows.map((workflow) => <option key={workflow.workflow_id} value={workflow.workflow_id}>{workflow.company ? `${workflow.company}: ` : ""}{workflow.title || "Prepared interview"}</option>)}
                   </select>
                 </div>
               ) : <div className="rounded-xl border border-dashed p-6 text-center"><FileText className="mx-auto h-6 w-6 text-muted-foreground" /><p className="mt-2 font-medium">No prepared pack yet</p><p className="mt-1 text-sm text-muted-foreground">Use Prepare first to create a grounded interview.</p><Link href="/prepare" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary">Open Prepare <ArrowRight className="h-4 w-4" /></Link></div>}
@@ -218,7 +217,7 @@ export function InterviewPanel() {
           </Card>
 
           <Card>
-            <CardHeader><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Before you begin</p><CardTitle className="text-xl">Session readiness</CardTitle></CardHeader>
+            <CardHeader><p className="text-sm font-medium text-primary">Before you begin</p><CardTitle className="text-xl">Session readiness</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <Readiness icon={<Target className="h-4 w-4" />} title="Grounded questions" copy="Questions come from your selected role, resume, and current company brief." />
               <Readiness icon={<Mic className="h-4 w-4" />} title="Natural responses" copy="Speak or type in your own words; the coach can probe shallow answers." />

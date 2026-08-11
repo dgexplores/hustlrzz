@@ -1,41 +1,32 @@
-# Hustlrzz product design contract
+# Hustlrzz design contract
 
-## Product lens
+## Product character
 
-Hustlrzz is a rehearsal studio for candidates who know that interview performance is more than memorising answers. It should feel focused, calm, and exact: a place to turn career evidence into a stronger live performance.
+Hustlrzz is a modern interview training environment. It should feel intelligent, precise, calm, and responsive. It must not look like a generic AI landing page or a career-services brochure.
 
-## First read
+## Visual system
 
-The product must make the current journey obvious within five seconds:
+- Cool monochrome surfaces with one cobalt interaction color.
+- System grotesk typography with tight display tracking and readable body leading.
+- Monospace is reserved for measurements, timing, and technical identifiers.
+- Soft 14-16px surfaces are used only where they group real product functions.
+- No warm paper palette, serif display type, neon gradients, glow effects, decorative grids, numbered section labels, or stock photography.
 
-1. Prepare the evidence.
-2. Rehearse the conversation.
-3. Review one useful improvement.
+## Product flow
 
-The primary action is always the next step in that loop. Supporting tools such as company research and negotiation remain discoverable without competing with it.
+Navigation uses familiar feature names: Home, Prepare, Interview, Coaching, and Progress. Every screen opens with one direct sentence explaining the task. Secondary detail appears only where it supports the next action.
 
-## Visual language
+## Motion
 
-- Warm ivory and deep ink create an editorial, human tone.
-- Signal amber marks actions, live states, and progress—not decoration.
-- Display typography is reserved for important narrative moments; controls remain compact and direct.
-- Borders organise active workspaces. Open editorial space explains the product.
-- Motion reveals sequence, confirms state changes, and directs attention. It never delays input.
+- Press feedback begins immediately and uses a subtle 0.97 scale.
+- Hover and control transitions stay between 160ms and 200ms.
+- Page entry motion is used once to establish hierarchy and never blocks input.
+- Continuous movement is reserved for real states such as listening or processing.
+- Reduced motion removes positional animation while preserving state feedback.
 
-## Interaction model
+## Materials and accessibility
 
-- Global navigation mirrors the journey instead of presenting an undifferentiated app menu.
-- Preparation is a guided input sheet.
-- Interview and coaching are focused studio canvases.
-- History is a chronological evidence ledger.
-
-## Responsive and accessibility rules
-
-- Desktop content is capped at a readable measure and avoids equal-width card walls.
-- Mobile keeps the same journey order with horizontally scrollable navigation and stacked studio panes.
-- All actions retain visible focus, keyboard access, and WCAG-conscious contrast.
-- Motion is removed when `prefers-reduced-motion` is enabled.
-
-## Finish gate
-
-A screen does not ship if its first-read object is unclear, if the primary action competes with secondary actions, or if it relies on decorative cards, gradients, or motion to create interest.
+- Translucency is limited to navigation and the primary product preview.
+- A solid fallback is provided for reduced-transparency preferences.
+- Light and dark modes preserve the same hierarchy and cobalt identity.
+- Inputs, buttons, placeholders, labels, and error states must meet WCAG AA contrast.

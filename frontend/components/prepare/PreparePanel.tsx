@@ -93,10 +93,9 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      <section className="motion-enter grid gap-4 border-b border-foreground/20 pb-7 md:grid-cols-[90px_1fr]">
-        <p className="font-mono text-sm font-semibold text-primary">01 / PREPARE</p>
-        <div className="max-w-3xl"><h1 className="font-display text-4xl font-semibold leading-tight tracking-tight md:text-5xl">Build the evidence behind your answers.</h1>
-        <p className="mt-3 text-base leading-7 text-muted-foreground">Your resume, target role, and current company signals become a focused practice pack that grounds future follow-ups.</p></div>
+      <section className="motion-enter max-w-3xl pb-2">
+        <h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] md:text-5xl">Prepare for the role you want.</h1>
+        <p className="mt-4 text-base leading-7 text-muted-foreground">Add your experience and target role. Hustlrzz will create a focused question pack and research the company when requested.</p>
       </section>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-6 items-start">
       <Card className="motion-enter motion-enter-delay-1 overflow-hidden border-foreground/25">
@@ -204,9 +203,9 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
                 <span className="font-semibold text-primary">{result.company_match.overall_match_percent}%</span>
               </div>
               <p className="text-sm">{result.company_match.summary}</p>
-              <p className="text-sm"><span className="font-medium">Match:</span> {result.company_match.matched_skills.join(", ") || "—"}</p>
-              <p className="text-sm"><span className="font-medium">Gaps:</span> {result.company_match.gap_skills.join(", ") || "—"}</p>
-              <p className="text-sm"><span className="font-medium">Weaknesses:</span> {result.company_match.resume_weaknesses.join(", ") || "—"}</p>
+              <p className="text-sm"><span className="font-medium">Match:</span> {result.company_match.matched_skills.join(", ") || "None found"}</p>
+              <p className="text-sm"><span className="font-medium">Gaps:</span> {result.company_match.gap_skills.join(", ") || "None found"}</p>
+              <p className="text-sm"><span className="font-medium">Weaknesses:</span> {result.company_match.resume_weaknesses.join(", ") || "None found"}</p>
             </div>
           )}
           {result?.company_research && result.company_research.status !== "not_requested" && (

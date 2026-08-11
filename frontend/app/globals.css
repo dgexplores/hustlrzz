@@ -4,43 +4,43 @@
 
 @layer base {
   :root {
-    --background: 42 33% 96%;
-    --foreground: 214 38% 12%;
-    --card: 42 38% 99%;
-    --card-foreground: 214 38% 12%;
-    --primary: 35 91% 48%;
-    --primary-foreground: 214 42% 9%;
-    --secondary: 39 24% 91%;
-    --secondary-foreground: 214 32% 17%;
-    --muted: 39 24% 91%;
-    --muted-foreground: 215 13% 38%;
-    --accent: 36 57% 88%;
-    --accent-foreground: 214 38% 12%;
+    --background: 220 24% 98%;
+    --foreground: 225 34% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 225 34% 10%;
+    --primary: 222 72% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 18% 94%;
+    --secondary-foreground: 225 28% 15%;
+    --muted: 220 18% 94%;
+    --muted-foreground: 220 9% 40%;
+    --accent: 220 72% 95%;
+    --accent-foreground: 222 62% 34%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 36 16% 78%;
-    --input: 36 16% 70%;
-    --ring: 35 91% 48%;
-    --radius: 0.5rem;
+    --border: 220 15% 87%;
+    --input: 220 14% 80%;
+    --ring: 222 72% 53%;
+    --radius: 0.875rem;
   }
   .dark {
-    --background: 215 38% 8%;
-    --foreground: 42 35% 94%;
-    --card: 214 31% 11%;
-    --card-foreground: 42 35% 94%;
-    --primary: 37 94% 56%;
-    --primary-foreground: 215 42% 8%;
-    --secondary: 214 25% 16%;
-    --secondary-foreground: 42 35% 94%;
-    --muted: 214 25% 16%;
-    --muted-foreground: 38 12% 67%;
-    --accent: 214 25% 20%;
-    --accent-foreground: 42 35% 94%;
+    --background: 225 28% 7%;
+    --foreground: 220 25% 96%;
+    --card: 224 24% 10%;
+    --card-foreground: 220 25% 96%;
+    --primary: 217 89% 65%;
+    --primary-foreground: 225 32% 8%;
+    --secondary: 223 18% 15%;
+    --secondary-foreground: 220 25% 96%;
+    --muted: 223 18% 15%;
+    --muted-foreground: 220 10% 64%;
+    --accent: 222 30% 18%;
+    --accent-foreground: 217 89% 72%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 210 20% 98%;
-    --border: 214 18% 25%;
-    --input: 214 18% 31%;
-    --ring: 37 94% 56%;
+    --border: 222 15% 21%;
+    --input: 222 14% 29%;
+    --ring: 217 89% 65%;
   }
 }
 
@@ -50,9 +50,9 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-    background-image: radial-gradient(hsl(var(--foreground) / 0.045) 0.65px, transparent 0.65px);
-    background-size: 9px 9px;
+    font-family: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03", "cv04", "cv11";
+    font-optical-sizing: auto;
   }
 
   ::selection { @apply bg-primary/20 text-foreground; }
@@ -61,22 +61,31 @@
 }
 
 @layer utilities {
-  .font-display { font-family: Iowan Old Style, Baskerville, "Times New Roman", serif; }
-  .surface-transition { transition: color 180ms cubic-bezier(0.23, 1, 0.32, 1), background-color 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1), transform 180ms cubic-bezier(0.23, 1, 0.32, 1); }
-  .motion-enter { animation: enter-up 680ms cubic-bezier(0.16, 1, 0.3, 1) both; }
-  .motion-enter-delay-1 { animation-delay: 90ms; }
-  .motion-enter-delay-2 { animation-delay: 180ms; }
-  .motion-enter-delay-3 { animation-delay: 270ms; }
-  .interactive-lift:hover { transform: translateY(-3px); box-shadow: 0 14px 30px hsl(var(--foreground) / 0.09); }
-  .studio-grid { background-image: linear-gradient(hsl(var(--foreground) / .055) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground) / .055) 1px, transparent 1px); background-size: 32px 32px; }
-  .signal-pulse { animation: signal-pulse 2.2s ease-out infinite; }
-  .wave-bar { transform-origin: bottom; animation: wave 1.25s ease-in-out infinite alternate; }
+  .surface-transition { transition: color 180ms cubic-bezier(0.23, 1, 0.32, 1), background-color 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1), transform 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+  .motion-enter { animation: enter-up 480ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .motion-enter-delay-1 { animation-delay: 60ms; }
+  .motion-enter-delay-2 { animation-delay: 120ms; }
+  .motion-enter-delay-3 { animation-delay: 180ms; }
+  .product-window { border: 1px solid hsl(var(--border)); background: hsl(var(--card) / .88); box-shadow: 0 28px 80px hsl(225 34% 10% / .12), inset 0 1px 0 hsl(0 0% 100% / .7); backdrop-filter: blur(24px) saturate(140%); }
+  .feature-surface { border: 1px solid hsl(var(--border)); background-color: hsl(var(--card) / .72); box-shadow: inset 0 1px 0 hsl(0 0% 100% / .65); transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms ease, background-color 180ms ease; }
+  .data-grid { background-image: linear-gradient(hsl(var(--foreground) / .04) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground) / .04) 1px, transparent 1px); background-size: 28px 28px; }
+  .live-wave > span { transform-origin: center; animation: live-wave 900ms ease-in-out infinite alternate; }
+  .live-wave > span:nth-child(3n + 1) { animation-delay: -180ms; }
+  .live-wave > span:nth-child(3n + 2) { animation-delay: -420ms; }
 }
 
 @keyframes enter-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes signal-pulse { 0% { box-shadow: 0 0 0 0 hsl(var(--primary) / .42); } 70%, 100% { box-shadow: 0 0 0 12px hsl(var(--primary) / 0); } }
-@keyframes wave { from { transform: scaleY(.28); } to { transform: scaleY(1); } }
+@keyframes live-wave { from { transform: scaleY(.42); opacity: .52; } to { transform: scaleY(1); opacity: 1; } }
+
+@media (hover: hover) and (pointer: fine) {
+  .feature-surface:hover { transform: translateY(-3px); border-color: hsl(var(--primary) / .32); background-color: hsl(var(--card)); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .product-window { background: hsl(var(--card)); backdrop-filter: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; transform: none !important; }
+  .live-wave > span { animation: none !important; }
 }

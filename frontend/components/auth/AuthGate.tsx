@@ -8,7 +8,7 @@ import type { Session } from "@supabase/supabase-js";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { Loader2, LogOut, Radio } from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -43,13 +43,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (pathname === "/") {
       return (
         <div className="min-h-screen bg-background">
-          <header className="sticky top-0 z-40 border-b border-foreground/15 bg-background/92 backdrop-blur-xl">
-            <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-              <Link href="/" className="flex items-center gap-2.5 text-foreground">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-foreground bg-primary text-primary-foreground"><Radio className="h-4 w-4" /></span>
-                <span className="font-display text-xl font-semibold tracking-tight">Hustlrzz</span>
+          <header className="sticky top-0 z-40 bg-background/78 backdrop-blur-2xl">
+            <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
+              <Link href="/" className="text-foreground">
+                <span className="text-lg font-bold tracking-[-0.04em]">HUSTLRZZ</span>
               </Link>
-              <div className="flex items-center gap-2"><ThemeToggle /><Link href="/prepare"><Button size="sm">Enter studio <span aria-hidden="true">→</span></Button></Link></div>
+              <div className="flex items-center gap-2"><ThemeToggle /><Link href="/prepare"><Button size="sm">Get started</Button></Link></div>
             </div>
           </header>
           {children}
@@ -57,14 +56,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
       );
     }
     return (
-      <main className="relative min-h-screen flex items-center justify-center overflow-hidden p-4 studio-grid">
+      <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-secondary/25 p-4">
         <div className="absolute right-4 top-4"><ThemeToggle /></div>
         <div className="w-full max-w-md">
           <div className="flex justify-center mb-6">
-            <div className="flex items-center gap-2 text-foreground">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-foreground bg-primary text-primary-foreground"><Radio className="h-4 w-4" /></span>
-              <span className="font-display text-2xl font-semibold">Hustlrzz</span>
-            </div>
+            <span className="text-xl font-bold tracking-[-0.04em]">HUSTLRZZ</span>
           </div>
           <AuthForm />
         </div>
@@ -73,32 +69,31 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   const nav = [
-    { href: "/", label: "Studio", number: "00" },
-    { href: "/prepare", label: "Prepare", number: "01" },
-    { href: "/interview", label: "Rehearse", number: "02" },
-    { href: "/coaching", label: "Coach", number: "03" },
-    { href: "/dashboard", label: "Review", number: "04" },
+    { href: "/", label: "Home" },
+    { href: "/prepare", label: "Prepare" },
+    { href: "/interview", label: "Interview" },
+    { href: "/coaching", label: "Coaching" },
+    { href: "/dashboard", label: "Progress" },
   ];
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className="sticky top-0 z-40 border-b border-foreground/15 bg-background/92 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-          <Link href="/" className="group flex items-center gap-2.5 text-foreground" aria-label="Hustlrzz home">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-foreground bg-primary text-primary-foreground surface-transition group-hover:rotate-12"><Radio className="h-4 w-4" /></span>
-            <span className="font-display text-xl font-semibold tracking-tight">Hustlrzz</span>
+      <header className="sticky top-0 z-40 bg-background/78 backdrop-blur-2xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
+          <Link href="/" className="text-foreground" aria-label="Hustlrzz home">
+            <span className="text-lg font-bold tracking-[-0.04em]">HUSTLRZZ</span>
           </Link>
           <nav className="hidden items-stretch self-stretch md:flex" aria-label="Product journey">
             {nav.map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
-                className={`group relative flex items-center gap-1.5 px-3 text-sm font-semibold surface-transition ${
+                className={`group relative flex items-center px-3 text-sm font-medium surface-transition ${
                   pathname === n.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <span className={`font-mono text-[10px] ${pathname === n.href ? "text-primary" : "opacity-45"}`}>{n.number}</span>{n.label}
-                <span className={`absolute inset-x-3 bottom-0 h-0.5 origin-left bg-primary transition-transform ${pathname === n.href ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} />
+                {n.label}
+                <span className={`absolute inset-x-3 bottom-2 h-0.5 origin-left rounded-full bg-primary transition-transform ${pathname === n.href ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} />
               </Link>
             ))}
           </nav>
@@ -110,14 +105,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
             </Button>
           </div>
         </div>
-        <nav className="flex max-w-full items-center overflow-x-auto border-t border-foreground/10 px-3 md:hidden" aria-label="Mobile navigation">
+        <nav className="flex max-w-full items-center overflow-x-auto px-3 md:hidden" aria-label="Mobile navigation">
           {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={`shrink-0 border-b-2 px-3 py-2.5 text-xs font-semibold ${pathname === item.href ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
-              <span className="mr-1 font-mono text-[9px] text-primary">{item.number}</span>{item.label}
+              {item.label}
             </Link>
           ))}
         </nav>

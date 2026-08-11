@@ -28,12 +28,12 @@ export function DashboardContent() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-10">
-      <section className="motion-enter grid gap-4 border-b border-foreground/20 pb-7 md:grid-cols-[90px_1fr_auto] md:items-end"><p className="font-mono text-sm font-semibold text-primary">04 / REVIEW</p><div className="max-w-2xl"><h1 className="font-display text-4xl font-semibold leading-tight tracking-tight md:text-5xl">See the evidence behind your progress.</h1><p className="mt-3 text-muted-foreground">Prepared packs and interview reports stay together so the next session starts with a specific focus.</p></div><Link href="/interview" className="inline-flex items-center gap-1.5 text-sm font-bold text-primary hover:underline">Start next rehearsal <ArrowRight className="h-4 w-4" /></Link></section>
+      <section className="motion-enter flex flex-col gap-5 pb-2 md:flex-row md:items-end md:justify-between"><div className="max-w-2xl"><h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] md:text-5xl">Track what is improving.</h1><p className="mt-4 text-muted-foreground">Keep your preparation packs and interview reports together. Use the latest feedback to choose what to practise next.</p></div><Link href="/interview" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">Start an interview <ArrowRight className="h-4 w-4" /></Link></section>
       {error && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">{error}</p>}
       <section>
         <div className="mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Prepared packs</h2></div>
         <div className="divide-y divide-foreground/15 border-y border-foreground/20">
-          {workflows.length === 0 && <p className="text-sm text-muted-foreground">No prepared packs yet — go to Prepare.</p>}
+          {workflows.length === 0 && <p className="text-sm text-muted-foreground">No prepared packs yet. Start in Prepare.</p>}
           {workflows.map((w) => (
             <Card key={w.workflow_id} className="grid rounded-none border-0 bg-transparent shadow-none surface-transition hover:bg-accent/45 md:grid-cols-[1fr_auto]">
               <CardHeader className="py-5">
