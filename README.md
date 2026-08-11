@@ -185,6 +185,8 @@ delivery with Resend.
   research bounded and lets preparation fall back safely when sources are slow.
 - **Supabase:** apply the schema or RAG migration. Never expose
   `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
+- **Google sign-in:** enable the Google provider and register the production
+  callback URLs by following [the Google authentication setup](docs/GOOGLE_AUTH_SETUP.md).
 - **RAG:** configure `GEMINI_API_KEY` to enable embeddings; the app remains
   fully usable if candidate knowledge retrieval is unavailable.
 
