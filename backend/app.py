@@ -39,6 +39,7 @@ from backend import config, db as dbc
 from backend.ai import provider
 from backend.career import analysis, company_profiles
 from backend.rag import service as rag
+from backend.resume import service as resume_analyzer
 from backend.session import registry
 from backend.workflow.preparation import run_preparation_workflow
 
@@ -252,6 +253,81 @@ def _extract_docx_text(content: bytes) -> str:
         return "\n".join(paragraphs)
     except (KeyError, zipfile.BadZipFile, ElementTree.ParseError):
         return ""
+
+
+# --------------------------------------------------------------------------- #
+# Resume Analyzer (cost-aware, no raw-resume persistence)
+# --------------------------------------------------------------------------- #
+@router.get("/resume-analyzer/usage")
+async def resume_analyzer_usage(user: dict = Depends(get_user)):
+    _db_or_503()
+    try:
+        return {"success": True, "data": await resume_analyzer.usage(user["uid"])}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Resume Analyzer usage is temporarily unavailable.")
+
+
+@router.get("/resume-analyzer/analyses")
+async def list_resume_analyses(user: dict = Depends(get_user)):
+    _db_or_503()
+    try:
+        response = dbc.get_client().table("resume_analysis").select(
+            "analysis_id,resume_score,extracted_skills,created_at"
+        ).eq("user_id", user["uid"]).order("created_at", desc=True).limit(50).execute()
+        return {"success": True, "data": response.data or []}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Resume Analyzer history is temporarily unavailable.")
+
+
+@router.get("/resume-analyzer/analyses/{analysis_id}")
+async def get_resume_analysis(analysis_id: str, user: dict = Depends(get_user)):
+    _db_or_503()
+    try:
+        response = dbc.get_client().table("resume_analysis").select("*").eq(
+            "analysis_id", analysis_id
+        ).eq("user_id", user["uid"]).limit(1).execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        return {"success": True, "data": response.data[0]}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=503, detail="Resume Analyzer result is temporarily unavailable.")
+
+
+@router.post("/resume-analyzer/analyze")
+async def analyze_resume(
+    file: UploadFile = File(...),
+    job_description: str = Form(""),
+    user: dict = Depends(get_user),
+):
+    """Analyze a PDF/DOCX in memory; raw upload bytes are discarded after parsing."""
+    _db_or_503()
+    filename = file.filename or ""
+    if Path(filename).suffix.lower() not in {".pdf", ".docx"}:
+        raise HTTPException(status_code=400, detail="Upload a PDF or DOCX resume.")
+    content = await file.read(config.MAX_FILE_SIZE + 1)
+    if len(content) > config.MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="Resume files must be 5 MB or smaller.")
+    resume_text = _extract_resume_text(filename, content)
+    # Ensure the file bytes are no longer retained by this request before the
+    # model call; only extracted text is passed to the analysis service.
+    del content
+    if len(resume_text.strip()) < config.MIN_RESUME_TEXT_LENGTH:
+        raise HTTPException(status_code=400, detail="Could not extract enough readable text from this resume.")
+    if len(job_description) > config.RESUME_ANALYZER_MAX_JD_CHARS:
+        raise HTTPException(status_code=422, detail="Job description is too long.")
+    try:
+        record, cached = await resume_analyzer.analyze(
+            user_id=user["uid"], resume_text=resume_text, job_description=job_description,
+        )
+        return {"success": True, "data": record, "cached": cached}
+    except PermissionError as exc:
+        raise HTTPException(status_code=402, detail=str(exc))
+    except provider.ProviderError as exc:
+        raise HTTPException(status_code=503, detail="Resume analysis is temporarily unavailable. Please retry shortly.") from exc
+    except Exception:
+        raise HTTPException(status_code=503, detail="Resume analysis could not be completed. No quota was consumed; please retry.")
 
 
 # --------------------------------------------------------------------------- #
