@@ -71,6 +71,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const nav = [
     { href: "/", label: "Home" },
     { href: "/prepare", label: "Prepare" },
+    { href: "/resume-analyzer", label: "Resume Analyzer" },
     { href: "/interview", label: "Interview" },
     { href: "/coaching", label: "Coaching" },
     { href: "/dashboard", label: "Progress" },

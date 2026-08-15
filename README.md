@@ -142,7 +142,8 @@ Dockerfile       backend image for Railway or another Docker host
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. For a fresh project, run `supabase/schema.sql` in the SQL editor. Existing
-   installations can apply `supabase/migrations/20260809110000_rag_knowledge.sql`.
+   installations can apply the migrations in order, including
+   `supabase/migrations/20260815180000_resume_analyzer.sql` for Resume Analyzer quotas and history.
 3. Copy the project URL, `anon` key, and `service_role` key from **Project Settings → API**.
 
 ### 2. Start the API
@@ -189,6 +190,9 @@ delivery with Resend.
   callback URLs by following [the Google authentication setup](docs/GOOGLE_AUTH_SETUP.md).
 - **RAG:** configure `GEMINI_API_KEY` to enable embeddings; the app remains
   fully usable if candidate knowledge retrieval is unavailable.
+- **Resume Analyzer:** apply the Resume Analyzer migration before deploying.
+  It enforces a row-locked daily quota in Asia/Kolkata and stores structured
+  results only; raw resume files and extracted text are not persisted.
 
 ## Key API routes
 
@@ -202,6 +206,7 @@ delivery with Resend.
 | `POST /coaching/practice` | Typed/voice rehearsal → combined content and delivery coaching |
 | `POST /coaching/practice/turn` | Secure multi-turn coaching follow-up or objection |
 | `GET /knowledge/status`, `POST /knowledge/documents`, `POST /knowledge/search` | Candidate-owned RAG knowledge |
+| `POST /resume-analyzer/analyze`, `GET /resume-analyzer/usage` | In-memory PDF/DOCX analysis with quota and history |
 
 ---
 
