@@ -234,6 +234,7 @@ def submit_round(user_id: str, attempt_id: str, round_index: int, responses: dic
     if current + 1 < len(rounds):
         nxt = rounds[current + 1]
         updates["current_round"] = current + 1
+        updates["round_scores"] = scores
         dbc.update(TABLE, {"attempt_id": attempt_id}, updates)
         return {**result_payload, "completed": False,
                 "next_round_index": current + 1,
