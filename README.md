@@ -6,7 +6,7 @@
 
 [**Launch the live app ↗**](https://frontend-deepaklearn7878-6255s-projects.vercel.app) &nbsp;·&nbsp;
 [Backend health ↗](https://hustlrzzv2-production.up.railway.app/health) &nbsp;·&nbsp;
-[Explore the code](https://github.com/dgexplores/hustlrzzv2)
+[Explore the code](https://github.com/dgexplores/hustlrzz)
 
 [Launch readiness, privacy boundaries, and rollout gates](docs/LAUNCH_READINESS.md)
 
