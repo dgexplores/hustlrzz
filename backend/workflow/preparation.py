@@ -18,14 +18,19 @@ import json
 import secrets
 import string
 import time
-import traceback
 from datetime import datetime, timezone
 from typing import Optional
-from urllib.parse import urlparse
 
 from backend.ai import provider
 from backend import config
 from backend.career import company_profiles
+from backend.career.web_research import (
+    clean_web_results as _clean_web_results,
+    search_company_web as _search_company_web,
+)
+from backend.obs import get_logger
+
+log = get_logger("hustlrzz.prep")
 
 PERSONAL_SUMMARY_SYSTEM = (
     "You are a recruiting coach. Turn the candidate's raw materials into a crisp, "
@@ -55,31 +60,10 @@ def generate_session_id() -> str:
 
 
 def _search_web(job_title: str, job_description: str, max_results: int = 8) -> list[dict]:
-    queries = [
-        f"{job_title} interview questions",
-        f"{job_title} common interview questions and answers",
-        f"{job_title} behavioral interview questions",
-        f"{job_title} technical interview questions",
-    ]
-    results: list[dict] = []
-    try:
-        from ddgs import DDGS
+    """Industry question retrieval now lives in career.web_research."""
+    from backend.career.web_research import search_industry_questions
 
-        with DDGS() as ddgs:
-            for query in queries:
-                try:
-                    for item in ddgs.text(query, max_results=min(max_results, 5)):
-                        results.append({
-                            "title": item.get("title", ""),
-                            "url": item.get("href", ""),
-                            "snippet": item.get("body", ""),
-                            "query": query,
-                        })
-                except Exception:
-                    continue
-    except Exception as exc:
-        print(f"[WARN] DuckDuckGo search failed: {exc}")
-    return results
+    return search_industry_questions(job_title, max_results=min(max_results, 5))
 
 
 def _organize_search(job_title: str, job_description: str, results: list[dict]) -> dict:
@@ -96,7 +80,7 @@ def _organize_search(job_title: str, job_description: str, results: list[dict]) 
             + json.dumps(results[:60], ensure_ascii=False),
         )
     except Exception as exc:
-        print(f"[WARN] Search organization failed: {exc}")
+        log.warning("search organization failed: %s", exc)
         return {"real_questions": [], "interview_process": {}}
 
 
@@ -105,92 +89,6 @@ def _industry_faqs(job_title: str, job_description: str) -> dict:
     if not config.ENABLE_WEB_SEARCH:
         return {"real_questions": [], "interview_process": {}}
     return _organize_search(job_title, job_description, _search_web(job_title, job_description))
-
-
-def _clean_web_results(results: list[dict], limit: int = 24) -> list[dict]:
-    """Keep only unique, attributable HTTP sources before they reach the model."""
-    cleaned: list[dict] = []
-    seen: set[str] = set()
-    for item in results:
-        url = str(item.get("url") or item.get("href") or "").strip()
-        parsed = urlparse(url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc or url in seen:
-            continue
-        title = str(item.get("title") or parsed.netloc).strip()[:240]
-        snippet = str(item.get("snippet") or item.get("body") or "").strip()[:1200]
-        if not snippet:
-            continue
-        seen.add(url)
-        cleaned.append({
-            "id": f"S{len(cleaned) + 1}",
-            "title": title,
-            "url": url,
-            "domain": parsed.netloc.removeprefix("www."),
-            "snippet": snippet,
-            "published_at": str(item.get("date") or item.get("published_at") or "")[:80],
-            "query": str(item.get("query") or "")[:240],
-            "category": str(item.get("category") or "general")[:80],
-        })
-        if len(cleaned) >= limit:
-            break
-    return cleaned
-
-
-def _search_company_web(company_name: str, job_title: str, max_results: int = 5) -> list[dict]:
-    """Retrieve an on-demand, multi-angle company interview evidence set."""
-    year = datetime.now(timezone.utc).year
-    queries = [
-        ("role_demand", f'"{company_name}" "{job_title}" careers jobs requirements skills'),
-        ("hiring_process", f'"{company_name}" interview process hiring process careers'),
-        ("question_patterns", f'"{company_name}" "{job_title}" interview questions technical behavioral'),
-        ("candidate_experience", f'"{company_name}" "{job_title}" interview experience stages'),
-        ("values_culture", f'"{company_name}" official values leadership principles culture'),
-        ("engineering_product", f'"{company_name}" engineering blog product strategy {year}'),
-        ("business_priorities", f'"{company_name}" annual report investor priorities {year}'),
-    ]
-    results: list[dict] = []
-    try:
-        from ddgs import DDGS
-
-        with DDGS() as ddgs:
-            for category, query in queries:
-                try:
-                    for item in ddgs.text(query, max_results=max_results):
-                        results.append({**item, "query": query, "category": category})
-                except Exception:
-                    continue
-            try:
-                for item in ddgs.news(
-                    f'"{company_name}" hiring strategy product engineering',
-                    timelimit="m",
-                    max_results=max_results,
-                ):
-                    results.append({**item, "query": "recent company news", "category": "recent_news"})
-            except Exception:
-                pass
-    except Exception as exc:
-        print(f"[WARN] Company research search failed: {exc}")
-    company_token = "".join(character for character in company_name.lower() if character.isalnum())
-
-    def source_priority(item: dict) -> tuple[int, str]:
-        url = str(item.get("url") or item.get("href") or "").lower()
-        domain_token = "".join(character for character in urlparse(url).netloc.lower() if character.isalnum())
-        query = str(item.get("query") or "").lower()
-        category = str(item.get("category") or "")
-        score = 0
-        if company_token and company_token in domain_token:
-            score += 8
-        if any(term in url for term in ("career", "jobs", "investor", "annual-report", "about")):
-            score += 3
-        if "careers" in query or "annual report" in query:
-            score += 2
-        if category in {"role_demand", "hiring_process", "business_priorities"}:
-            score += 1
-        if item.get("date"):
-            score += 1
-        return (-score, url)
-
-    return _clean_web_results(sorted(results, key=source_priority))
 
 
 def _fallback_company_research(company_name: str) -> dict:
@@ -291,10 +189,10 @@ def _organize_company_research(company_name: str, job_title: str, sources: list[
             "sources": sources,
         }
     except Exception as exc:
-        print(f"[WARN] Company research organization failed: {exc}")
+        log.warning("company research organization failed: %s", exc)
         fallback = _fallback_company_research(company_name)
         fallback["sources"] = sources
-        fallback["confidence"] = "medium"
+        fallback["confidence"] = "low"
         return fallback
 
 
@@ -352,9 +250,13 @@ async def run_preparation_workflow(
         )
         search_task = asyncio.create_task(asyncio.to_thread(_industry_faqs, job_title, job_description))
         company_task = asyncio.create_task(asyncio.to_thread(_company_research, company_name, job_title))
+        side_tasks = (search_task, company_task)
         try:
             personal_summary = await asyncio.wait_for(summary_task, timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
+            # Cancel sibling work so a slow profile never leaves orphan threads running.
+            for task in side_tasks:
+                task.cancel()
             return {"success": False, "error": "Profile analysis timed out. Please try again.", "session_id": workflow_id}
         try:
             industry_faqs = await asyncio.wait_for(search_task, timeout=config.WEB_SEARCH_TIMEOUT_SECONDS)
@@ -416,7 +318,7 @@ async def run_preparation_workflow(
                 answers_data = answers_data.get("answers", []) if isinstance(answers_data, dict) else []
             answers_data = answers_data[: len(questions)]
         except Exception as exc:
-            print(f"[WARN] answer generation failed: {exc}")
+            log.warning("answer generation failed: %s", exc)
             answers_data = []
 
         return {
@@ -432,5 +334,5 @@ async def run_preparation_workflow(
             "answers": answers_data,
         }
     except Exception as exc:
-        print(traceback.format_exc())
+        log.exception("preparation workflow failed")
         return {"success": False, "error": str(exc), "session_id": workflow_id}

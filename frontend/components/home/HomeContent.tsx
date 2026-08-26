@@ -109,7 +109,7 @@ export function HomeContent() {
       <section className="border-y bg-secondary/35">
         <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 text-sm md:grid-cols-3 md:px-6">
           <p className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" />Voice and typing</p>
-          <p className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" />Groq with Gemini fallback</p>
+          <p className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" />Multi-provider AI with automatic failover</p>
           <p className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" />Private camera processing</p>
         </div>
       </section>

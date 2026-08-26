@@ -3,8 +3,24 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hustlrzz | AI interview coach",
-  description: "Prepare from your resume, practise live interviews, and review answer and body-language feedback.",
+  title: {
+    default: "Hustlrzz | AI mock interview coach",
+    template: "%s | Hustlrzz",
+  },
+  description:
+    "Prepare from your resume, pass aptitude-style screening rounds, practise live interviews with a human-sounding AI interviewer, and review answer and body-language feedback.",
+  openGraph: {
+    title: "Hustlrzz | AI mock interview coach",
+    description:
+      "Resume-grounded preparation, screening-round assessments, live voice interviews and private presence coaching.",
+    type: "website",
+    siteName: "Hustlrzz",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Hustlrzz | AI mock interview coach",
+    description: "Prepare, assess, rehearse, improve - one private interview workspace.",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

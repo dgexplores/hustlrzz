@@ -50,7 +50,8 @@ create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
   insert into public.profiles (user_id, display_name, photo_url)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', ''), new.raw_user_meta_data->>'avatar_url');
+  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', ''),
+          coalesce(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture', ''));
   return new;
 end;
 $$;
@@ -70,7 +71,7 @@ create table if not exists knowledge_documents (
   document_id text unique not null,
   user_id uuid not null,
   title text not null,
-  source_type text not null check (source_type in ('resume', 'portfolio', 'notes', 'session_report')),
+  source_type text not null check (source_type in ('resume', 'portfolio', 'notes', 'session_report', 'company_intelligence')),
   content_hash text not null,
   chunk_count integer not null default 0,
   created_at timestamptz not null default now(),
@@ -114,3 +115,43 @@ language sql stable security invoker set search_path = public as $$
   order by c.embedding <=> query_embedding
   limit greatest(1, least(match_count, 10));
 $$;
+
+-- Shared company intelligence cache (service-role writes only; no client policy).
+create table if not exists company_intelligence (
+  id bigint generated always as identity primary key,
+  company_key text unique not null,
+  company_name text not null,
+  data jsonb not null default '{}'::jsonb,
+  confidence text not null default 'medium',
+  fetched_at timestamptz not null default now()
+);
+
+alter table company_intelligence enable row level security;
+drop policy if exists "company_intelligence_service_only" on company_intelligence;
+create index if not exists company_intelligence_fetched_idx
+  on company_intelligence(company_key, fetched_at desc);
+
+-- Assessment attempts (aptitude / technical / judgment rounds).
+create table if not exists assessment_attempts (
+  id bigint generated always as identity primary key,
+  attempt_id text unique not null,
+  user_id uuid not null,
+  role text not null,
+  company text not null default '',
+  level text not null default 'mid',
+  rounds jsonb not null default '[]'::jsonb,
+  current_round integer not null default 0,
+  round_scores jsonb not null default '[]'::jsonb,
+  total_percent integer,
+  band text,
+  status text not null default 'in_progress',
+  created_at timestamptz not null default now(),
+  unique(attempt_id, user_id)
+);
+
+alter table assessment_attempts enable row level security;
+drop policy if exists "assessment_attempts_owner_all" on assessment_attempts;
+create policy "assessment_attempts_owner_all" on assessment_attempts
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create index if not exists assessment_attempts_owner_idx
+  on assessment_attempts(user_id, created_at desc);

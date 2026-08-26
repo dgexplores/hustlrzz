@@ -3,9 +3,14 @@ import { FaceLandmarker, FilesetResolver, HandLandmarker, PoseLandmarker } from 
 import { initializeHandDetection } from "../lib/mediapipe/handDetection";
 import { initializeFaceDetection } from "../lib/mediapipe/faceDetection";
 import { initializePoseDetection } from "../lib/mediapipe/poseDetection";
-import { isBadPosture, isFacingForward } from "../lib/analytics";
+import { clamp, isFacingForward, postureDetails, smooth } from "../lib/analytics";
 import { drawHandLandmarks, drawPoseLandmarkers } from "../lib/drawing";
 import { useMetrics } from "@/context/MetricsContext";
+
+// Pin the WASM runtime to the exact installed package version so a CDN
+// "@latest" drift can never silently break camera analysis.
+const MEDIAPIPE_VERSION = "0.10.21";
+const WASM_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`;
 
 const FRAME_INTERVAL_MS = 1000 / 15;
 const CONFIRM_FRAMES = 8;
@@ -29,6 +34,22 @@ export const useMediapipe = (
   const [handVisible, setHandVisible] = useState(false);
   const [eyeContact, setEyeContact] = useState(true);
   const [postureGood, setPostureGood] = useState(true);
+
+  // Advanced continuous signals live in refs; they are pushed to the store on
+  // a throttle so React re-renders stay cheap during interviews.
+  const headTiltRef = useRef(0);
+  const shoulderTiltRef = useRef(0);
+  const forwardHeadRef = useRef(0);
+  const gazeStabilityRef = useRef(100);
+  const postureScoreRef = useRef(100);
+  const lastStorePushRef = useRef(0);
+
+  const overlayRef = useRef(overlayEnabled);
+
+  useEffect(() => {
+    overlayRef.current = overlayEnabled;
+  }, [overlayEnabled]);
+
   const isHandOnScreenRef = useRef(false);
   const isEyeContactRef = useRef(true);
   const notFacingRef = useRef(false);
@@ -47,10 +68,16 @@ export const useMediapipe = (
   const poseDetectorRef = useRef<PoseLandmarker>();
   const { updateMetrics } = useMetrics();
 
+  // Counters/durations flow into the global store as before.
   useEffect(() => {
-    updateMetrics({ handDetectionCounter, handDetectionDuration, notFacingCounter, notFacingDuration, badPostureDetectionCounter, badPostureDuration });
+    updateMetrics({
+      handDetectionCounter, handDetectionDuration, notFacingCounter, notFacingDuration,
+      badPostureDetectionCounter, badPostureDuration,
+    });
   }, [updateMetrics, handDetectionCounter, handDetectionDuration, notFacingCounter, notFacingDuration, badPostureDetectionCounter, badPostureDuration]);
 
+  // Model loading happens once per `enabled` toggle. Overlay drawing no longer
+  // re-downloads models (it reads overlayRef inside the loop instead).
   useEffect(() => {
     if (!enabled) return;
     let frame = 0;
@@ -59,10 +86,16 @@ export const useMediapipe = (
 
     const begin = async () => {
       try {
-        const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm");
-        const [hand, face, pose] = await Promise.all([initializeHandDetection(vision), initializeFaceDetection(vision), initializePoseDetection(vision)]);
+        const vision = await FilesetResolver.forVisionTasks(WASM_BASE);
+        const [hand, face, pose] = await Promise.all([
+          initializeHandDetection(vision),
+          initializeFaceDetection(vision),
+          initializePoseDetection(vision),
+        ]);
         if (cancelled) return;
-        handDetectorRef.current = hand; faceDetectorRef.current = face; poseDetectorRef.current = pose;
+        handDetectorRef.current = hand;
+        faceDetectorRef.current = face;
+        poseDetectorRef.current = pose;
         setReady(true);
       } catch {
         if (!cancelled) setProcessingError("Posture feedback could not start. Your interview can continue normally.");
@@ -72,12 +105,14 @@ export const useMediapipe = (
     const transitionEyeContact = (lookingForward: boolean, now: number) => {
       if (lookingForward) {
         eyeContactFramesRef.current += 1; eyeAwayFramesRef.current = 0;
+        gazeStabilityRef.current = smooth(gazeStabilityRef.current, 100, 0.08);
         if (notFacingRef.current && eyeContactFramesRef.current >= CONFIRM_FRAMES) {
           setNotFacingDuration((value) => value + (now - eyeAwayStartRef.current) / 1000);
           notFacingRef.current = false; isEyeContactRef.current = true; setEyeContact(true);
         }
       } else {
         eyeAwayFramesRef.current += 1; eyeContactFramesRef.current = 0;
+        gazeStabilityRef.current = smooth(gazeStabilityRef.current, 40, 0.08);
         if (!notFacingRef.current && eyeAwayFramesRef.current >= CONFIRM_FRAMES) {
           setNotFacingCounter((value) => value + 1);
           eyeAwayStartRef.current = now; notFacingRef.current = true; isEyeContactRef.current = false; setEyeContact(false);
@@ -88,12 +123,14 @@ export const useMediapipe = (
     const transitionPosture = (needsAdjustment: boolean, now: number) => {
       if (needsAdjustment) {
         poorPostureFramesRef.current += 1; goodPostureFramesRef.current = 0;
+        postureScoreRef.current = smooth(postureScoreRef.current, 45, 0.06);
         if (!hasBadPostureRef.current && poorPostureFramesRef.current >= CONFIRM_FRAMES) {
           setBadPostureDetectionCounter((value) => value + 1);
           postureStartRef.current = now; hasBadPostureRef.current = true; setPostureGood(false);
         }
       } else {
         goodPostureFramesRef.current += 1; poorPostureFramesRef.current = 0;
+        postureScoreRef.current = smooth(postureScoreRef.current, 96, 0.06);
         if (hasBadPostureRef.current && goodPostureFramesRef.current >= CONFIRM_FRAMES) {
           setBadPostureDuration((value) => value + (now - postureStartRef.current) / 1000);
           hasBadPostureRef.current = false; setPostureGood(true);
@@ -108,6 +145,19 @@ export const useMediapipe = (
       const now = performance.now();
       if (now - lastProcessed < FRAME_INTERVAL_MS) return;
       lastProcessed = now;
+
+      // Push the smoothed continuous signals to the store ~2x/sec.
+      if (now - lastStorePushRef.current > 500) {
+        lastStorePushRef.current = now;
+        updateMetrics({
+          headTiltDeg: Number(headTiltRef.current.toFixed(1)),
+          shoulderTiltDeg: Number(shoulderTiltRef.current.toFixed(1)),
+          forwardHeadProxy: Number(forwardHeadRef.current.toFixed(3)),
+          gazeStabilityScore: Math.round(clamp(gazeStabilityRef.current)),
+          postureScore: Math.round(clamp(postureScoreRef.current)),
+        });
+      }
+
       const canvas = canvasRef.current;
       if (canvas && (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight)) {
         canvas.width = video.videoWidth; canvas.height = video.videoHeight;
@@ -129,14 +179,20 @@ export const useMediapipe = (
           lastGestureAtRef.current = now;
         }
         handWristRef.current = wrists.map((wrist) => ({ x: wrist.x, y: wrist.y }));
-        if (overlayEnabled && canvas) drawHandLandmarks(canvas, hand.landmarks);
+        if (overlayRef.current && canvas) drawHandLandmarks(canvas, hand.landmarks);
       }
       const face = faceDetectorRef.current?.detectForVideo(video, now);
       if (face?.faceLandmarks?.[0]) transitionEyeContact(isFacingForward(face.faceLandmarks[0]), now);
       const pose = poseDetectorRef.current?.detectForVideo(video, now);
       if (pose?.landmarks?.[0]) {
-        transitionPosture(isBadPosture(pose.landmarks[0]), now);
-        if (overlayEnabled && canvas) drawPoseLandmarkers(canvas, pose.landmarks);
+        const details = postureDetails(pose.landmarks[0]);
+        if (details) {
+          headTiltRef.current = smooth(headTiltRef.current, details.headTiltDeg);
+          shoulderTiltRef.current = smooth(shoulderTiltRef.current, details.shoulderTiltDeg);
+          forwardHeadRef.current = smooth(forwardHeadRef.current, details.headGapRatio < 0.34 ? 1 : 0);
+          transitionPosture(details.isBad, now);
+        }
+        if (overlayRef.current && canvas) drawPoseLandmarkers(canvas, pose.landmarks);
       }
     };
 
@@ -147,7 +203,14 @@ export const useMediapipe = (
       handDetectorRef.current?.close(); faceDetectorRef.current?.close(); poseDetectorRef.current?.close();
       handDetectorRef.current = undefined; faceDetectorRef.current = undefined; poseDetectorRef.current = undefined;
     };
-  }, [canvasRef, enabled, overlayEnabled, videoRef, ready]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasRef, enabled, videoRef, ready]);
 
-  return { ready, processingError, handDetectionCounter, handDetectionDuration, notFacingCounter, notFacingDuration, badPostureDetectionCounter, badPostureDuration, handVisible, eyeContact, postureGood };
+  return {
+    ready, processingError,
+    handDetectionCounter, handDetectionDuration,
+    notFacingCounter, notFacingDuration,
+    badPostureDetectionCounter, badPostureDuration,
+    handVisible, eyeContact, postureGood,
+  };
 };

@@ -27,6 +27,9 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set("Content-Type", "application/json");
   }
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  if (res.status === 401) {
+    throw new ApiError(401, "Your session expired. Sign in again to continue.");
+  }
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {

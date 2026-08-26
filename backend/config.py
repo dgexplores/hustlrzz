@@ -9,7 +9,6 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 
 # Preferred provider: "groq" (free tier, no card) or "gemini".
 AI_PROVIDER = os.getenv("AI_PROVIDER", "groq").lower()
@@ -50,3 +49,21 @@ WEB_SEARCH_TIMEOUT_SECONDS = int(os.getenv("WEB_SEARCH_TIMEOUT_SECONDS", "15"))
 # RPC; these values only define product policy and request bounds.
 RESUME_ANALYZER_FREE_DAILY_LIMIT = int(os.getenv("RESUME_ANALYZER_FREE_DAILY_LIMIT", "3"))
 RESUME_ANALYZER_MAX_JD_CHARS = int(os.getenv("RESUME_ANALYZER_MAX_JD_CHARS", "60000"))
+
+# Per-user request budgets (sliding window, seconds). These protect shared LLM
+# and search quota from runaway clients while staying invisible to normal use.
+RATE_WORKFLOWS_PER_MIN = int(os.getenv("RATE_WORKFLOWS_PER_MIN", "6"))
+RATE_COACHING_PER_MIN = int(os.getenv("RATE_COACHING_PER_MIN", "12"))
+RATE_KNOWLEDGE_PER_MIN = int(os.getenv("RATE_KNOWLEDGE_PER_MIN", "10"))
+RATE_INTERVIEW_STARTS_PER_MIN = int(os.getenv("RATE_INTERVIEW_STARTS_PER_MIN", "8"))
+RATE_ASSESSMENT_PER_HOUR = int(os.getenv("RATE_ASSESSMENT_PER_HOUR", "6"))
+
+# Live-interview session hygiene.
+SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "3600"))
+WS_TOKEN_TTL_SECONDS = int(os.getenv("WS_TOKEN_TTL_SECONDS", "1800"))
+
+# Company intelligence auto-refresh cadence (days).
+COMPANY_INTEL_TTL_DAYS = int(os.getenv("COMPANY_INTEL_TTL_DAYS", "7"))
+
+# DOCX decompression guard: a small zip entry can expand enormously.
+MAX_DOCX_XML_BYTES = int(os.getenv("MAX_DOCX_XML_BYTES", str(25 * 1024 * 1024)))

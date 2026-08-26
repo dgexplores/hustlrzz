@@ -5,6 +5,8 @@ fully localized to English. Used to shape question generation and report
 output per target company.
 """
 
+import re
+
 COMPANY_PROFILES: dict[str, dict] = {
     "google": {
         "style": "Engineering rigor: clear algorithms, strong abstraction",
@@ -67,9 +69,17 @@ COMPANY_PROFILES: dict[str, dict] = {
 
 
 def company_profile(company: str) -> dict:
+    """Match on whole-word tokens only.
+
+    "go" must not match "google" and "Metallurgy Corp" must not match "meta",
+    so substring matching is deliberately avoided.
+    """
     key = (company or "").strip().lower()
+    if key in COMPANY_PROFILES:
+        return COMPANY_PROFILES[key]
+    tokens = set(re.findall(r"[a-z0-9]+", key))
     for known, profile in COMPANY_PROFILES.items():
-        if known in key or key in known:
+        if known != "generic" and known in tokens:
             return profile
     fallback = COMPANY_PROFILES["generic"]
     fallback = {**fallback, "name": company or "this role"}

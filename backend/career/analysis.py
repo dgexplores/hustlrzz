@@ -7,6 +7,8 @@ can render.
 
 from __future__ import annotations
 
+import json
+
 from backend.ai import provider
 
 JD_MATCH_SYSTEM = (
@@ -38,8 +40,15 @@ def analyze_match(job_description: str, resume_text: str) -> dict:
     data = provider.chat_json_strict(JD_MATCH_SYSTEM, user)
     if isinstance(data, dict) and "matched_skills" in data:
         return _coerce_match(data)
-    from backend.ai.provider import extract_json
-    return _coerce_match(extract_json(str(data)))
+    # Model returned a non-dict (list/string); re-extract defensively but never
+    # crash the endpoint - fall back to an empty structured result instead.
+    try:
+        recovered = provider.extract_json(data if isinstance(data, str) else json.dumps(data))
+        if isinstance(recovered, dict) and "matched_skills" in recovered:
+            return _coerce_match(recovered)
+    except Exception:
+        pass
+    return _coerce_match({})
 
 
 def _coerce_match(data: dict) -> dict:

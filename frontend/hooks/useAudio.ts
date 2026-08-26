@@ -1,28 +1,138 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Browser-only speech support (STT via webkit SpeechRecognition, TTS via SpeechSynthesis).
 const SR = typeof window !== "undefined"
   ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
   : undefined;
 
+/**
+ * Rank installed TTS voices so the interviewer sounds as human as the platform
+ * allows: prefer neural/natural voices, then high-quality Google/Apple voices.
+ */
+const rankVoice = (voice: SpeechSynthesisVoice): number => {
+  const name = `${voice.name} ${voice.voiceURI}`.toLowerCase();
+  let score = 0;
+  if (name.includes("natural") || name.includes("neural")) score += 100;
+  if (name.includes("premium") || name.includes("enhanced")) score += 60;
+  if (name.includes("google")) score += 50;
+  if (name.includes("samantha") || name.includes("aria") || name.includes("jenny")) score += 40;
+  if (voice.lang.startsWith("en")) score += 30;
+  if (name.includes("compact") || name.includes("espeak")) score -= 40;
+  if (!voice.localService) score += 8; // cloud voices usually sound better
+  return score;
+};
+
+/** Split text into sentence-ish chunks so speech gets natural micro-pauses. */
+const chunkForSpeech = (text: string): string[] => {
+  const sentences = text
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9"'(])/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const chunks: string[] = [];
+  let current = "";
+  for (const sentence of sentences) {
+    if ((current + " " + sentence).trim().length > 220) {
+      if (current) chunks.push(current.trim());
+      current = sentence;
+    } else {
+      current = (current + " " + sentence).trim();
+    }
+  }
+  if (current) chunks.push(current.trim());
+  return chunks.length ? chunks : [text];
+};
+
 export function useAudio(onTranscript: (text: string) => void) {
   const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
   const recRef = useRef<any>(null);
+  const queueRef = useRef<SpeechSynthesisUtterance[]>([]);
+  const speakingRef = useRef(false);
 
-  const supported = !!SR && "speechSynthesis" in window;
+  const supported = !!SR && typeof window !== "undefined" && "speechSynthesis" in window;
 
+  const pickVoice = useCallback((): SpeechSynthesisVoice | null => {
+    if (!supported) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+    return [...voices].sort((a, b) => rankVoice(b) - rankVoice(a))[0] || null;
+  }, [supported]);
+
+  // Warm the voice list (Chrome loads it asynchronously).
+  useEffect(() => {
+    if (!supported) return;
+    const synth = window.speechSynthesis;
+    const warm = () => synth.getVoices();
+    warm();
+    synth.addEventListener?.("voiceschanged", warm);
+    return () => {
+      synth.removeEventListener?.("voiceschanged", warm);
+      synth.cancel();
+    };
+  }, [supported]);
+
+  const stopSpeaking = useCallback(() => {
+    if (!supported) return;
+    queueRef.current = [];
+    window.speechSynthesis.cancel();
+    speakingRef.current = false;
+    setSpeaking(false);
+  }, [supported]);
+
+  /** Speak a full message with human cadence: queued chunks + micro-pauses. */
   const speak = useCallback((text: string) => {
     if (!supported || !text) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "en-US";
-    u.rate = 1;
-    window.speechSynthesis.speak(u);
-  }, [supported]);
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    queueRef.current = [];
+    const voice = pickVoice();
+    const chunks = chunkForSpeech(text);
+    chunks.forEach((chunk, index) => {
+      const utterance = new SpeechSynthesisUtterance(chunk);
+      utterance.lang = "en-US";
+      utterance.rate = index === 0 ? 1.02 : 1.04;
+      utterance.pitch = 1.0;
+      utterance.volume = 1;
+      if (voice) utterance.voice = voice;
+      if (index === chunks.length - 1) {
+        utterance.onend = () => {
+          speakingRef.current = false;
+          setSpeaking(false);
+        };
+        utterance.onerror = () => {
+          speakingRef.current = false;
+          setSpeaking(false);
+        };
+      }
+      queueRef.current.push(utterance);
+    });
+    // Speak sequentially with a small breath between sentences.
+    const speakNext = (index: number) => {
+      if (index >= queueRef.current.length) {
+        speakingRef.current = false;
+        setSpeaking(false);
+        return;
+      }
+      const utterance = queueRef.current[index];
+      utterance.onend = () => {
+        window.setTimeout(() => speakNext(index + 1), 140);
+      };
+      utterance.onerror = () => speakNext(index + 1);
+      if (index === 0) {
+        speakingRef.current = true;
+        setSpeaking(true);
+      }
+      synth.speak(utterance);
+    };
+    speakingRef.current = true;
+    setSpeaking(true);
+    speakNext(0);
+  }, [supported, pickVoice]);
 
   const stop = useCallback(() => {
     if (recRef.current) {
@@ -35,6 +145,7 @@ export function useAudio(onTranscript: (text: string) => void) {
 
   const start = useCallback(() => {
     if (!supported || !SR) return;
+    stopSpeaking(); // barge-in: candidate talks, interviewer pauses
     if (recRef.current) stop();
     setError(null);
     setInterim("");
@@ -66,9 +177,15 @@ export function useAudio(onTranscript: (text: string) => void) {
     rec.start();
     recRef.current = rec;
     setListening(true);
-  }, [supported, stop, onTranscript]);
+  }, [supported, stop, stopSpeaking, onTranscript]);
 
-  useEffect(() => () => stop(), [stop]);
+  useEffect(() => () => {
+    stop();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+  }, [stop]);
 
-  return { supported, listening, interim, error, start, stop, speak };
+  return useMemo(
+    () => ({ supported, listening, speaking, interim, error, start, stop, speak, stopSpeaking }),
+    [supported, listening, speaking, interim, error, start, stop, speak, stopSpeaking],
+  );
 }

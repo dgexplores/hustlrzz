@@ -40,17 +40,26 @@ def insert(table: str, rows: list[dict]) -> list[dict]:
     return resp.data
 
 
+def upsert(table: str, rows: list[dict], on_conflict: str) -> list[dict]:
+    client = get_client()
+    resp = client.table(table).upsert(rows, on_conflict=on_conflict).execute()
+    return resp.data
+
+
 def update(table: str, match: dict, values: dict) -> dict | None:
     client = get_client()
-    resp = client.table(table).update(values).eq(*_single(match)).execute()
+    query = client.table(table).update(values)
+    for key, value in match.items():
+        query = query.eq(key, value)
+    resp = query.execute()
     return resp.data[0] if resp.data else None
 
 
 def select_where(table: str, match: dict = None, order: str = None) -> list[dict]:
     client = get_client()
     q = client.table(table).select("*")
-    if match:
-        q = q.eq(*_single(match))
+    for key, value in (match or {}).items():
+        q = q.eq(key, value)
     if order:
         q = q.order(order, desc=True)
     resp = q.execute()
@@ -59,11 +68,7 @@ def select_where(table: str, match: dict = None, order: str = None) -> list[dict
 
 def delete_where(table: str, match: dict) -> None:
     client = get_client()
-    client.table(table).delete().eq(*_single(match)).execute()
-
-
-def _single(match: dict):
-    if len(match) != 1:
-        raise ValueError("Only single-column matches supported")
-    item = next(iter(match.items()))
-    return item[0], item[1]
+    q = client.table(table).delete()
+    for key, value in match.items():
+        q = q.eq(key, value)
+    q.execute()

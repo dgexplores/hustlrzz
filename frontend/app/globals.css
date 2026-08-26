@@ -77,6 +77,46 @@
 @keyframes enter-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes live-wave { from { transform: scaleY(.42); opacity: .52; } to { transform: scaleY(1); opacity: 1; } }
 
+/* Interview studio: voice orb, presence aura, coach nudges. */
+@keyframes orb-ring {
+  0% { transform: scale(0.72); opacity: 0.85; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+.orb-speaking > span { position: absolute; inset: 0; border-radius: 9999px; border: 2px solid currentColor; animation: orb-ring 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+.orb-speaking > span:nth-child(2) { animation-delay: 380ms; }
+.orb-speaking > span:nth-child(3) { animation-delay: 760ms; }
+.orb-idle { transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 420ms ease; }
+.orb-listening { box-shadow: 0 0 0 6px hsl(142 71% 45% / 0.18), 0 0 34px hsl(142 71% 45% / 0.28); }
+
+@keyframes nudge-in {
+  from { opacity: 0; transform: translateY(-14px) scale(0.96); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.nudge-enter { animation: nudge-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes nudge-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-10px) scale(0.97); }
+}
+.nudge-exit { animation: nudge-out 260ms ease-in both; }
+.nudge-card { backdrop-filter: blur(18px) saturate(150%); border: 1px solid hsl(var(--border)); box-shadow: 0 14px 44px hsl(225 34% 10% / 0.16); }
+
+@keyframes aura-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.presence-aura { transition: box-shadow 700ms cubic-bezier(0.23, 1, 0.32, 1), border-color 700ms ease; }
+.presence-aura-good { box-shadow: 0 0 0 2px hsl(142 71% 45% / 0.35), 0 0 26px hsl(142 71% 45% / 0.12); border-color: hsl(142 71% 45% / 0.5); }
+.presence-aura-warn { box-shadow: 0 0 0 2px hsl(38 92% 50% / 0.4), 0 0 30px hsl(38 92% 50% / 0.16); border-color: hsl(38 92% 50% / 0.55); animation: aura-breathe 1.8s ease-in-out infinite; }
+.presence-aura-alert { box-shadow: 0 0 0 2px hsl(0 72% 51% / 0.42), 0 0 32px hsl(0 72% 51% / 0.16); border-color: hsl(0 72% 51% / 0.55); animation: aura-breathe 1.2s ease-in-out infinite; }
+
+.studio-bg { background:
+  radial-gradient(1200px 500px at 20% -10%, hsl(222 60% 22% / 0.55), transparent 60%),
+  radial-gradient(900px 420px at 90% 110%, hsl(258 60% 24% / 0.35), transparent 60%),
+  hsl(225 30% 8%);
+}
+.rec-dot { animation: rec-pulse 1.6s ease-in-out infinite; }
+@keyframes rec-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
 @media (hover: hover) and (pointer: fine) {
   .feature-surface:hover { transform: translateY(-3px); border-color: hsl(var(--primary) / .32); background-color: hsl(var(--card)); }
 }
@@ -88,4 +128,5 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; transform: none !important; }
   .live-wave > span { animation: none !important; }
+  .orb-speaking > span, .nudge-enter, .nudge-exit, .presence-aura-warn, .presence-aura-alert, .rec-dot { animation: none !important; }
 }
