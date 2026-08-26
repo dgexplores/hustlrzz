@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMetrics } from "@/context/MetricsContext";
 import {
   Activity, Eye, Hand, Sparkles, X,
@@ -78,8 +78,37 @@ export function PresenceCoach({
   const lastShownRef = useRef<Record<string, number>>({});
   const idRef = useRef(0);
   const countersRef = useRef({ badPosture: 0, notFacing: 0, gestures: 0 });
+  const dismissTimersRef = useRef<number[]>([]);
 
   const metrics = useMetrics((state) => state.metrics);
+
+  const dismiss = useCallback((id: number) => {
+    setExiting((current) => new Set(current).add(id));
+    window.setTimeout(() => {
+      setNudges((current) => current.filter((nudge) => nudge.id !== id));
+      setExiting((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+    }, 260);
+  }, []);
+
+  const enqueue = useCallback((tone: NudgeTone) => {
+    const now = Date.now();
+    const cooldown = tone === "praise" ? PRAISE_COOLDOWN_MS : COOLDOWN_MS;
+    if (now - (lastShownRef.current[tone] || 0) < cooldown) return;
+    lastShownRef.current[tone] = now;
+    const pool = COPY[tone].messages;
+    const message = pool[Math.floor(Math.random() * pool.length)];
+    const nudge: Nudge = { id: ++idRef.current, tone, title: COPY[tone].title, message };
+    setNudges((current) => {
+      if (current.length >= 2) return current;
+      return [...current.slice(-1), nudge];
+    });
+    const timer = window.setTimeout(() => dismiss(nudge.id), AUTO_DISMISS_MS);
+    dismissTimersRef.current.push(timer);
+  }, [dismiss]);
 
   useEffect(() => {
     if (!active) return;
@@ -93,18 +122,7 @@ export function PresenceCoach({
   useEffect(() => {
     if (!active) return;
 
-    const push = (tone: NudgeTone) => {
-      const now = Date.now();
-      const cooldown = tone === "praise" ? PRAISE_COOLDOWN_MS : COOLDOWN_MS;
-      if (now - (lastShownRef.current[tone] || 0) < cooldown) return;
-      if (nudges.length >= 2) return; // never stack more than two
-      lastShownRef.current[tone] = now;
-      const pool = COPY[tone].messages;
-      const message = pool[Math.floor(Math.random() * pool.length)];
-      const nudge: Nudge = { id: ++idRef.current, tone, title: COPY[tone].title, message };
-      setNudges((current) => [...current.slice(-1), nudge]);
-      window.setTimeout(() => dismiss(nudge.id), AUTO_DISMISS_MS);
-    };
+    const push = enqueue;
 
     if (metrics.badPostureDetectionCounter > countersRef.current.badPosture) {
       countersRef.current.badPosture = metrics.badPostureDetectionCounter;
@@ -137,32 +155,17 @@ export function PresenceCoach({
         nudges.length === 0
       ) {
         lastShownRef.current.gesture = Date.now();
-        const pool = COPY.gesture.messages;
-        const nudge: Nudge = {
-          id: ++idRef.current,
-          tone: "gesture",
-          title: COPY.gesture.title,
-          message: pool[Math.floor(Math.random() * pool.length)],
-        };
-        setNudges((current) => [...current.slice(-1), nudge]);
-        window.setTimeout(() => dismiss(nudge.id), AUTO_DISMISS_MS);
+        enqueue("gesture");
       }
     }, 20_000);
     return () => window.clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, cameraActive]);
 
-  const dismiss = (id: number) => {
-    setExiting((current) => new Set(current).add(id));
-    window.setTimeout(() => {
-      setNudges((current) => current.filter((nudge) => nudge.id !== id));
-      setExiting((current) => {
-        const next = new Set(current);
-        next.delete(id);
-        return next;
-      });
-    }, 260);
-  };
+  useEffect(() => () => {
+    dismissTimersRef.current.forEach((id) => window.clearTimeout(id));
+    dismissTimersRef.current = [];
+  }, []);
 
   if (!active) return null;
 

@@ -56,6 +56,7 @@ export function useAudio(onTranscript: (text: string) => void) {
   // Chrome ends SpeechRecognition after a silence gap; while the user intends
   // to stay on mic we restart it automatically for a natural conversation flow.
   const shouldListenRef = useRef(false);
+  const cachedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const onTranscriptRef = useRef(onTranscript);
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
@@ -63,25 +64,26 @@ export function useAudio(onTranscript: (text: string) => void) {
 
   const supported = !!SR && typeof window !== "undefined" && "speechSynthesis" in window;
 
-  const pickVoice = useCallback((): SpeechSynthesisVoice | null => {
-    if (!supported) return null;
+  const refreshCachedVoice = useCallback(() => {
+    if (!supported) return;
     const voices = window.speechSynthesis.getVoices();
-    if (!voices.length) return null;
-    return [...voices].sort((a, b) => rankVoice(b) - rankVoice(a))[0] || null;
+    if (!voices.length) return;
+    cachedVoiceRef.current = [...voices].sort((a, b) => rankVoice(b) - rankVoice(a))[0] || null;
   }, [supported]);
 
-  // Warm the voice list (Chrome loads it asynchronously).
+  const pickVoice = useCallback((): SpeechSynthesisVoice | null => cachedVoiceRef.current, []);
+
+  // Warm the voice list (Chrome loads it asynchronously) and cache the ranked choice.
   useEffect(() => {
     if (!supported) return;
     const synth = window.speechSynthesis;
-    const warm = () => synth.getVoices();
-    warm();
-    synth.addEventListener?.("voiceschanged", warm);
+    refreshCachedVoice();
+    synth.addEventListener?.("voiceschanged", refreshCachedVoice);
     return () => {
-      synth.removeEventListener?.("voiceschanged", warm);
+      synth.removeEventListener?.("voiceschanged", refreshCachedVoice);
       synth.cancel();
     };
-  }, [supported]);
+  }, [supported, refreshCachedVoice]);
 
   const stopSpeaking = useCallback(() => {
     if (!supported) return;

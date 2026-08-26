@@ -201,9 +201,8 @@ async def start_attempt(user_id: str, role: str, company: str, level: str) -> di
 
 
 def _load_owned(attempt_id: str, user_id: str) -> dict | None:
-    rows = dbc.select_where(TABLE, {"attempt_id": attempt_id}) or []
-    owned = [row for row in rows if row.get("user_id") == user_id]
-    return owned[0] if owned else None
+    rows = dbc.select_where(TABLE, {"attempt_id": attempt_id, "user_id": user_id}) or []
+    return rows[0] if rows else None
 
 
 def submit_round(user_id: str, attempt_id: str, round_index: int, responses: dict) -> dict:
@@ -304,5 +303,4 @@ def list_attempts(user_id: str) -> list[dict]:
     } for row in rows]
 
 
-def log_generation_failure(exc: Exception) -> None:
-    log.warning("assessment generation failed: %s", exc)
+

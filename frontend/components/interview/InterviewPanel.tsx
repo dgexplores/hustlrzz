@@ -11,11 +11,20 @@ import { useAudio } from "@/hooks/useAudio";
 import { CameraPanel } from "@/components/interview/CameraPanel";
 import { PresenceCoach } from "@/components/interview/PresenceCoach";
 import { useMetrics } from "@/context/MetricsContext";
+import { formatClock } from "@/lib/analytics";
 import {
   AlertCircle, ArrowRight, Bot, CheckCircle2, Download, FileText,
   Loader2, MessageSquareText, Mic, MicOff, RefreshCw, Send, Sparkles,
   Square, Target, Volume2, VideoOff, WifiOff, Star, Dumbbell, X,
 } from "lucide-react";
+
+const teardownWs = (ws: WebSocket | null) => {
+  if (!ws) return;
+  ws.onclose = null;
+  ws.onerror = null;
+  ws.onmessage = null;
+  try { ws.close(); } catch {}
+};
 
 interface Turn { role: "candidate" | "interviewer"; text: string }
 interface WorkflowOption {
@@ -49,6 +58,7 @@ export function InterviewPanel() {
   // onclose can never clobber a fresh session (state race fix).
   const generationRef = useRef(0);
   const startedAtRef = useRef(0);
+  const draftTimerRef = useRef<number | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const metrics = useMetrics((state) => state.metrics);
   const resetMetrics = useMetrics((state) => state.reset);
@@ -83,14 +93,7 @@ export function InterviewPanel() {
       .catch((error) => setSessionError(error instanceof Error ? error.message : "Prepared packs could not be loaded."))
       .finally(() => setLoadingWorkflows(false));
     return () => {
-      generationRef.current += 1;
-      const socket = wsRef.current;
-      if (socket) {
-        socket.onclose = null;
-        socket.onerror = null;
-        socket.onmessage = null;
-        socket.close();
-      }
+      teardownWs(wsRef.current)
       if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     };
   }, []);
@@ -105,10 +108,15 @@ export function InterviewPanel() {
     return () => window.clearInterval(timer);
   }, [phase]);
 
-  // Persist a lightweight draft so an accidental refresh can be recovered.
+  // Persist a lightweight draft (debounced) so an accidental refresh can be recovered
+  // without serializing the full transcript on every keystroke.
   useEffect(() => {
     if (phase !== "live" && phase !== "interrupted") return;
-    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ workflowId, turns, at: Date.now() })); } catch {}
+    if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = window.setTimeout(() => {
+      try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ workflowId, turns: turns.slice(-40), at: Date.now() })); } catch {}
+    }, 1500);
+    return () => { if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current); };
   }, [turns, phase, workflowId]);
 
   const begin = useCallback(async () => {
@@ -220,14 +228,7 @@ export function InterviewPanel() {
   };
 
   const restart = () => {
-    generationRef.current += 1;
-    const socket = wsRef.current;
-    if (socket) {
-      socket.onclose = null;
-      socket.onerror = null;
-      socket.onmessage = null;
-      try { socket.close(); } catch {}
-    }
+      teardownWs(wsRef.current)
     try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
     setPhase("setup");
     setTurns([]);
@@ -236,7 +237,8 @@ export function InterviewPanel() {
     setAwaitingReply(false);
   };
 
-  const elapsed = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
+  const elapsed = formatClock(elapsedSeconds);
+  const lastInterviewerLine = useMemo(() => turns.findLast((t) => t.role === "interviewer")?.text || "", [turns]);
 
   return (
     <main className="mx-auto max-w-[1440px] space-y-6 px-4 py-8 md:px-6">
@@ -369,7 +371,7 @@ export function InterviewPanel() {
 
           {/* Stage */}
           <div className="relative grid min-h-[520px] place-items-center px-4 pb-40 pt-14 md:pb-44">
-            <InterviewerStage speaking={speaking} awaitingReply={awaitingReply} lastLine={[...turns].reverse().find((t) => t.role === "interviewer")?.text || ""} />
+            <InterviewerStage speaking={speaking} awaitingReply={awaitingReply} lastLine={lastInterviewerLine} />
 
             {/* Candidate PiP camera */}
             <div className="absolute bottom-28 right-4 z-30 hidden aspect-video w-48 sm:block md:w-56 lg:w-64">

@@ -62,12 +62,15 @@ def generate_session_id() -> str:
     return "".join(secrets.choice(alphabet) for _ in range(20))
 
 
+
+
+
+
 def _search_web(job_title: str, job_description: str, max_results: int = 8) -> list[dict]:
-    """Industry question retrieval now lives in career.web_research."""
+    """Compatibility shim: tests mock this symbol. Delegates to shared helper."""
     from backend.career.web_research import search_industry_questions
 
     return search_industry_questions(job_title, max_results=min(max_results, 5))
-
 
 def _organize_search(job_title: str, job_description: str, results: list[dict]) -> dict:
     """Pass raw web results to the LLM so leftovers become structured industry FAQs."""
@@ -91,7 +94,11 @@ def _industry_faqs(job_title: str, job_description: str) -> dict:
     """Optional web context. Never make a preparation request depend on it."""
     if not config.ENABLE_WEB_SEARCH:
         return {"real_questions": [], "interview_process": {}}
-    return _organize_search(job_title, job_description, _search_web(job_title, job_description))
+    from backend.career.web_research import search_industry_questions
+
+    return _organize_search(
+        job_title, job_description, search_industry_questions(job_title, max_results=5)
+    )
 
 
 def _fallback_company_research(company_name: str) -> dict:

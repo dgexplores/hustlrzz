@@ -90,3 +90,10 @@ export const smooth = (previous: number, next: number, alpha = 0.12): number =>
 
 export const clamp = (value: number, min = 0, max = 100): number =>
   Math.min(max, Math.max(min, value));
+
+export const formatClock = (totalSeconds: number): string => {
+  const safe = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};

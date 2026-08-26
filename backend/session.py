@@ -11,7 +11,7 @@ import time
 
 
 class Session:
-    def __init__(self, session_id: str, user_id: str, app_name: str = "hustlrzzv2"):
+    def __init__(self, session_id: str, user_id: str, app_name: str = "hustlrzz"):
         self.id = session_id
         self.user_id = user_id
         self.app_name = app_name
@@ -20,9 +20,11 @@ class Session:
 
 
 class SessionRegistry:
-    def __init__(self, ttl_seconds: int = 3600):
+    def __init__(self, ttl_seconds: int | None = None):
+        from backend import config as _config
+
         self._sessions: dict = {}
-        self.ttl_seconds = ttl_seconds
+        self.ttl_seconds = ttl_seconds if ttl_seconds is not None else _config.SESSION_TTL_SECONDS
 
     def _purge_expired(self) -> None:
         cutoff = time.monotonic() - self.ttl_seconds
@@ -44,4 +46,4 @@ class SessionRegistry:
         self._sessions.pop((app_name, user_id, session_id), None)
 
 
-registry = SessionRegistry(ttl_seconds=3600)
+registry = SessionRegistry()
