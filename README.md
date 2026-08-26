@@ -4,7 +4,7 @@
 
 > Prepare from your own resume. Practice with a live AI interviewer. Improve what you say — and how you say it.
 
-[**Launch the live app ↗**](https://frontend-deepaklearn7878-6255s-projects.vercel.app) &nbsp;·&nbsp;
+[**Launch the live app ↗**](https://hustlrzz.vercel.app) &nbsp;·&nbsp;
 [Backend health ↗](https://hustlrzzv2-production.up.railway.app/health) &nbsp;·&nbsp;
 [Explore the code](https://github.com/dgexplores/hustlrzz)
 
@@ -120,7 +120,7 @@ interview if embeddings or the knowledge database are unavailable.
 
 ## For evaluators: demo flow
 
-1. Open the [live application](https://frontend-deepaklearn7878-6255s-projects.vercel.app) and create an account.
+1. Open the [live application](https://hustlrzz.vercel.app) and create an account.
 2. In **Prepare**, add a short resume and a target job description.
 3. Review the tailored question pack, then begin an interview.
 4. Answer using text or microphone and enable the camera for local posture signals.
