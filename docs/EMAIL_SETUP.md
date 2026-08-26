@@ -11,7 +11,7 @@ an SMTP provider or a verified sender domain.
 1. Add and verify a custom sender domain in Resend. A `vercel.app` deployment
    URL cannot be used as the sender domain.
 2. In Resend, use **Integrations → Connect to Supabase** and select the
-   `hustlrzzv2` project and verified domain. Resend configures Supabase Auth's
+   the Supabase project and verified domain. Resend configures Supabase Auth's
    email provider without putting an SMTP credential in this repository.
 3. Change `supabase/config.toml` to `enable_confirmations = true` and run:
 

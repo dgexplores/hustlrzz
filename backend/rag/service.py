@@ -20,7 +20,7 @@ class RAGUnavailable(RuntimeError):
     """Raised when configured services cannot support semantic retrieval."""
 
 
-ALLOWED_SOURCE_TYPES = frozenset({"resume", "portfolio", "notes", "session_report"})
+ALLOWED_SOURCE_TYPES = frozenset({"resume", "portfolio", "notes", "session_report", "company_intelligence"})
 
 
 @dataclass(frozen=True)

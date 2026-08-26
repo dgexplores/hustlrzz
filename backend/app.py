@@ -1,9 +1,11 @@
-"""FastAPI app entrypoint for hustlrzzv2.
+"""FastAPI app entrypoint for Hustlrzz.
 
 English-native AI mock interview coach. Merges:
   - hustlrzz       (prep workflow, live WebSocket interviewer, judge)
   - interview-skills (company profiles, JD-vs-resume, salary negotiation, modes)
   - AI-Interview-Coach (Next.js shell consumed by frontend)
+  - v3: auto-refreshing company intelligence, assessment rounds, humanized
+    live interviews, rate limiting, session hygiene.
 """
 
 from __future__ import annotations
@@ -15,7 +17,6 @@ import math
 from io import BytesIO
 from pathlib import Path
 from typing import Literal, Optional
-from urllib.parse import urlparse
 from xml.etree import ElementTree
 
 from fastapi import (
@@ -31,19 +32,22 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from backend import config, db as dbc
 from backend.ai import provider
 from backend.career import analysis, company_profiles
+from backend.career import intelligence as company_intel
 from backend.rag import service as rag
 from backend.resume import service as resume_analyzer
 from backend.session import registry
 from backend.workflow.preparation import run_preparation_workflow
+from backend.obs import get_logger, limiter
 
-app = FastAPI(title="Hustlrzz V2", version="2.0.0")
+log = get_logger("hustlrzz.app")
+
+app = FastAPI(title="Hustlrzz", version="3.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -66,6 +70,22 @@ def _db_or_503():
         )
 
 
+def rate_limited(scope: str, limit: int, window_seconds: int):
+    """Per-user sliding-window request guard bound to an authenticated user."""
+
+    async def dependency(request: Request, user: dict = Depends(get_user)) -> dict:
+        allowed, retry_after = limiter.allow(f"{scope}:{user['uid']}", limit, window_seconds)
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="You are moving faster than we can coach. Please wait a moment and try again.",
+                headers={"Retry-After": str(retry_after)},
+            )
+        return user
+
+    return dependency
+
+
 def get_user(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer)):
     if not credentials:
         raise HTTPException(status_code=401, detail="Missing bearer token")
@@ -83,10 +103,6 @@ def get_user(request: Request, credentials: Optional[HTTPAuthorizationCredential
         }
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-
-def _valid_url(host: str) -> str:
-    return host
 
 
 @router.get("/workflows")
@@ -107,6 +123,7 @@ async def list_interviews(user: dict = Depends(get_user)):
 def health():
     return {
         "status": "ok",
+        "version": app.version,
         "ai_configured": provider.is_configured(),
         "provider": config.AI_PROVIDER,
         "db_ready": dbc.is_ready(),
@@ -126,7 +143,7 @@ async def start_workflow(
     portfolio_link: str = Form(""),
     additional_info: str = Form(""),
     num_questions: int = Form(config.DEFAULT_QUESTION_COUNT),
-    user: dict = Depends(get_user),
+    user: dict = Depends(rate_limited("workflows", config.RATE_WORKFLOWS_PER_MIN, 60)),
 ):
     num_questions = max(1, min(num_questions, 50))
     t0 = time.time()
@@ -158,6 +175,40 @@ async def start_workflow(
         additional_info=additional_info,
         num_questions=num_questions,
     )
+
+    # Company intelligence: cached when fresh, auto-researched when stale.
+    job_title_for_intel = job_description.split("\n")[0].strip()[:80]
+    try:
+        intel = await company_intel.ensure_fresh(company_name, role=job_title_for_intel)
+    except Exception as exc:
+        log.warning("company intel unavailable: %s", exc)
+        intel = {
+            "status": "fallback",
+            "company": company_name,
+            "fetched_at": "",
+            "confidence": "low",
+            "data": company_intel._fallback_data(company_name),
+        }
+    result["company_intelligence"] = intel
+
+    # Feed the condensed intelligence into this candidate's knowledge base so
+    # live follow-ups stay grounded in how the company actually hires.
+    if rag.is_ready() and intel.get("status") in {"live", "cached"} and company_name.strip():
+        try:
+            await rag.ingest_document(
+                user_id=user["uid"],
+                title=f"Company intelligence: {company_name.strip()[:150]}",
+                source_type="company_intelligence",
+                content=company_intel.to_knowledge_text(company_name, intel.get("data") or {}),
+            )
+        except Exception as exc:
+            log.info("intel RAG ingest skipped: %s", exc)
+
+    # Kick off a background refresh so the shared cache stays current without
+    # making this request wait.
+    if intel.get("status") == "live":
+        company_intel.start_background_refresh(company_name, job_title_for_intel)
+
     result["processing_time"] = round(time.time() - t0, 2)
     result["knowledge"] = rag_status
     if not result.get("success"):
@@ -184,7 +235,7 @@ async def start_workflow(
                 "created_at": _now(),
             }])
         except Exception as e:
-            print("persist workflow failed:", e)
+            log.warning("persist workflow failed: %s", e)
     return {"success": True, **result}
 
 
@@ -240,10 +291,18 @@ def _extract_pdf_text(content: bytes) -> str:
 
 
 def _extract_docx_text(content: bytes) -> str:
-    """Read the main DOCX document XML without adding a document-parser dependency."""
+    """Read the main DOCX document XML without adding a document-parser dependency.
+
+    Decompression is capped so a crafted small archive cannot expand into a
+    zip-bomb inside the worker process.
+    """
     try:
         with zipfile.ZipFile(BytesIO(content)) as archive:
-            root = ElementTree.fromstring(archive.read("word/document.xml"))
+            with archive.open("word/document.xml") as member:
+                raw = member.read(config.MAX_DOCX_XML_BYTES + 1)
+            if len(raw) > config.MAX_DOCX_XML_BYTES:
+                log.warning("docx document exceeded decompression cap; truncated")
+            root = ElementTree.fromstring(raw)
         namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
         paragraphs = []
         for node in root.iter(f"{namespace}p"):
@@ -253,6 +312,22 @@ def _extract_docx_text(content: bytes) -> str:
         return "\n".join(paragraphs)
     except (KeyError, zipfile.BadZipFile, ElementTree.ParseError):
         return ""
+
+
+# --------------------------------------------------------------------------- #
+# Company intelligence (auto-refreshing shared cache)
+# --------------------------------------------------------------------------- #
+@router.get("/companies/{company_name}/intelligence")
+async def get_company_intelligence(
+    company_name: str,
+    refresh: bool = False,
+    user: dict = Depends(rate_limited("intel", config.RATE_COACHING_PER_MIN, 60)),
+):
+    try:
+        data = await company_intel.ensure_fresh(company_name, force=refresh)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Company intelligence is temporarily unavailable.")
+    return {"success": True, "data": data}
 
 
 # --------------------------------------------------------------------------- #
@@ -299,7 +374,7 @@ async def get_resume_analysis(analysis_id: str, user: dict = Depends(get_user)):
 async def analyze_resume(
     file: UploadFile = File(...),
     job_description: str = Form(""),
-    user: dict = Depends(get_user),
+    user: dict = Depends(rate_limited("resume", config.RATE_COACHING_PER_MIN, 60)),
 ):
     """Analyze a PDF/DOCX in memory; raw upload bytes are discarded after parsing."""
     _db_or_503()
@@ -379,7 +454,7 @@ class CoachingTurnRequest(BaseModel):
 
 
 @router.post("/coaching/salary")
-def salary_script(payload: SalaryRequest, user: dict = Depends(get_user)):
+def salary_script(payload: SalaryRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
     try:
         return {"success": True, "data": analysis.salary_script(**payload.model_dump())}
     except provider.ProviderError as exc:
@@ -388,7 +463,7 @@ def salary_script(payload: SalaryRequest, user: dict = Depends(get_user)):
 
 
 @router.post("/coaching/analyze")
-async def analyze(payload: MatchAnalysisRequest, user: dict = Depends(get_user)):
+async def analyze(payload: MatchAnalysisRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
     try:
         return {"success": True, "data": analysis.analyze_match(payload.job_description, payload.resume_text)}
     except provider.ProviderError as exc:
@@ -396,21 +471,29 @@ async def analyze(payload: MatchAnalysisRequest, user: dict = Depends(get_user))
         raise HTTPException(status_code=status, detail="The role-fit coach is temporarily busy. Please retry shortly.")
 
 
-@router.post("/coaching/practice")
-def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(get_user)):
-    allowed_metrics: dict[str, float] = {}
-    allowed_keys = {
-            "handDetectionCounter", "handDetectionDuration", "notFacingCounter",
-            "notFacingDuration", "badPostureDetectionCounter", "badPostureDuration",
-            "sessionDurationSeconds", "eyeContactConsistency", "postureStability",
-            "gestureRatePerMinute",
-    }
-    for key, value in payload.presence_metrics.items():
-        if key not in allowed_keys or isinstance(value, bool) or not isinstance(value, (int, float)):
+PRESENCE_ALLOWED_KEYS = {
+    "handDetectionCounter", "handDetectionDuration", "notFacingCounter",
+    "notFacingDuration", "badPostureDetectionCounter", "badPostureDuration",
+    "sessionDurationSeconds", "eyeContactConsistency", "postureStability",
+    "gestureRatePerMinute", "headTiltDeg", "shoulderTiltDeg",
+    "gazeStabilityScore", "postureScore", "forwardHeadProxy",
+}
+
+
+def _sanitize_presence(metrics: dict | None) -> dict[str, float]:
+    allowed: dict[str, float] = {}
+    for key, value in (metrics or {}).items():
+        if key not in PRESENCE_ALLOWED_KEYS or isinstance(value, bool) or not isinstance(value, (int, float)):
             continue
         numeric = float(value)
         if math.isfinite(numeric):
-            allowed_metrics[key] = min(max(0, numeric), 100_000)
+            allowed[key] = min(max(0, numeric), 100_000)
+    return allowed
+
+
+@router.post("/coaching/practice")
+def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
+    allowed_metrics = _sanitize_presence(payload.presence_metrics)
     try:
         result = analysis.evaluate_coaching_practice(
             scenario=payload.scenario,
@@ -427,7 +510,7 @@ def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(get
 
 
 @router.post("/coaching/practice/turn")
-def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depends(get_user)):
+def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
     try:
         result = analysis.coaching_practice_turn(
             scenario=payload.scenario,
@@ -446,12 +529,77 @@ def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depends(ge
 
 
 # --------------------------------------------------------------------------- #
+# Assessment rounds (aptitude -> technical -> judgment)
+# --------------------------------------------------------------------------- #
+class AssessmentStartRequest(BaseModel):
+    role: str = Field(min_length=2, max_length=200)
+    company: str = Field(default="", max_length=160)
+    level: Literal["fresher", "mid", "senior"] = "mid"
+
+
+class AssessmentSubmitRequest(BaseModel):
+    round_index: int = Field(ge=0, le=10)
+    responses: dict = Field(default_factory=dict)
+
+
+@router.post("/assessment/start")
+async def assessment_start(payload: AssessmentStartRequest, user: dict = Depends(rate_limited("assessment", config.RATE_ASSESSMENT_PER_HOUR, 3600))):
+    _db_or_503()
+    try:
+        data = await assessment_service.start_attempt(user["uid"], payload.role, payload.company, payload.level)
+        return {"success": True, "data": data}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception:
+        log.exception("assessment start failed")
+        raise HTTPException(status_code=503, detail="The assessment generator is busy. Please retry shortly.")
+
+
+@router.post("/assessment/attempts/{attempt_id}/submit")
+async def assessment_submit(attempt_id: str, payload: AssessmentSubmitRequest, user: dict = Depends(get_user)):
+    _db_or_503()
+    try:
+        data = assessment_service.submit_round(user["uid"], attempt_id, payload.round_index, payload.responses)
+        return {"success": True, "data": data}
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Assessment attempt not found.")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception:
+        log.exception("assessment submit failed")
+        raise HTTPException(status_code=503, detail="Scoring is temporarily unavailable. Your answers were saved.")
+
+
+@router.get("/assessment/attempts")
+async def assessment_attempts(user: dict = Depends(get_user)):
+    _db_or_503()
+    try:
+        return {"success": True, "data": assessment_service.list_attempts(user["uid"])}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Assessment history is temporarily unavailable.")
+
+
+@router.get("/assessment/attempts/{attempt_id}")
+async def assessment_attempt(attempt_id: str, user: dict = Depends(get_user)):
+    _db_or_503()
+    try:
+        data = assessment_service.get_attempt(user["uid"], attempt_id)
+        if not data:
+            raise HTTPException(status_code=404, detail="Attempt not found.")
+        return {"success": True, "data": data}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=503, detail="Assessment state is temporarily unavailable.")
+
+
+# --------------------------------------------------------------------------- #
 # Candidate knowledge base (RAG)
 # --------------------------------------------------------------------------- #
 class KnowledgeIngestRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     content: str = Field(min_length=config.MIN_RESUME_TEXT_LENGTH, max_length=config.RAG_MAX_DOCUMENT_CHARS)
-    source_type: str = Field(default="notes", pattern="^(resume|portfolio|notes|session_report)$")
+    source_type: str = Field(default="notes", pattern=r"^(resume|portfolio|notes|session_report|company_intelligence)$")
 
 
 class KnowledgeSearchRequest(BaseModel):
@@ -465,7 +613,7 @@ def knowledge_status(user: dict = Depends(get_user)):
 
 
 @router.post("/knowledge/documents")
-async def ingest_knowledge(payload: KnowledgeIngestRequest, user: dict = Depends(get_user)):
+async def ingest_knowledge(payload: KnowledgeIngestRequest, user: dict = Depends(rate_limited("knowledge", config.RATE_KNOWLEDGE_PER_MIN, 60))):
     try:
         data = await rag.ingest_document(
             user_id=user["uid"],
@@ -525,7 +673,7 @@ def _fallback_interview_report() -> dict:
 
 
 @router.post("/interviews/start")
-async def start_interview(payload: InterviewStart, user: dict = Depends(get_user)):
+async def start_interview(payload: InterviewStart, user: dict = Depends(rate_limited("interview", config.RATE_INTERVIEW_STARTS_PER_MIN, 60))):
     try:
         workflow = dbc.select_where("workflows", {"workflow_id": payload.workflow_id}) or []
     except Exception:
@@ -535,8 +683,9 @@ async def start_interview(payload: InterviewStart, user: dict = Depends(get_user
         raise HTTPException(status_code=404, detail="Workflow not found")
     session_id = secrets.token_urlsafe(16)
     ws_token = secrets.token_urlsafe(32)
-    sess = await registry.create("hustlrzzv2", user["uid"], session_id)
+    sess = await registry.create("hustlrzz", user["uid"], session_id)
     sess.state["ws_token"] = ws_token
+    sess.state["ws_issued_at"] = time.time()
     sess.state["workflow_id"] = payload.workflow_id
     sess.state["duration"] = payload.duration
     sess.state["is_audio"] = payload.is_audio
@@ -557,25 +706,42 @@ async def interview_ws(
     duration: int = 15,
     is_audio: bool = False,
 ):
-    sess = await registry.get("hustlrzzv2", user_id, session_id)
+    sess = await registry.get("hustlrzz", user_id, session_id)
     expected = sess.state.get("ws_token", "") if sess else ""
-    if not sess or not token or not secrets.compare_digest(str(expected), str(token)):
+    issued_at = float(sess.state.get("ws_issued_at", 0)) if sess else 0.0
+    token_fresh = issued_at and (time.time() - issued_at) <= config.WS_TOKEN_TTL_SECONDS
+    if (
+        not sess or not token or not secrets.compare_digest(str(expected), str(token))
+        or not token_fresh
+    ):
+        await websocket.accept()
         await websocket.close(code=1008)
         return
+    if sess.state.get("active"):
+        # One live connection per session prevents duplicate transcripts.
+        await websocket.accept()
+        await websocket.close(code=1013)
+        return
+    sess.state["active"] = True
+    duration = max(5, min(60, int(duration or 15)))
+    started_at = time.monotonic()
 
-    # Load prepared questions for this workflow so interviewer has a script.
+    # Load prepared questions for this workflow so the interviewer has a script.
     import json
 
-    questions = []
+    questions: list[dict] = []
     workflow_record: dict = {}
+    resume_text = ""
+    job_description = ""
     try:
         rows = dbc.select_where("workflows", {"workflow_id": workflow_id, "user_id": user_id})
         for r in rows:
             workflow_record = r
             if isinstance(r.get("questions"), list):
                 questions.extend(r["questions"])
-    except Exception:
-        pass
+    except Exception as exc:
+        # Never kill the socket over persistence trouble, but make it visible.
+        log.warning("workflow load failed for session %s: %s", session_id, exc)
 
     stored_match = workflow_record.get("match") if isinstance(workflow_record.get("match"), dict) else {}
     system = build_interviewer_system(
@@ -586,11 +752,12 @@ async def interview_ws(
         company_context=stored_match.get("company_research") if isinstance(stored_match, dict) else None,
     )
     transcript: list[dict] = []
+    end_presence: dict = {}
 
     await websocket.accept()
     try:
-        # Opening question.
-        opener = {"question": questions[0]["question"] if questions else "Tell me about yourself.", "message": ""}
+        opener_text = questions[0].get("question") if questions else ""
+        opener = {"question": opener_text or "Tell me about yourself.", "message": ""}
         transcript.append({"from": "interviewer", "text": opener["question"]})
         await websocket.send_json({"type": "question", "data": opener})
         while True:
@@ -613,25 +780,39 @@ async def interview_ws(
                         # or unavailable; the prepared question script remains.
                         retrieval_context = ""
                 try:
-                    reply = interviewer_turn(system, transcript, text, retrieval_context=retrieval_context)
+                    reply = interviewer_turn(
+                        system,
+                        transcript,
+                        text,
+                        retrieval_context=retrieval_context,
+                        elapsed_seconds=int(time.monotonic() - started_at),
+                        duration_minutes=duration,
+                        total_questions=len(questions),
+                    )
                 except provider.ProviderError:
                     await websocket.send_json({"type": "error", "data": {"message": "The interviewer is temporarily unavailable. Please try your answer again in a moment."}})
                     continue
                 transcript.append({"from": "candidate", "text": text})
-                transcript.append({"from": "interviewer", "text": reply.get("message") or reply.get("question") or ""})
+                spoken = reply.get("message") or reply.get("question") or ""
+                transcript.append({"from": "interviewer", "text": spoken})
                 await websocket.send_json({"type": "message", "data": reply})
             elif msg.get("type") == "end":
+                # Optional browser-derived presence snapshot rides along with
+                # the end signal so the judge can ground delivery feedback.
+                end_presence = _sanitize_presence(msg.get("presence"))
                 break
     except WebSocketDisconnect:
         pass
     finally:
+        sess.state["active"] = False
+        elapsed_seconds = int(time.monotonic() - started_at)
         # Judge + persist session report.
         report = {}
         if transcript:
             try:
-                report = judge_report(questions, transcript, "", "")
+                report = judge_report(questions, transcript, resume_text, job_description, presence_metrics=end_presence)
             except Exception as exc:
-                print("judge failed:", exc)
+                log.warning("judge failed: %s", exc)
                 report = _fallback_interview_report()
         if dbc.is_ready() and transcript:
             try:
@@ -642,10 +823,11 @@ async def interview_ws(
                     "transcript": transcript,
                     "report": report,
                     "is_audio": is_audio,
+                    "duration_seconds": elapsed_seconds,
                     "created_at": _now(),
                 }])
             except Exception as exc:
-                print("persist interview failed:", exc)
+                log.warning("persist interview failed: %s", exc)
         if report and rag.is_ready():
             try:
                 await rag.ingest_document(
@@ -667,9 +849,10 @@ async def interview_ws(
             await websocket.close()
         except Exception:
             pass
-        await registry.delete("hustlrzzv2", user_id, session_id)
+        await registry.delete("hustlrzz", user_id, session_id)
 
 
 from backend.agents.interviewer import build_interviewer_system, interviewer_turn, judge_report  # noqa: E402
+from backend.assessment import service as assessment_service  # noqa: E402
 
 app.include_router(router)

@@ -1,4 +1,4 @@
-# HUSTLRZZ V2
+# Hustlrzz
 
 ### Your private, real-time AI mock interview coach
 
@@ -6,7 +6,7 @@
 
 [**Launch the live app ↗**](https://frontend-deepaklearn7878-6255s-projects.vercel.app) &nbsp;·&nbsp;
 [Backend health ↗](https://hustlrzzv2-production.up.railway.app/health) &nbsp;·&nbsp;
-[Explore the code](https://github.com/dgexplores/hustlrzzv2)
+[Explore the code](https://github.com/dgexplores/hustlrzz)
 
 [Launch readiness, privacy boundaries, and rollout gates](docs/LAUNCH_READINESS.md)
 
@@ -18,7 +18,7 @@ Interview preparation is usually fragmented: static question banks do not know
 the candidate, generic tools cannot probe a real answer, and most feedback
 ignores confidence, posture, and delivery.
 
-**HUSTLRZZ V2 closes that gap.** It turns a resume and job description into a
+**Hustlrzz closes that gap.** It turns a resume and job description into a
 focused practice plan, conducts a conversational mock interview, and gives the
 candidate an actionable report — all in one private workspace.
 
@@ -176,6 +176,10 @@ delivery with Resend.
 
 ## Deployment checklist
 
+- **Supabase:** apply the schema or migrations **including
+  `supabase/migrations/20260826120000_intelligence_assessment.sql`** (company
+  intelligence cache + assessment rounds). Never expose
+  `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
 - **Vercel:** set the project root to `frontend`; configure
   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
   `NEXT_PUBLIC_API_URL` for Preview and Production.
@@ -184,8 +188,6 @@ delivery with Resend.
   Set `ENABLE_WEB_SEARCH=true` for on-demand company intelligence (enabled by
   default in new deployments). `WEB_SEARCH_TIMEOUT_SECONDS=15` keeps broad web
   research bounded and lets preparation fall back safely when sources are slow.
-- **Supabase:** apply the schema or RAG migration. Never expose
-  `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
 - **Google sign-in:** enable the Google provider and register the production
   callback URLs by following [the Google authentication setup](docs/GOOGLE_AUTH_SETUP.md).
 - **RAG:** configure `GEMINI_API_KEY` to enable embeddings; the app remains
@@ -198,9 +200,12 @@ delivery with Resend.
 
 | Route | Purpose |
 | --- | --- |
-| `POST /workflows/start` | Resume + JD → tailored interview pack |
-| `WS /ws/{session_id}` | Live interviewer and judge report |
+| `POST /workflows/start` | Resume + JD → tailored interview pack (+ auto-refreshed company intelligence fed into RAG) |
+| `WS /ws/{session_id}` | Live human-voiced interviewer with follow-up probing and grounded judge report |
 | `GET /workflows`, `GET /interviews` | Candidate history |
+| `GET /companies/{name}/intelligence` | Auto-updating company hiring intelligence (rounds, patterns, difficulty) |
+| `POST /assessment/start` | Timed multi-round screening battery (aptitude → technical → judgment) |
+| `POST /assessment/attempts/{id}/submit` | Server-side graded round submission and final readiness report |
 | `POST /coaching/analyze` | JD-versus-resume analysis |
 | `POST /coaching/salary` | Salary negotiation coaching |
 | `POST /coaching/practice` | Typed/voice rehearsal → combined content and delivery coaching |
@@ -210,6 +215,6 @@ delivery with Resend.
 
 ---
 
-**HUSTLRZZ V2** brings role relevance, live practice, and private delivery
+**Hustlrzz** brings role relevance, live practice, and private delivery
 feedback together so candidates can enter interviews prepared to communicate —
 not just to answer.

@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { downloadJson } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Clock3, ExternalLink, Loader2, Brain, Database, Download, FileText, Radio, ShieldCheck, Upload } from "lucide-react";
+import { ArrowRight, Building2, Clock3, ExternalLink, Loader2, Brain, Database, Download, FileText, Radio, ShieldCheck, Upload } from "lucide-react";
 import type { Question } from "@/lib/types";
 
 interface FlowResult {
@@ -21,6 +22,21 @@ interface FlowResult {
     summary: string;
   };
   knowledge?: { available: boolean; indexed: boolean; warning?: string; chunk_count?: number };
+  company_intelligence?: {
+    status: "live" | "cached" | "fallback" | "not_requested";
+    company: string;
+    fetched_at?: string;
+    confidence?: string;
+    data?: {
+      summary?: string;
+      rounds?: Array<{ name: string; count?: number; focus?: string; source_ids?: string[] }>;
+      question_patterns?: Array<{ category?: string; example: string; why_asked?: string; source_ids?: string[] }>;
+      approach_style?: string;
+      difficulty_signal?: string;
+      evaluation_focus?: string[];
+      preparation_tips?: string[];
+    };
+  };
   company_research?: {
     status: "live" | "fallback" | "not_requested";
     company: string;
@@ -185,6 +201,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle>Generated pack</CardTitle>
           {result && <Button size="sm" variant="outline" onClick={() => downloadJson("hustlrzz-interview-pack.json", result)}><Download className="h-4 w-4" /> Export pack</Button>}
+          {result && <Link href="/interview"><Button size="sm">Practice this pack <ArrowRight className="h-4 w-4" /></Button></Link>}
         </CardHeader>
         <CardContent className="space-y-4">
           {!result && (
@@ -206,6 +223,77 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
               <p className="text-sm"><span className="font-medium">Match:</span> {result.company_match.matched_skills.join(", ") || "None found"}</p>
               <p className="text-sm"><span className="font-medium">Gaps:</span> {result.company_match.gap_skills.join(", ") || "None found"}</p>
               <p className="text-sm"><span className="font-medium">Weaknesses:</span> {result.company_match.resume_weaknesses.join(", ") || "None found"}</p>
+            </div>
+          )}
+          {result?.company_intelligence && result.company_intelligence.status !== "not_requested" && (
+            <div className="rounded-xl border bg-card p-4 space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex gap-3">
+                  <div className="rounded-lg bg-violet-500/10 p-2 text-violet-600 dark:text-violet-400"><Radio className="h-5 w-5" /></div>
+                  <div>
+                    <h3 className="font-semibold">Company intelligence · auto-updating</h3>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Clock3 className="h-3.5 w-3.5" />
+                      {result.company_intelligence.fetched_at ? `Fetched ${new Date(result.company_intelligence.fetched_at).toLocaleString()}` : "Built-in profile"}
+                    </p>
+                  </div>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${result.company_intelligence.status === "fallback" ? "bg-amber-500/10 text-amber-700 dark:text-amber-300" : "bg-violet-500/10 text-violet-600 dark:text-violet-400"}`}>
+                  {result.company_intelligence.status === "cached" ? `cached · refreshed every 7 days` : result.company_intelligence.status === "live" ? `${result.company_intelligence.confidence ?? ""} confidence · live sources`.trim() : "Fallback profile"}
+                </span>
+              </div>
+              {result.company_intelligence.data?.summary && (
+                <p className="text-sm leading-6 text-muted-foreground">{result.company_intelligence.data.summary}</p>
+              )}
+              {(result.company_intelligence.data?.rounds?.length ?? 0) > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reported hiring rounds</p>
+                  <div className="flex flex-wrap gap-2">
+                    {result.company_intelligence.data!.rounds!.map((roundItem, index) => (
+                      <span key={`${roundItem.name}-${index}`} title={roundItem.focus} className="rounded-full border bg-secondary/40 px-3 py-1.5 text-xs font-semibold">
+                        {roundItem.name}{roundItem.count && roundItem.count > 1 ? ` ×${roundItem.count}` : ""}
+                        {roundItem.source_ids?.length ? <span className="ml-1 font-normal text-primary">{roundItem.source_ids.join("/")}</span> : null}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(result.company_intelligence.data?.question_patterns?.length ?? 0) > 0 && (
+                <details className="rounded-lg border p-3">
+                  <summary className="cursor-pointer text-sm font-semibold">Known question patterns ({result.company_intelligence.data!.question_patterns!.length})</summary>
+                  <div className="mt-3 space-y-2">
+                    {result.company_intelligence.data!.question_patterns!.map((pattern, index) => (
+                      <div key={`${pattern.example}-${index}`} className="rounded-md bg-secondary/30 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium">{pattern.example}</p>
+                          {pattern.category && <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{pattern.category}</span>}
+                        </div>
+                        {pattern.why_asked && <p className="mt-1 text-xs leading-5 text-muted-foreground">Why they ask: {pattern.why_asked}</p>}
+                        {pattern.source_ids?.length ? <p className="mt-1 text-[11px] font-semibold text-primary">{pattern.source_ids.join(" · ")}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+              {(result.company_intelligence.data?.approach_style || result.company_intelligence.data?.difficulty_signal) && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {result.company_intelligence.data?.approach_style && (
+                    <div className="rounded-lg border bg-secondary/25 p-3"><p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Interview style</p><p className="mt-1 text-sm leading-5">{result.company_intelligence.data.approach_style}</p></div>
+                  )}
+                  {result.company_intelligence.data?.difficulty_signal && (
+                    <div className="rounded-lg border bg-secondary/25 p-3"><p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Difficulty signal</p><p className="mt-1 text-sm capitalize leading-5">{result.company_intelligence.data.difficulty_signal}</p></div>
+                  )}
+                </div>
+              )}
+              {(result.company_intelligence.data?.preparation_tips?.length ?? 0) > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Preparation tips</p>
+                  <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+                    {result.company_intelligence.data!.preparation_tips!.slice(0, 6).map((tip, index) => <li key={`${tip}-${index}`} className="flex gap-2"><span className="text-primary">•</span><span>{tip}</span></li>)}
+                  </ul>
+                </div>
+              )}
+              <p className="rounded-lg bg-secondary/50 p-3 text-xs leading-5 text-muted-foreground">This brief is cached and refreshed automatically from public sources each time it ages out, and is also fed into your knowledge base so live interviews stay grounded.</p>
             </div>
           )}
           {result?.company_research && result.company_research.status !== "not_requested" && (

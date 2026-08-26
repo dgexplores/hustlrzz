@@ -125,6 +125,10 @@ export function PracticeRoom() {
       eyeContactConsistency: cameraEnabled ? clamp(100 - (metrics.notFacingDuration / duration) * 100) : 0,
       postureStability: cameraEnabled ? clamp(100 - (metrics.badPostureDuration / duration) * 100) : 0,
       gestureRatePerMinute: cameraEnabled ? Number((metrics.handDetectionCounter / (duration / 60)).toFixed(1)) : 0,
+      postureScore: cameraEnabled ? metrics.postureScore : 0,
+      gazeStabilityScore: cameraEnabled ? metrics.gazeStabilityScore : 0,
+      headTiltDeg: cameraEnabled ? metrics.headTiltDeg : 0,
+      shoulderTiltDeg: cameraEnabled ? metrics.shoulderTiltDeg : 0,
       cameraEnabled,
     };
   };
@@ -134,7 +138,12 @@ export function PracticeRoom() {
     stop();
     setPhase("scoring");
     setError(null);
-    const transcript = turns.map((turn) => `${turn.role === "coach" ? "Coach" : "Candidate"}: ${turn.text}`).join("\n\n");
+    const joined = turns.map((turn) => `${turn.role === "coach" ? "Coach" : "Candidate"}: ${turn.text}`).join("\n\n");
+    // Keep the payload under the API cap; keep the middle where the answer lives.
+    const MAX_CHARS = 11000;
+    const transcript = joined.length <= MAX_CHARS
+      ? joined
+      : joined.slice(0, Math.floor(MAX_CHARS * 0.6)) + "\n…[middle trimmed]…\n" + joined.slice(-Math.floor(MAX_CHARS * 0.35));
     try {
       const response = await api<{ data: any }>("/coaching/practice", {
         method: "POST",

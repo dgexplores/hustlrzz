@@ -9,8 +9,5 @@ websockets==14.1
 groq==0.15.0
 google-generativeai==0.8.3
 supabase==2.13.0
-PyPDF2==3.0.1
 pypdf==5.1.0
-ddgs
-pytest==8.3.4
-pytest-asyncio==0.25.0
+ddgs==9.15.0

@@ -93,6 +93,7 @@ export function AuthForm() {
                 setError(null);
                 setMessage(null);
               }}
+              aria-pressed={mode === m}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 mode === m ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, wsUrl } from "@/lib/api";
 import { downloadJson } from "@/lib/download";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { useAudio } from "@/hooks/useAudio";
 import { CameraPanel } from "@/components/interview/CameraPanel";
+import { PresenceCoach } from "@/components/interview/PresenceCoach";
 import { useMetrics } from "@/context/MetricsContext";
 import {
   AlertCircle, ArrowRight, Bot, CheckCircle2, Download, FileText,
   Loader2, MessageSquareText, Mic, MicOff, RefreshCw, Send, Sparkles,
-  Square, Target, UserRound, Volume2,
+  Square, Target, Volume2, VideoOff, WifiOff, Star, Dumbbell, X,
 } from "lucide-react";
 
 interface Turn { role: "candidate" | "interviewer"; text: string }
@@ -25,7 +26,9 @@ interface WorkflowOption {
   match?: { overall_match_percent?: number };
   created_at?: string;
 }
-type SessionPhase = "setup" | "connecting" | "live" | "ending" | "complete";
+type SessionPhase = "setup" | "connecting" | "live" | "ending" | "complete" | "interrupted";
+
+const DRAFT_KEY = "hustlrzz-interview-draft";
 
 export function InterviewPanel() {
   const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
@@ -40,7 +43,12 @@ export function InterviewPanel() {
   const [report, setReport] = useState<any>(null);
   const [audioMode, setAudioMode] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  // Generation counter: callbacks from stale sockets are ignored so a slow
+  // onclose can never clobber a fresh session (state race fix).
+  const generationRef = useRef(0);
+  const startedAtRef = useRef(0);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const metrics = useMetrics((state) => state.metrics);
   const resetMetrics = useMetrics((state) => state.reset);
@@ -51,8 +59,19 @@ export function InterviewPanel() {
     [workflowId, workflows],
   );
 
-  const { supported: audioSupported, listening, start: startMic, stop: stopMic, speak } =
-    useAudio((text) => send(text));
+  const { supported: audioSupported, listening, speaking, interim, start: startMic, stop: stopMic, speak, stopSpeaking } =
+    useAudio(send);
+
+  function send(override?: string) {
+    const text = (override ?? input).trim();
+    if (!text || awaitingReply || wsRef.current?.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({ type: "message", text }));
+    stopSpeaking(); // barge-in
+    setSessionError(null);
+    setAwaitingReply(true);
+    setTurns((current) => [...current, { role: "candidate", text }]);
+    setInput("");
+  }
 
   useEffect(() => {
     api<{ data: WorkflowOption[] }>("/workflows")
@@ -63,7 +82,17 @@ export function InterviewPanel() {
       })
       .catch((error) => setSessionError(error instanceof Error ? error.message : "Prepared packs could not be loaded."))
       .finally(() => setLoadingWorkflows(false));
-    return () => wsRef.current?.close();
+    return () => {
+      generationRef.current += 1;
+      const socket = wsRef.current;
+      if (socket) {
+        socket.onclose = null;
+        socket.onerror = null;
+        socket.onmessage = null;
+        socket.close();
+      }
+      if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    };
   }, []);
 
   useEffect(() => {
@@ -71,16 +100,23 @@ export function InterviewPanel() {
   }, [turns, awaitingReply]);
 
   useEffect(() => {
-    if (phase !== "live") return;
+    if (phase !== "live" && phase !== "ending") return;
     const timer = window.setInterval(() => setElapsedSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [phase]);
 
-  const begin = async () => {
+  // Persist a lightweight draft so an accidental refresh can be recovered.
+  useEffect(() => {
+    if (phase !== "live" && phase !== "interrupted") return;
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ workflowId, turns, at: Date.now() })); } catch {}
+  }, [turns, phase, workflowId]);
+
+  const begin = useCallback(async () => {
     if (!workflowId) {
       setSessionError("Create or select a prepared interview pack first.");
       return;
     }
+    generationRef.current += 1;
     setPhase("connecting");
     setSessionError(null);
     setReport(null);
@@ -97,13 +133,28 @@ export function InterviewPanel() {
       setPhase("setup");
       setSessionError(error instanceof Error ? error.message : "Unable to start the interview.");
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflowId, duration, audioMode, audioSupported, resetMetrics]);
 
   const connectWs = (sessionId: string, query: string) => {
-    wsRef.current?.close();
+    const generation = ++generationRef.current;
+    const previous = wsRef.current;
+    if (previous) {
+      previous.onclose = null;
+      previous.onerror = null;
+      previous.onmessage = null;
+      try { previous.close(); } catch {}
+    }
     const socket = new WebSocket(wsUrl(`/ws/${sessionId}${query}`, {}));
-    socket.onopen = () => setPhase("live");
+    wsRef.current = socket;
+    startedAtRef.current = Date.now();
+
+    socket.onopen = () => {
+      if (generation !== generationRef.current) return;
+      setPhase("live");
+    };
     socket.onmessage = (event) => {
+      if (generation !== generationRef.current) return;
       let message: any;
       try {
         message = JSON.parse(event.data);
@@ -122,6 +173,7 @@ export function InterviewPanel() {
         }
       } else if (message.type === "report") {
         setAwaitingReply(false);
+        stopSpeaking();
         setReport(message.data);
         setPhase("complete");
       } else if (message.type === "error") {
@@ -130,33 +182,53 @@ export function InterviewPanel() {
       }
     };
     socket.onerror = () => {
+      if (generation !== generationRef.current) return;
       setAwaitingReply(false);
-      setSessionError("The live connection was interrupted. Your preparation pack is still safe.");
     };
-    socket.onclose = () => setPhase((current) => current === "complete" ? current : "setup");
-    wsRef.current = socket;
-  };
-
-  const send = (override?: string) => {
-    const text = (override ?? input).trim();
-    if (!text || awaitingReply || wsRef.current?.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify({ type: "message", text }));
-    setSessionError(null);
-    setAwaitingReply(true);
-    setTurns((current) => [...current, { role: "candidate", text }]);
-    setInput("");
+    socket.onclose = () => {
+      if (generation !== generationRef.current) return;
+      setAwaitingReply(false);
+      stopSpeaking();
+      setPhase((current) =>
+        current === "complete" ? current : current === "ending" ? "complete" : "interrupted",
+      );
+    };
   };
 
   const end = () => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) return;
     stopMic();
+    stopSpeaking();
     setPhase("ending");
     setAwaitingReply(true);
-    wsRef.current.send(JSON.stringify({ type: "end" }));
+    wsRef.current.send(JSON.stringify({
+      type: "end",
+      presence: {
+        handDetectionCounter: metrics.handDetectionCounter,
+        handDetectionDuration: Number(metrics.handDetectionDuration.toFixed(1)),
+        notFacingCounter: metrics.notFacingCounter,
+        notFacingDuration: Number(metrics.notFacingDuration.toFixed(1)),
+        badPostureDetectionCounter: metrics.badPostureDetectionCounter,
+        badPostureDuration: Number(metrics.badPostureDuration.toFixed(1)),
+        sessionDurationSeconds: elapsedSeconds,
+        postureScore: metrics.postureScore,
+        gazeStabilityScore: metrics.gazeStabilityScore,
+        headTiltDeg: metrics.headTiltDeg,
+        shoulderTiltDeg: metrics.shoulderTiltDeg,
+      },
+    }));
   };
 
   const restart = () => {
-    wsRef.current?.close();
+    generationRef.current += 1;
+    const socket = wsRef.current;
+    if (socket) {
+      socket.onclose = null;
+      socket.onerror = null;
+      socket.onmessage = null;
+      try { socket.close(); } catch {}
+    }
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
     setPhase("setup");
     setTurns([]);
     setReport(null);
@@ -171,16 +243,19 @@ export function InterviewPanel() {
       <section className="motion-enter flex flex-col gap-4 pb-2 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           <h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] md:text-5xl">Run a realistic interview.</h1>
-          <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">Choose a prepared pack, answer by voice or text, and review your content and delivery together.</p>
+          <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">A live human-sounding interviewer, your camera presence, and a scored debrief - all in one studio.</p>
         </div>
-        <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-2 text-sm shadow-sm">
-          <span className={`h-2 w-2 rounded-full ${phase === "live" ? "bg-emerald-500 animate-pulse" : phase === "connecting" || phase === "ending" ? "bg-amber-500" : "bg-muted-foreground/40"}`} />
-          <span className="font-medium capitalize">{phase === "setup" ? "Ready to configure" : phase}</span>
-          {phase === "live" && <span className="font-mono text-muted-foreground">{elapsed}</span>}
-        </div>
+        {phase !== "live" && phase !== "ending" && (
+          <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-2 text-sm shadow-sm">
+            <span className={`h-2 w-2 rounded-full ${phase === "connecting" ? "bg-amber-500 animate-pulse" : phase === "complete" ? "bg-emerald-500" : phase === "interrupted" ? "bg-red-500" : "bg-muted-foreground/40"}`} />
+            <span className="font-medium capitalize">{phase === "setup" ? "Ready to configure" : phase === "interrupted" ? "Connection lost" : phase}</span>
+          </div>
+        )}
       </section>
 
-      {sessionError && <div role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{sessionError}</span></div>}
+      {(sessionError && phase !== "live" && phase !== "ending") && (
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{sessionError}</span></div>
+      )}
 
       {phase === "setup" || phase === "connecting" ? (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
@@ -205,7 +280,7 @@ export function InterviewPanel() {
               <div className="space-y-2"><Label>Session length</Label><div className="grid grid-cols-4 gap-2">{[10, 15, 30, 45].map((minutes) => <button key={minutes} type="button" onClick={() => setDuration(minutes)} className={`min-h-11 rounded-lg border px-2 text-sm font-semibold surface-transition ${duration === minutes ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`}>{minutes} min</button>)}</div></div>
 
               <label className={`flex min-h-16 cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 surface-transition ${audioMode ? "border-primary/40 bg-primary/5" : "bg-background"}`}>
-                <span className="flex items-center gap-3"><span className="rounded-lg bg-primary/10 p-2 text-primary"><Volume2 className="h-5 w-5" /></span><span><span className="block text-sm font-semibold">Voice interview</span><span className="block text-xs text-muted-foreground">Hear questions and answer through your microphone.</span></span></span>
+                <span className="flex items-center gap-3"><span className="rounded-lg bg-primary/10 p-2 text-primary"><Volume2 className="h-5 w-5" /></span><span><span className="block text-sm font-semibold">Voice interview</span><span className="block text-xs text-muted-foreground">Hear a natural voice and answer through your microphone.</span></span></span>
                 <input type="checkbox" checked={audioMode && audioSupported} disabled={!audioSupported} onChange={(event) => setAudioMode(event.target.checked)} className="h-5 w-5 accent-primary" aria-label="Enable voice interview" />
               </label>
               {!audioSupported && <p className="text-xs text-muted-foreground">Voice input is unavailable in this browser; typed interviews still work fully.</p>}
@@ -228,34 +303,160 @@ export function InterviewPanel() {
         </div>
       ) : phase === "complete" && report ? (
         <ReportPanel report={report} metrics={metrics} onRestart={restart} />
-      ) : (
-        <div className="grid gap-6 xl:grid-cols-[minmax(360px,0.82fr)_minmax(0,1.18fr)]">
-          <div className="space-y-6"><Card><CardHeader className="flex-row items-center justify-between space-y-0"><div><CardTitle className="text-lg">Presence coach</CardTitle><p className="mt-1 text-xs text-muted-foreground">Processed privately on this device</p></div><span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">Local only</span></CardHeader><CardContent><CameraPanel /></CardContent></Card></div>
-
-          <Card className="flex min-h-[680px] flex-col overflow-hidden">
-            <CardHeader className="flex-row items-center justify-between space-y-0 border-b bg-secondary/20">
-              <div><CardTitle className="flex items-center gap-2 text-lg"><Bot className="h-5 w-5 text-primary" />AI interviewer</CardTitle><p className="mt-1 text-xs text-muted-foreground">{selectedWorkflow?.company || "Role-specific"} · {turns.filter((turn) => turn.role === "candidate").length} answers</p></div>
-              <Button variant="outline" size="sm" onClick={end} disabled={phase === "ending"}>{phase === "ending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-3.5 w-3.5" />} End &amp; score</Button>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col p-0">
-              <div aria-live="polite" className="flex-1 space-y-5 overflow-y-auto p-4 md:p-6">
-                {turns.map((turn, index) => <TranscriptTurn key={`${turn.role}-${index}`} turn={turn} />)}
-                {awaitingReply && <div className="flex items-center gap-3 text-sm text-muted-foreground"><span className="rounded-full bg-primary/10 p-2 text-primary"><Bot className="h-4 w-4" /></span><span className="flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" />{phase === "ending" ? "Building your coaching report…" : "Interviewer is considering your answer…"}</span></div>}
-                <div ref={transcriptEndRef} />
-              </div>
-              <div className="border-t bg-background p-3 md:p-4">
-                <div className="flex gap-2">
-                  {audioMode && audioSupported && <Button type="button" onClick={listening ? stopMic : startMic} disabled={!connected || awaitingReply} variant={listening ? "destructive" : "secondary"} size="icon" aria-label={listening ? "Stop microphone" : "Start microphone"}>{listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}</Button>}
-                  <Input value={input} maxLength={12000} disabled={!connected || awaitingReply} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder={awaitingReply ? "Waiting for interviewer…" : "Answer with a concrete example…"} aria-label="Interview answer" />
-                  <Button type="button" size="icon" onClick={() => send()} disabled={!connected || awaitingReply || !input.trim()} aria-label="Send answer"><Send className="h-4 w-4" /></Button>
+      ) : phase === "interrupted" ? (
+        <Card className="mx-auto max-w-xl text-center">
+          <CardContent className="space-y-4 py-10">
+            <WifiOff className="mx-auto h-8 w-8 text-destructive" />
+            <h2 className="text-xl font-semibold">The live connection dropped.</h2>
+            <p className="text-sm leading-6 text-muted-foreground">Your transcript below is safe in this tab, but this session ended server-side. Start a fresh session to continue practicing - your prepared pack stays selected.</p>
+            <div className="flex justify-center gap-2 pt-2">
+              <Button onClick={begin}><RefreshCw className="h-4 w-4" />Start new session</Button>
+              <Button variant="outline" onClick={() => { setPhase("setup"); }}>Back to setup</Button>
+            </div>
+            {turns.length > 0 && (
+              <details className="mt-4 rounded-xl border p-4 text-left">
+                <summary className="cursor-pointer text-sm font-semibold">Recovered transcript ({turns.length} turns)</summary>
+                <div className="mt-3 max-h-64 space-y-2 overflow-auto text-sm">
+                  {turns.map((turn, index) => <p key={index}><span className="font-semibold">{turn.role === "candidate" ? "You" : "Interviewer"}:</span> {turn.text}</p>)}
                 </div>
-                <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground"><span>Enter to send</span><span>{input.length}/12,000</span></div>
+              </details>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        /* ------------------------------ STUDIO ------------------------------ */
+        <div className="studio-bg relative overflow-hidden rounded-3xl border shadow-2xl">
+          {/* Top bar */}
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 md:px-6">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 font-mono text-sm text-white backdrop-blur">
+                <span className={`rec-dot h-2 w-2 rounded-full ${phase === "ending" ? "bg-amber-400" : "bg-red-500"}`} />
+                {elapsed}
+              </span>
+              <span className="hidden text-sm font-medium text-white/85 sm:block">{selectedWorkflow?.company || "Role-specific"} · live interview</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setShowTranscript((value) => !value)} aria-label="Toggle live transcript" aria-expanded={showTranscript} className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/75 surface-transition hover:bg-white/20 hover:text-white">
+                <MessageSquareText className="h-3.5 w-3.5" /> Transcript
+              </button>
+              <span className="hidden rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300 sm:inline">Connected</span>
+              <span className="hidden rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/70 md:block">{metrics.postureScore} presence</span>
+            </div>
+          </div>
+
+          <PresenceCoach active={connected} cameraActive={connected} sessionKey={workflowId} />
+
+          {showTranscript && (
+            <div className="absolute inset-y-0 right-0 z-40 flex w-full max-w-sm flex-col border-l border-white/10 bg-black/70 backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <span className="text-sm font-semibold text-white/90">Live transcript</span>
+                <button type="button" onClick={() => setShowTranscript(false)} aria-label="Close transcript" className="rounded-md p-1.5 text-white/60 surface-transition hover:bg-white/10 hover:text-white">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            </CardContent>
-          </Card>
+              <div aria-live="polite" className="flex-1 space-y-3 overflow-y-auto p-4">
+                {turns.length === 0 && <p className="text-sm text-white/50">The conversation will appear here as you go.</p>}
+                {turns.map((turn, index) => (
+                  <div key={`${turn.role}-${index}`} className={`flex flex-col ${turn.role === "candidate" ? "items-end" : "items-start"}`}>
+                    <span className="mb-1 text-[10px] font-bold uppercase tracking-wide text-white/45">{turn.role === "candidate" ? "You" : "Interviewer"}</span>
+                    <div className={`max-w-[90%] rounded-2xl px-3 py-2 text-left text-xs leading-5 ${turn.role === "candidate" ? "bg-primary/80 text-white" : "bg-white/10 text-white/85"}`}>{turn.text}</div>
+                  </div>
+                ))}
+                {awaitingReply && <p className="text-center text-[11px] text-white/45">…</p>}
+              </div>
+            </div>
+          )}
+
+          {/* Stage */}
+          <div className="relative grid min-h-[520px] place-items-center px-4 pb-40 pt-14 md:pb-44">
+            <InterviewerStage speaking={speaking} awaitingReply={awaitingReply} lastLine={[...turns].reverse().find((t) => t.role === "interviewer")?.text || ""} />
+
+            {/* Candidate PiP camera */}
+            <div className="absolute bottom-28 right-4 z-30 hidden aspect-video w-48 sm:block md:w-56 lg:w-64">
+              <CameraPanel compact />
+            </div>
+          </div>
+
+          {/* Control dock */}
+          <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/10 bg-black/35 px-4 py-3 backdrop-blur-xl">
+            <div className="mx-auto flex max-w-4xl items-center gap-2 md:gap-3">
+              {audioMode && audioSupported ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={listening ? stopMic : startMic}
+                    disabled={!connected || awaitingReply}
+                    aria-label={listening ? "Mute microphone" : "Unmute microphone"}
+                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full surface-transition ${listening ? "bg-emerald-500 text-white orb-listening" : "bg-red-500/90 text-white hover:bg-red-500"}`}
+                  >
+                    {listening ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                  </button>
+                  <Input
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }}
+                    disabled={!connected || awaitingReply}
+                    placeholder={awaitingReply ? "Interviewer is responding…" : listening ? "Listening… speak or type" : "Answer with a concrete example…"}
+                    aria-label="Interview answer"
+                    className="h-12 flex-1 border-white/15 bg-white/10 text-white placeholder:text-white/50 focus-visible:ring-white/40"
+                  />
+                </>
+              ) : (
+                <Input
+                  value={input}
+                  maxLength={12000}
+                  onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }}
+                  disabled={!connected || awaitingReply}
+                  placeholder={awaitingReply ? "Waiting for interviewer…" : "Answer with a concrete example…"}
+                  aria-label="Interview answer"
+                  className="h-12 flex-1 border-white/15 bg-white/10 text-white placeholder:text-white/50 focus-visible:ring-white/40"
+                />
+              )}
+              <Button type="button" size="icon" onClick={() => send()} disabled={!connected || awaitingReply || !input.trim()} aria-label="Send answer" className="h-12 w-12 shrink-0 rounded-full"><Send className="h-5 w-5" /></Button>
+              <Button type="button" onClick={end} disabled={phase === "ending"} variant="destructive" className="ml-1 h-12 shrink-0 rounded-full px-4 md:px-6">
+                {phase === "ending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+                <span className="hidden sm:inline">{phase === "ending" ? "Scoring…" : "End & score"}</span>
+              </Button>
+            </div>
+            <p className="mx-auto mt-1.5 max-w-4xl truncate text-center text-[11px] text-white/45">
+              {listening && interim ? `“${interim}”` : audioMode && audioSupported ? (listening ? "Microphone live · Enter to send typed text" : "Tap the mic to speak, or type your answer") : "Type your answers · voice unavailable in this browser"}
+            </p>
+          </div>
         </div>
       )}
     </main>
+  );
+}
+
+function InterviewerStage({ speaking, awaitingReply, lastLine }: { speaking: boolean; awaitingReply: boolean; lastLine: string }) {
+  return (
+    <div className="flex w-full max-w-2xl flex-col items-center text-center">
+      <div className="relative mb-8">
+        <div className={`relative flex h-32 w-32 items-center justify-center rounded-full ${speaking ? "orb-speaking text-primary" : "orb-idle"}`}>
+          {speaking && (<><span /><span /><span /></>)}
+          <div className={`relative z-10 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-violet-600/80 shadow-xl transition-transform ${speaking ? "scale-105" : "scale-100"}`}>
+            <Bot className="h-10 w-10 text-white" />
+          </div>
+        </div>
+        {awaitingReply && (
+          <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-card/90 px-3 py-1 text-xs text-muted-foreground shadow backdrop-blur">
+            <Loader2 className="h-3 w-3 animate-spin" /> considering…
+          </span>
+        )}
+        {!awaitingReply && speaking && (
+          <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow">speaking</span>
+        )}
+      </div>
+      <div className="min-h-[96px] w-full rounded-2xl border border-white/10 bg-white/5 p-5 text-base leading-7 text-white/90 backdrop-blur-md md:text-lg">
+        {lastLine || "Your interviewer will open the session in a moment."}
+      </div>
+      <div className="mt-4 flex flex-wrap justify-center gap-2 text-[11px] text-white/50">
+        <span className="rounded-full bg-white/10 px-2.5 py-1">Natural voice</span>
+        <span className="rounded-full bg-white/10 px-2.5 py-1">Follow-up probing</span>
+        <span className="rounded-full bg-white/10 px-2.5 py-1">Time-aware pacing</span>
+      </div>
+    </div>
   );
 }
 
@@ -267,26 +468,32 @@ function Readiness({ icon, title, copy }: { icon: React.ReactNode; title: string
   return <div className="flex gap-3"><span className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">{icon}</span><div><p className="text-sm font-semibold">{title}</p><p className="mt-0.5 text-sm leading-6 text-muted-foreground">{copy}</p></div></div>;
 }
 
-function TranscriptTurn({ turn }: { turn: Turn }) {
-  const candidate = turn.role === "candidate";
-  return <div className={`flex gap-3 ${candidate ? "flex-row-reverse" : ""}`}><span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${candidate ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>{candidate ? <UserRound className="h-4 w-4" /> : <Bot className="h-4 w-4" />}</span><div className={`max-w-[85%] ${candidate ? "text-right" : ""}`}><p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{candidate ? "You" : "Interviewer"}</p><div className={`inline-block rounded-2xl px-4 py-3 text-left text-sm leading-6 ${candidate ? "rounded-tr-sm bg-primary text-primary-foreground" : "rounded-tl-sm border bg-card"}`}>{turn.text}</div></div></div>;
-}
-
 function ReportPanel({ report, metrics, onRestart }: { report: any; metrics: ReturnType<typeof useMetrics.getState>["metrics"]; onRestart: () => void }) {
   const scores = Object.entries(report?.scores || {}) as [string, number][];
   const presence = [
     ["Gestures", metrics.handDetectionCounter, `${metrics.handDetectionDuration.toFixed(0)}s active`],
     ["Gaze resets", metrics.notFacingCounter, `${metrics.notFacingDuration.toFixed(0)}s away`],
     ["Posture resets", metrics.badPostureDetectionCounter, `${metrics.badPostureDuration.toFixed(0)}s adjusting`],
+    ["Presence score", metrics.postureScore, `gaze stability ${metrics.gazeStabilityScore}`],
   ] as const;
   const exportData = { ...report, local_presence_metrics: metrics };
   return <div className="space-y-6">
     <Card className="overflow-hidden"><CardContent className="grid gap-6 p-6 lg:grid-cols-[1.2fr_0.8fr]"><div><span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" />Session complete</span><h2 className="mt-4 text-3xl font-semibold tracking-tight">Your coaching debrief</h2><p className="mt-3 max-w-2xl leading-7 text-muted-foreground">{report?.summary || "Your report has been saved to practice history."}</p>{report?.verdict && <p className="mt-4 rounded-xl border bg-secondary/30 p-4 text-sm"><span className="font-semibold">Coach verdict:</span> {report.verdict}</p>}</div><div className="flex flex-col justify-end gap-2"><Button onClick={() => downloadJson("hustlrzz-coaching-report.json", exportData)}><Download className="h-4 w-4" />Export full report</Button><Button variant="outline" onClick={onRestart}><RefreshCw className="h-4 w-4" />Practice another session</Button></div></CardContent></Card>
     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
       <Card><CardHeader><CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-primary" />Answer quality</CardTitle></CardHeader><CardContent className="space-y-4">{scores.length ? scores.map(([label, rawScore]) => { const score = Number(rawScore) || 0; return <div key={label}><div className="mb-1.5 flex justify-between text-sm"><span className="font-medium capitalize">{label.replace(/_/g, " ")}</span><span className="font-semibold">{score}/100</span></div><div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(0, Math.min(score, 100))}%` }} /></div></div>; }) : <p className="text-sm text-muted-foreground">No numerical scores were returned.</p>}</CardContent></Card>
-      <Card><CardHeader><CardTitle className="flex items-center gap-2"><MessageSquareText className="h-5 w-5 text-primary" />Local presence signals</CardTitle><p className="text-xs text-muted-foreground">These measurements stayed in your browser.</p></CardHeader><CardContent className="grid grid-cols-3 gap-3">{presence.map(([label, value, detail]) => <div key={label} className="rounded-xl bg-secondary/50 p-3"><p className="text-2xl font-semibold">{value}</p><p className="mt-1 text-xs font-medium">{label}</p><p className="mt-1 text-[11px] text-muted-foreground">{detail}</p></div>)}</CardContent></Card>
+      <Card><CardHeader><CardTitle className="flex items-center gap-2"><MessageSquareText className="h-5 w-5 text-primary" />Local presence signals</CardTitle><p className="text-xs text-muted-foreground">These measurements stayed in your browser.</p></CardHeader><CardContent className="grid grid-cols-2 gap-3">{presence.map(([label, value, detail]) => <div key={label} className="rounded-xl bg-secondary/50 p-3"><p className="text-2xl font-semibold">{value}</p><p className="mt-1 text-xs font-medium">{label}</p><p className="mt-1 text-[11px] text-muted-foreground">{detail}</p></div>)}</CardContent></Card>
     </div>
-    <div className="grid gap-6 lg:grid-cols-2"><FeedbackList title="What worked" items={report?.strengths || []} positive /><FeedbackList title="Next practice focus" items={report?.improvements || []} /></div>
+    <div className="grid gap-6 lg:grid-cols-2">
+      <FeedbackList title="What worked" items={report?.strengths || []} positive />
+      <FeedbackList title="Next practice focus" items={report?.improvements || []} />
+    </div>
+    {(report?.star_example || report?.next_drill || (report?.delivery_notes?.length ?? 0) > 0) && (
+      <div className="grid gap-6 lg:grid-cols-3">
+        {report?.star_example && <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Star className="h-4 w-4 text-primary" />Strongest STAR moment</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-muted-foreground">{report.star_example}</CardContent></Card>}
+        {(report?.delivery_notes?.length ?? 0) > 0 && <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><VideoOff className="h-4 w-4 text-primary" />Delivery notes</CardTitle></CardHeader><CardContent><ul className="space-y-2 text-sm leading-6 text-muted-foreground">{report.delivery_notes.slice(0, 4).map((note: string, index: number) => <li key={index}>• {note}</li>)}</ul></CardContent></Card>}
+        {report?.next_drill && <Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Dumbbell className="h-4 w-4 text-primary" />Next drill</CardTitle></CardHeader><CardContent className="text-sm leading-6 text-muted-foreground">{report.next_drill}</CardContent></Card>}
+      </div>
+    )}
   </div>;
 }
 

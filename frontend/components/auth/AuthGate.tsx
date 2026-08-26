@@ -3,27 +3,53 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getSupabase } from "@/lib/supabase/client";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { Loader2, LogOut } from "lucide-react";
+import { AlertTriangle, Loader2, LogOut } from "lucide-react";
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    const supabase = getSupabase();
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    if (!isSupabaseConfigured) {
+      setConfigError(
+        "This deployment is missing its Supabase configuration. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then redeploy."
+      );
       setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
-    return () => sub.subscription.unsubscribe();
+      return;
+    }
+    let active = true;
+    try {
+      const supabase = getSupabase();
+      supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          if (!active) return;
+          setSession(data.session);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (!active) return;
+          setSession(null);
+          setLoading(false);
+        });
+      const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+      return () => {
+        active = false;
+        sub.subscription.unsubscribe();
+      };
+    } catch (error) {
+      setConfigError(error instanceof Error ? error.message : "Authentication could not start.");
+      setLoading(false);
+      return () => { active = false; };
+    }
   }, []);
 
   const signOut = async () => {
@@ -36,6 +62,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
+    );
+  }
+
+  if (configError) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="w-full max-w-lg rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
+          <AlertTriangle className="mx-auto h-8 w-8 text-destructive" />
+          <h1 className="mt-3 text-xl font-semibold">Configuration needed</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{configError}</p>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => window.location.reload()}>Reload</Button>
+        </div>
+      </main>
     );
   }
 
@@ -63,6 +102,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
             <span className="text-xl font-bold tracking-[-0.04em]">HUSTLRZZ</span>
           </div>
           <AuthForm />
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            By continuing you agree to our{" "}
+            <Link href="/legal/terms" className="font-semibold text-primary hover:underline">Terms</Link> and{" "}
+            <Link href="/legal/privacy" className="font-semibold text-primary hover:underline">Privacy policy</Link>.
+          </p>
         </div>
       </main>
     );
@@ -72,6 +116,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     { href: "/", label: "Home" },
     { href: "/prepare", label: "Prepare" },
     { href: "/resume-analyzer", label: "Resume Analyzer" },
+    { href: "/assessment", label: "Assessment" },
     { href: "/interview", label: "Interview" },
     { href: "/coaching", label: "Coaching" },
     { href: "/dashboard", label: "Progress" },
