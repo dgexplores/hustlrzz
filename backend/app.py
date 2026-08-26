@@ -492,14 +492,30 @@ def _sanitize_presence(metrics: dict | None) -> dict[str, float]:
 
 
 @router.post("/coaching/practice")
-def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
+async def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
     allowed_metrics = _sanitize_presence(payload.presence_metrics)
+    # Memory + RAG grounding for the next drill
+    try:
+        from backend.memory.profile import get_weakness_context
+
+        weakness_ctx = get_weakness_context(user["uid"])
+    except Exception:
+        weakness_ctx = ""
+    rag_ctx = ""
+    if rag.is_ready():
+        try:
+            chunks = await rag.retrieve(user_id=user["uid"], query=payload.answer[:1200], top_k=2)
+            rag_ctx = rag.format_context(chunks, max_chars=1200)
+        except Exception:
+            rag_ctx = ""
     try:
         result = analysis.evaluate_coaching_practice(
             scenario=payload.scenario,
             prompt=payload.prompt,
             answer=payload.answer,
             presence_metrics=allowed_metrics,
+            weakness_context=weakness_ctx,
+            rag_context=rag_ctx,
         )
         if not result or result.get("error"):
             raise HTTPException(status_code=502, detail="The coach returned incomplete feedback. Please retry.")
@@ -510,8 +526,14 @@ def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(rat
 
 
 @router.post("/coaching/practice/turn")
-def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
+async def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
     try:
+        from backend.memory.profile import get_weakness_context
+
+        try:
+            weakness_ctx = get_weakness_context(user["uid"])
+        except Exception:
+            weakness_ctx = ""
         result = analysis.coaching_practice_turn(
             scenario=payload.scenario,
             difficulty=payload.difficulty,
@@ -519,6 +541,7 @@ def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depends(ra
             opening_prompt=payload.opening_prompt,
             history=[item.model_dump() for item in payload.history],
             candidate_answer=payload.candidate_answer,
+            weakness_context=weakness_ctx,
         )
         if result.get("error"):
             raise HTTPException(status_code=502, detail="The coach returned an incomplete response. Please retry.")
@@ -560,6 +583,24 @@ async def assessment_submit(attempt_id: str, payload: AssessmentSubmitRequest, u
     _db_or_503()
     try:
         data = assessment_service.submit_round(user["uid"], attempt_id, payload.round_index, payload.responses)
+        # Memory: feed the completed assessment into RAG so future sessions remember it
+        if data.get("completed") and data.get("report") and rag.is_ready():
+            try:
+                report = data["report"]
+                gaps = ", ".join(report.get("gap_skills") or []) or "none noted"
+                strengths = ", ".join(report.get("strength_skills") or []) or "none noted"
+                await rag.ingest_document(
+                    user_id=user["uid"],
+                    title="Assessment summary",
+                    source_type="notes",
+                    content=(
+                        f"Assessment ({report.get('band','')} {report.get('total_percent','')}%) — "
+                        f"Gaps: {gaps}. Strengths: {strengths}. "
+                        f"Rounds: {', '.join(s.get('name','') for s in report.get('round_scores') or [])}"
+                    )[:2000],
+                )
+            except Exception:
+                pass
         return {"success": True, "data": data}
     except LookupError:
         raise HTTPException(status_code=404, detail="Assessment attempt not found.")
@@ -751,6 +792,15 @@ async def interview_ws(
         duration,
         company_context=stored_match.get("company_research") if isinstance(stored_match, dict) else None,
     )
+    # Memory: bias live probing toward previously weak areas
+    try:
+        from backend.memory.profile import get_weakness_context
+
+        _weak = get_weakness_context(user_id)
+        if _weak:
+            system += f"\n\n{_weak}\nPrioritize probing these weak areas with specific follow-ups."
+    except Exception:
+        pass
     transcript: list[dict] = []
     end_presence: dict = {}
 

@@ -279,13 +279,21 @@ async def run_preparation_workflow(
 
         # Step 2+3 (parallel): match analysis + question generation in one call.
         def _do_questions():
+            try:
+                from backend.memory.profile import get_weakness_context
+
+                weakness_block = get_weakness_context(user_id)
+            except Exception:
+                weakness_block = ""
             quser = (
                 f"Company: {company_name or 'unknown'}\n"
                 f"Interview style: {company_profiles.company_profile(company_name).get('style', '')}\n"
                 f"Personal summary:\n{json.dumps(personal_summary, ensure_ascii=False)}\n"
                 f"Industry FAQs:\n{json.dumps(industry_faqs, ensure_ascii=False)}\n\n"
                 f"Current company research:\n{json.dumps(company_research, ensure_ascii=False)}\n\n"
-                f"Generate exactly {num_questions} personalized questions as the JSON schema: "
+                + (weakness_block + "\n\n" if weakness_block else "")
+                + ("Bias roughly 40% of questions toward the weak areas above, without repeating prior questions verbatim.\n\n" if weakness_block else "")
+                + f"Generate exactly {num_questions} personalized questions as the JSON schema: "
                 '[{"type":"technical|project|behavioral|reverse-question","question":"...",'
                 '"tests":"...","difficulty":1-5,"answer_hint":"...","follow_up":"...","tags":[]}]\n\n'
                 "Also produce a short JD-vs-resume match summary. Return JSON:\n"

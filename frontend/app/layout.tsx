@@ -4,22 +4,21 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Hustlrzz | AI mock interview coach",
+    default: "Hustlrzz — Interview practice that remembers you",
     template: "%s | Hustlrzz",
   },
   description:
-    "Prepare from your resume, pass aptitude-style screening rounds, practise live interviews with a human-sounding AI interviewer, and review answer and body-language feedback.",
+    "Turn your resume into a practice pack, clear aptitude-style screens, and rehearse with an interviewer that focuses on what you need to improve. Private, in your browser.",
   openGraph: {
-    title: "Hustlrzz | AI mock interview coach",
-    description:
-      "Resume-grounded preparation, screening-round assessments, live voice interviews and private presence coaching.",
+    title: "Hustlrzz — Interview practice that remembers you",
+    description: "Preparation, screening rounds and live practice in one private workspace.",
     type: "website",
     siteName: "Hustlrzz",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Hustlrzz | AI mock interview coach",
-    description: "Prepare, assess, rehearse, improve - one private interview workspace.",
+    title: "Hustlrzz — Interview practice that remembers you",
+    description: "Prepare, assess, rehearse, improve.",
   },
 };
 

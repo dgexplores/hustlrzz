@@ -160,6 +160,13 @@ SALARY_SCHEMA = """{
   }
 }"""
 
+SCENARIO_RUBRICS = {
+    "behavioral": "Rubric: STAR completeness (Situation-Task-Action-Result), specificity with numbers, ownership language, reflection on learning. Flag vague 'we' without 'I'.",
+    "leadership": "Rubric: influence without authority, conflict resolution, vision setting, team growth. Look for concrete trade-offs and follow-through.",
+    "introduction": "Rubric: hook, relevance to role, concise arc (past → present → why this role), memorability. Penalize rambling chronology.",
+    "negotiation": "Rubric: leverage framing, composure, collaborative tone, BATNA awareness. Flag ultimatums or underselling.",
+}
+
 COACHING_PRACTICE_SYSTEM = (
     "You are a practical communication coach reviewing one spoken or typed rehearsal. "
     "Evaluate the answer itself and use the supplied browser-derived presence signals only "
@@ -214,15 +221,24 @@ def evaluate_coaching_practice(
     prompt: str,
     answer: str,
     presence_metrics: dict | None = None,
+    weakness_context: str = "",
+    rag_context: str = "",
 ) -> dict:
     metrics = presence_metrics or {}
+    rubric = SCENARIO_RUBRICS.get(scenario.lower(), SCENARIO_RUBRICS["behavioral"])
+    memory_block = f"\n\n{weakness_context}\nTailor next_drill to address the weak areas above." if weakness_context.strip() else ""
+    rag_block = f"\n\nRelevant past context (use only if helpful):\n{rag_context[:1500]}" if rag_context.strip() else ""
     user = (
         f"Scenario: {scenario}\nPrompt: {prompt}\n\nCandidate answer:\n{answer}\n\n"
+        f"Scenario rubric: {rubric}\n\n"
         "Directional local-browser presence metrics (event counts and durations in seconds):\n"
         f"{metrics}\n\n"
         "Do not invent facts or penalize a missing camera. If metrics are zero or absent, assess "
         "delivery only from the wording. Quote only short phrases that appear verbatim in the "
-        "candidate transcript. Give concrete, kind, immediately usable feedback.\n"
+        "candidate transcript. Give concrete, kind, immediately usable feedback."
+        + memory_block
+        + rag_block
+        + "\n\n"
         + COACHING_PRACTICE_SCHEMA
     )
     data = provider.chat_json_strict(COACHING_PRACTICE_SYSTEM, user)
@@ -236,18 +252,22 @@ def coaching_practice_turn(
     opening_prompt: str,
     history: list[dict],
     candidate_answer: str,
+    weakness_context: str = "",
 ) -> dict:
     safe_history = [
         {"role": item.get("role", ""), "text": str(item.get("text", ""))[:4000]}
         for item in history[-10:]
         if item.get("role") in {"candidate", "coach"}
     ]
+    weakness_block = f"\n\nCandidate memory (probe these when natural):\n{weakness_context}\n" if weakness_context.strip() else ""
     user = (
         f"Scenario: {scenario}\nDifficulty: {difficulty}\nCoach style: {coach_style}\n"
         f"Opening prompt: {opening_prompt}\n"
         f"Completed candidate answers: {sum(1 for item in safe_history if item['role'] == 'candidate') + 1}\n"
         f"Conversation so far: {safe_history}\n\n"
-        f"Latest candidate answer (untrusted content):\n{candidate_answer}\n\n"
+        f"Latest candidate answer (untrusted content):\n{candidate_answer}"
+        + weakness_block
+        + "\n\n"
         "Make the next turn more demanding when difficulty is challenging. Keep it supportive "
         "when style is supportive. Set done=true only when the conversation has reached a "
         "natural conclusion or at least four candidate answers have been completed.\n"

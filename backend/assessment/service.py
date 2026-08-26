@@ -240,12 +240,18 @@ def submit_round(user_id: str, attempt_id: str, round_index: int, responses: dic
                 "next_round": _sanitize_round(nxt)}
     total_percent = round(sum(s["score"] for s in scores) / max(1, len(scores)))
     band, recommendation = _band(total_percent)
-    updates.update({"status": "completed", "total_percent": total_percent, "band": band})
-    dbc.update(TABLE, {"attempt_id": attempt_id}, updates)
     all_right: list[str] = list(graded["skills_right"])
     all_wrong: list[str] = list(graded["skills_wrong"])
     strength_skills = _top_skills(all_right)
     gap_skills = _top_skills([s for s in all_wrong if s not in set(strength_skills)])
+    updates.update({
+        "status": "completed",
+        "total_percent": total_percent,
+        "band": band,
+        "gap_skills": gap_skills,
+        "strength_skills": strength_skills,
+    })
+    dbc.update(TABLE, {"attempt_id": attempt_id}, updates)
     return {**result_payload, "completed": True,
             "report": {"round_scores": scores, "total_percent": total_percent,
                        "band": band, "recommendation": recommendation,

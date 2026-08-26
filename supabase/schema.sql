@@ -144,6 +144,8 @@ create table if not exists assessment_attempts (
   round_scores jsonb not null default '[]'::jsonb,
   total_percent integer,
   band text,
+  gap_skills jsonb default '[]'::jsonb,
+  strength_skills jsonb default '[]'::jsonb,
   status text not null default 'in_progress',
   created_at timestamptz not null default now(),
   unique(attempt_id, user_id)
