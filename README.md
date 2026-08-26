@@ -1,4 +1,4 @@
-# HUSTLRZZ V2
+# Hustlrzz
 
 ### Your private, real-time AI mock interview coach
 
@@ -18,7 +18,7 @@ Interview preparation is usually fragmented: static question banks do not know
 the candidate, generic tools cannot probe a real answer, and most feedback
 ignores confidence, posture, and delivery.
 
-**HUSTLRZZ V2 closes that gap.** It turns a resume and job description into a
+**Hustlrzz closes that gap.** It turns a resume and job description into a
 focused practice plan, conducts a conversational mock interview, and gives the
 candidate an actionable report — all in one private workspace.
 
@@ -215,6 +215,6 @@ delivery with Resend.
 
 ---
 
-**HUSTLRZZ V2** brings role relevance, live practice, and private delivery
+**Hustlrzz** brings role relevance, live practice, and private delivery
 feedback together so candidates can enter interviews prepared to communicate —
 not just to answer.

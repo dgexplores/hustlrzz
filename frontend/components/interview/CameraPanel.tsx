@@ -23,6 +23,9 @@ export function CameraPanel({ compact = false }: { compact?: boolean }) {
   const { status } = useCamera(videoRef, retryKey);
   const live = status === "live";
 
+  // PiP view skips landmark drawing to save CPU during live interviews.
+  const overlayActive = overlay && !compact;
+
   const {
     handDetectionCounter,
     handDetectionDuration,
@@ -35,7 +38,7 @@ export function CameraPanel({ compact = false }: { compact?: boolean }) {
     postureGood,
     ready,
     processingError,
-  } = useMediapipe(videoRef, canvasRef, overlay, live);
+  } = useMediapipe(videoRef, canvasRef, overlayActive, live);
 
   const metrics = useMetrics((state) => state.metrics);
   const aura: AuraState =
@@ -67,7 +70,7 @@ export function CameraPanel({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="space-y-4">
-      <PresenceCoach active={live} sessionKey="camera-panel" />
+      <PresenceCoach active={live} cameraActive={live} sessionKey="camera-panel" />
       {status === "no-device" && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
           <p className="font-semibold flex items-center gap-2"><CameraOff className="h-4 w-4" /> No camera detected (browser reports 0 devices).</p>

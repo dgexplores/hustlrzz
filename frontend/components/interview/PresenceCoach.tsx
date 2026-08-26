@@ -66,9 +66,11 @@ const AUTO_DISMISS_MS = 5_200;
  */
 export function PresenceCoach({
   active,
+  cameraActive = false,
   sessionKey = "default",
 }: {
   active: boolean;
+  cameraActive?: boolean;
   sessionKey?: string;
 }) {
   const [nudges, setNudges] = useState<Nudge[]>([]);
@@ -116,11 +118,39 @@ export function PresenceCoach({
       countersRef.current.gestures = metrics.handDetectionCounter;
       push("praise");
     }
-    // Gesture encouragement: no hands detected for long stretch is only knowable
-    // client-side here via duration stagnation; approximate with low counter and
-    // elapsed session heuristics handled by parent passing active=true.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, metrics.badPostureDetectionCounter, metrics.notFacingCounter, metrics.handDetectionCounter, metrics.postureScore]);
+
+  // Gesture encouragement: when the camera is on but hands stay idle for a long
+  // stretch, suggest one natural gesture (once per cooldown).
+  useEffect(() => {
+    if (!active || !cameraActive) return;
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      const { handDetectionCounter, postureScore } = useMetrics.getState().metrics;
+      const elapsed = (Date.now() - startedAt) / 1000;
+      if (
+        elapsed > 90 &&
+        handDetectionCounter === 0 &&
+        postureScore >= 60 &&
+        Date.now() - (lastShownRef.current.gesture || 0) > COOLDOWN_MS * 3 &&
+        nudges.length === 0
+      ) {
+        lastShownRef.current.gesture = Date.now();
+        const pool = COPY.gesture.messages;
+        const nudge: Nudge = {
+          id: ++idRef.current,
+          tone: "gesture",
+          title: COPY.gesture.title,
+          message: pool[Math.floor(Math.random() * pool.length)],
+        };
+        setNudges((current) => [...current.slice(-1), nudge]);
+        window.setTimeout(() => dismiss(nudge.id), AUTO_DISMISS_MS);
+      }
+    }, 20_000);
+    return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, cameraActive]);
 
   const dismiss = (id: number) => {
     setExiting((current) => new Set(current).add(id));

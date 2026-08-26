@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { downloadJson } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Clock3, ExternalLink, Loader2, Brain, Database, Download, FileText, Radio, ShieldCheck, Upload } from "lucide-react";
+import { ArrowRight, Building2, Clock3, ExternalLink, Loader2, Brain, Database, Download, FileText, Radio, ShieldCheck, Upload } from "lucide-react";
 import type { Question } from "@/lib/types";
 
 interface FlowResult {
@@ -200,6 +201,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle>Generated pack</CardTitle>
           {result && <Button size="sm" variant="outline" onClick={() => downloadJson("hustlrzz-interview-pack.json", result)}><Download className="h-4 w-4" /> Export pack</Button>}
+          {result && <Link href="/interview"><Button size="sm">Practice this pack <ArrowRight className="h-4 w-4" /></Button></Link>}
         </CardHeader>
         <CardContent className="space-y-4">
           {!result && (

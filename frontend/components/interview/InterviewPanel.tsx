@@ -14,7 +14,7 @@ import { useMetrics } from "@/context/MetricsContext";
 import {
   AlertCircle, ArrowRight, Bot, CheckCircle2, Download, FileText,
   Loader2, MessageSquareText, Mic, MicOff, RefreshCw, Send, Sparkles,
-  Square, Target, Volume2, VideoOff, WifiOff, Star, Dumbbell,
+  Square, Target, Volume2, VideoOff, WifiOff, Star, Dumbbell, X,
 } from "lucide-react";
 
 interface Turn { role: "candidate" | "interviewer"; text: string }
@@ -43,6 +43,7 @@ export function InterviewPanel() {
   const [report, setReport] = useState<any>(null);
   const [audioMode, setAudioMode] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   // Generation counter: callbacks from stale sockets are ignored so a slow
   // onclose can never clobber a fresh session (state race fix).
@@ -335,12 +336,36 @@ export function InterviewPanel() {
               <span className="hidden text-sm font-medium text-white/85 sm:block">{selectedWorkflow?.company || "Role-specific"} · live interview</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">Connected</span>
+              <button type="button" onClick={() => setShowTranscript((value) => !value)} aria-label="Toggle live transcript" aria-expanded={showTranscript} className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/75 surface-transition hover:bg-white/20 hover:text-white">
+                <MessageSquareText className="h-3.5 w-3.5" /> Transcript
+              </button>
+              <span className="hidden rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300 sm:inline">Connected</span>
               <span className="hidden rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/70 md:block">{metrics.postureScore} presence</span>
             </div>
           </div>
 
-          <PresenceCoach active={connected} sessionKey={workflowId} />
+          <PresenceCoach active={connected} cameraActive={connected} sessionKey={workflowId} />
+
+          {showTranscript && (
+            <div className="absolute inset-y-0 right-0 z-40 flex w-full max-w-sm flex-col border-l border-white/10 bg-black/70 backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <span className="text-sm font-semibold text-white/90">Live transcript</span>
+                <button type="button" onClick={() => setShowTranscript(false)} aria-label="Close transcript" className="rounded-md p-1.5 text-white/60 surface-transition hover:bg-white/10 hover:text-white">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div aria-live="polite" className="flex-1 space-y-3 overflow-y-auto p-4">
+                {turns.length === 0 && <p className="text-sm text-white/50">The conversation will appear here as you go.</p>}
+                {turns.map((turn, index) => (
+                  <div key={`${turn.role}-${index}`} className={`flex flex-col ${turn.role === "candidate" ? "items-end" : "items-start"}`}>
+                    <span className="mb-1 text-[10px] font-bold uppercase tracking-wide text-white/45">{turn.role === "candidate" ? "You" : "Interviewer"}</span>
+                    <div className={`max-w-[90%] rounded-2xl px-3 py-2 text-left text-xs leading-5 ${turn.role === "candidate" ? "bg-primary/80 text-white" : "bg-white/10 text-white/85"}`}>{turn.text}</div>
+                  </div>
+                ))}
+                {awaitingReply && <p className="text-center text-[11px] text-white/45">…</p>}
+              </div>
+            </div>
+          )}
 
           {/* Stage */}
           <div className="relative grid min-h-[520px] place-items-center px-4 pb-40 pt-14 md:pb-44">

@@ -125,6 +125,10 @@ export function PracticeRoom() {
       eyeContactConsistency: cameraEnabled ? clamp(100 - (metrics.notFacingDuration / duration) * 100) : 0,
       postureStability: cameraEnabled ? clamp(100 - (metrics.badPostureDuration / duration) * 100) : 0,
       gestureRatePerMinute: cameraEnabled ? Number((metrics.handDetectionCounter / (duration / 60)).toFixed(1)) : 0,
+      postureScore: cameraEnabled ? metrics.postureScore : 0,
+      gazeStabilityScore: cameraEnabled ? metrics.gazeStabilityScore : 0,
+      headTiltDeg: cameraEnabled ? metrics.headTiltDeg : 0,
+      shoulderTiltDeg: cameraEnabled ? metrics.shoulderTiltDeg : 0,
       cameraEnabled,
     };
   };

@@ -53,6 +53,13 @@ export function useAudio(onTranscript: (text: string) => void) {
   const recRef = useRef<any>(null);
   const queueRef = useRef<SpeechSynthesisUtterance[]>([]);
   const speakingRef = useRef(false);
+  // Chrome ends SpeechRecognition after a silence gap; while the user intends
+  // to stay on mic we restart it automatically for a natural conversation flow.
+  const shouldListenRef = useRef(false);
+  const onTranscriptRef = useRef(onTranscript);
+  useEffect(() => {
+    onTranscriptRef.current = onTranscript;
+  }, [onTranscript]);
 
   const supported = !!SR && typeof window !== "undefined" && "speechSynthesis" in window;
 
@@ -135,6 +142,7 @@ export function useAudio(onTranscript: (text: string) => void) {
   }, [supported, pickVoice]);
 
   const stop = useCallback(() => {
+    shouldListenRef.current = false;
     if (recRef.current) {
       try { recRef.current.stop(); } catch {}
       recRef.current = null;
@@ -146,9 +154,13 @@ export function useAudio(onTranscript: (text: string) => void) {
   const start = useCallback(() => {
     if (!supported || !SR) return;
     stopSpeaking(); // barge-in: candidate talks, interviewer pauses
-    if (recRef.current) stop();
+    if (recRef.current) {
+      try { recRef.current.stop(); } catch {}
+      recRef.current = null;
+    }
     setError(null);
     setInterim("");
+    shouldListenRef.current = true;
     const rec = new SR();
     rec.lang = "en-US";
     rec.interimResults = true;
@@ -158,12 +170,25 @@ export function useAudio(onTranscript: (text: string) => void) {
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const text = e.results[i][0].transcript.trim();
         if (e.results[i].isFinal && text) {
-          onTranscript(text);
+          onTranscriptRef.current(text);
         } else if (text) interimParts.push(text);
       }
       setInterim(interimParts.join(" "));
     };
-    rec.onend = () => { setListening(false); setInterim(""); recRef.current = null; };
+    rec.onend = () => {
+      setListening(false); setInterim("");
+      if (shouldListenRef.current) {
+        window.setTimeout(() => {
+          if (!shouldListenRef.current) return;
+          try {
+            rec.start();
+            setListening(true);
+          } catch {}
+        }, 300);
+      } else {
+        recRef.current = null;
+      }
+    };
     rec.onerror = (event: any) => {
       const messages: Record<string, string> = {
         "not-allowed": "Microphone permission is blocked. Allow it in the browser address bar and retry.",
@@ -171,15 +196,21 @@ export function useAudio(onTranscript: (text: string) => void) {
         network: "Speech recognition lost its network connection. Your typed transcript is still available.",
         "no-speech": "No speech was detected. Move closer to the microphone and try again.",
       };
-      setError(messages[event?.error] || "Voice recognition stopped unexpectedly. You can continue by typing.");
-      setListening(false); setInterim(""); recRef.current = null;
+      // Transient errors keep the auto-restart loop alive; fatal ones do not.
+      const transient = event?.error === "no-speech" || event?.error === "aborted" || event?.error === "network";
+      if (!transient) {
+        setError(messages[event?.error] || "Voice recognition stopped unexpectedly. You can continue by typing.");
+        shouldListenRef.current = false;
+      }
+      setListening(false); setInterim("");
     };
     rec.start();
     recRef.current = rec;
     setListening(true);
-  }, [supported, stop, stopSpeaking, onTranscript]);
+  }, [supported, stopSpeaking]);
 
   useEffect(() => () => {
+    shouldListenRef.current = false;
     stop();
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
   }, [stop]);

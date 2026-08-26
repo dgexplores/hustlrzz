@@ -1,4 +1,4 @@
-"""FastAPI app entrypoint for hustlrzzv2.
+"""FastAPI app entrypoint for Hustlrzz.
 
 English-native AI mock interview coach. Merges:
   - hustlrzz       (prep workflow, live WebSocket interviewer, judge)
@@ -47,7 +47,7 @@ from backend.obs import get_logger, limiter
 
 log = get_logger("hustlrzz.app")
 
-app = FastAPI(title="Hustlrzz V2", version="3.0.0")
+app = FastAPI(title="Hustlrzz", version="3.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -683,7 +683,7 @@ async def start_interview(payload: InterviewStart, user: dict = Depends(rate_lim
         raise HTTPException(status_code=404, detail="Workflow not found")
     session_id = secrets.token_urlsafe(16)
     ws_token = secrets.token_urlsafe(32)
-    sess = await registry.create("hustlrzzv2", user["uid"], session_id)
+    sess = await registry.create("hustlrzz", user["uid"], session_id)
     sess.state["ws_token"] = ws_token
     sess.state["ws_issued_at"] = time.time()
     sess.state["workflow_id"] = payload.workflow_id
@@ -706,7 +706,7 @@ async def interview_ws(
     duration: int = 15,
     is_audio: bool = False,
 ):
-    sess = await registry.get("hustlrzzv2", user_id, session_id)
+    sess = await registry.get("hustlrzz", user_id, session_id)
     expected = sess.state.get("ws_token", "") if sess else ""
     issued_at = float(sess.state.get("ws_issued_at", 0)) if sess else 0.0
     token_fresh = issued_at and (time.time() - issued_at) <= config.WS_TOKEN_TTL_SECONDS
@@ -849,7 +849,7 @@ async def interview_ws(
             await websocket.close()
         except Exception:
             pass
-        await registry.delete("hustlrzzv2", user_id, session_id)
+        await registry.delete("hustlrzz", user_id, session_id)
 
 
 from backend.agents.interviewer import build_interviewer_system, interviewer_turn, judge_report  # noqa: E402

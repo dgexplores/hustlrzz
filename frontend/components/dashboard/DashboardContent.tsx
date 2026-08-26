@@ -6,13 +6,14 @@ import { api } from "@/lib/api";
 import { downloadJson } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowRight, BookOpenCheck, ChevronDown, Download, FileText,
+  ArrowRight, BookOpenCheck, ChevronDown, ClipboardList, Download, FileText,
   Loader2, Target, MessageSquareText, Sparkles,
 } from "lucide-react";
 
 export function DashboardContent() {
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
+  const [attempts, setAttempts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openWorkflow, setOpenWorkflow] = useState<string | null>(null);
@@ -22,9 +23,11 @@ export function DashboardContent() {
     Promise.all([
       api<{ data: any[] }>("/workflows").catch((e) => ({ data: [], error: e.message })),
       api<{ data: any[] }>("/interviews").catch(() => ({ data: [] })),
-    ]).then(([w, s]: any[]) => {
+      api<{ data: any[] }>("/assessment/attempts").catch(() => ({ data: [] })),
+    ]).then(([w, s, a]: any[]) => {
       setWorkflows(w.data || []);
       setSessions(s.data || []);
+      setAttempts(a.data || []);
       setError(w.error || null);
       setLoading(false);
     });
@@ -135,6 +138,22 @@ export function DashboardContent() {
           })}
         </div>
       </section>
+      {attempts.length > 0 && (
+        <section>
+          <div className="mb-4 flex items-center gap-2"><ClipboardList className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Assessment attempts</h2></div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {attempts.slice(0, 6).map((row) => (
+              <div key={row.attempt_id} className="rounded-xl border p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="truncate text-sm font-semibold">{row.role}{row.company ? ` · ${row.company}` : ""}</p>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${Number(row.total_percent) >= 70 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : Number(row.total_percent) >= 50 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-red-500/10 text-red-600 dark:text-red-400"}`}>{Number(row.total_percent)}%</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{row.band || "in progress"} · {row.level}{row.created_at ? ` · ${new Date(row.created_at).toLocaleDateString()}` : ""}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

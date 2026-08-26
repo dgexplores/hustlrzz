@@ -67,6 +67,7 @@ export function HomeContent() {
               <div className="flex items-center gap-2.5">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary"><Sparkles className="h-4 w-4" /></span>
                 <div><p className="text-sm font-semibold">Product interview</p><p className="text-xs text-muted-foreground">Senior frontend engineer</p></div>
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Illustrative</span>
               </div>
               <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">Live</span>
             </div>
