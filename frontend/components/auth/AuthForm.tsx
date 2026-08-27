@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, Loader2 } from "lucide-react";
 
-type Mode = "signin" | "signup";
+type Mode = "signin" | "signup" | "forgot";
 
 export function AuthForm() {
   const pathname = usePathname();
@@ -36,6 +36,11 @@ export function AuthForm() {
       if (mode === "signin") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+      } else if (mode === "forgot") {
+        const redirectTo = `${window.location.origin}/auth/update-password`;
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+        if (error) throw error;
+        setMessage("Check your email for a password reset link. It expires in 1 hour.");
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -108,14 +113,26 @@ export function AuthForm() {
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" required autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required minLength={6} autoComplete={mode === "signin" ? "current-password" : "new-password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
-          </div>
+          {mode !== "forgot" && (
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" type="password" required minLength={6} autoComplete={mode === "signin" ? "current-password" : "new-password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+          )}
+          {mode === "signin" && (
+            <div className="text-right">
+              <button type="button" onClick={() => { setMode("forgot"); setError(null); setMessage(null); }} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4">Forgot password?</button>
+            </div>
+          )}
+          {mode === "forgot" && (
+            <div className="text-right">
+              <button type="button" onClick={() => { setMode("signin"); setError(null); setMessage(null); }} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4">Back to sign in</button>
+            </div>
+          )}
           {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-sm leading-5 text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</p>}
           {message && <p className="text-sm text-green-600">{message}</p>}
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : mode === "signin" ? "Sign In" : "Create Account"}
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : mode === "signin" ? "Sign In" : mode === "forgot" ? "Send reset link" : "Create Account"}
           </Button>
         </form>
 
