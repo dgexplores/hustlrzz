@@ -735,6 +735,7 @@ def _fallback_interview_report() -> dict:
         "improvements": ["Review the saved transcript and retry scoring from a future session."],
         "summary": "Your interview transcript was saved, but detailed AI scoring is temporarily unavailable.",
         "verdict": "Session captured successfully; scoring can be retried when the provider is available.",
+        "hiring_manager": {"decision": "lean-no-hire", "confidence": "low", "risk": "Insufficient signal to assess hiring risk.", "bar_raiser_notes": "Complete a full interview with concrete examples and measurable outcomes."},
     }
 
 

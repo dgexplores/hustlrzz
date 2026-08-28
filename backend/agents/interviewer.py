@@ -209,9 +209,11 @@ def judge_report(
         "technical_accuracy, confidence. For each give score 1-100 and a short note. Also "
         "give one strengths list, one improvements list, delivery notes derived from any "
         "presence signals (omit if none), a STAR example, one concrete next drill, a summary "
-        "and a verdict. "
+        "and a verdict. Additionally, provide a hiring-manager view: decision (hire, lean-hire, lean-no-hire, no-hire), "
+        "confidence (high/medium/low), primary risk if hired, and bar-raiser notes (what would make you confident to hire). "
         'JSON: {"scores":{"communication":0,...},"strengths":[],"improvements":[],'
-        '"delivery_notes":[],"star_example":"","next_drill":"","summary":"","verdict":"..."}.'
+        '"delivery_notes":[],"star_example":"","next_drill":"","summary":"","verdict":"",'
+        '"hiring_manager":{"decision":"lean-hire","confidence":"medium","risk":"","bar_raiser_notes":""}}.'
     )
     data = provider.chat_json_strict(judge_system, user)
     return data if isinstance(data, dict) else {}

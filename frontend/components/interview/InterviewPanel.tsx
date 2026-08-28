@@ -13,7 +13,7 @@ import { PresenceCoach } from "@/components/interview/PresenceCoach";
 import { useMetrics } from "@/context/MetricsContext";
 import { formatClock } from "@/lib/analytics";
 import {
-  AlertCircle, ArrowRight, Bot, CheckCircle2, Download, FileText,
+  AlertCircle, ArrowRight, Bot, Building2, CheckCircle2, Download, FileText,
   Loader2, MessageSquareText, Mic, MicOff, RefreshCw, Send, Sparkles,
   Square, Target, Volume2, VideoOff, WifiOff, Star, Dumbbell, X,
 } from "lucide-react";
@@ -499,6 +499,19 @@ function ReportPanel({ report, metrics, onRestart }: { report: any; metrics: Ret
   const exportData = { ...report, local_presence_metrics: metrics };
   return <div className="space-y-6">
     <Card className="overflow-hidden"><CardContent className="grid gap-6 p-6 lg:grid-cols-[1.2fr_0.8fr]"><div><span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" />Session complete</span><h2 className="mt-4 text-3xl font-semibold tracking-tight">Your coaching debrief</h2><p className="mt-3 max-w-2xl leading-7 text-muted-foreground">{report?.summary || "Your report has been saved to practice history."}</p>{report?.verdict && <p className="mt-4 rounded-xl border bg-secondary/30 p-4 text-sm"><span className="font-semibold">Coach verdict:</span> {report.verdict}</p>}</div><div className="flex flex-col justify-end gap-2"><Button onClick={() => downloadJson("hustlrzz-coaching-report.json", exportData)}><Download className="h-4 w-4" />Export full report</Button><Button variant="outline" onClick={onRestart}><RefreshCw className="h-4 w-4" />Practice another session</Button></div></CardContent></Card>
+    {report?.hiring_manager && (
+      <Card className="border-primary/20 bg-primary/[0.03]">
+        <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" />Hiring-manager view</CardTitle><p className="text-xs text-muted-foreground">How a hiring manager would read this interview.</p></CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${String(report.hiring_manager.decision).includes("hire") && !String(report.hiring_manager.decision).includes("no-hire") ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : String(report.hiring_manager.decision).includes("no-hire") ? "bg-red-500/10 text-red-700 dark:text-red-300" : "bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}>{report.hiring_manager.decision || "lean-no-hire"}</span>
+            <span className="rounded-full bg-secondary px-2.5 py-1 text-xs">confidence {report.hiring_manager.confidence || "medium"}</span>
+          </div>
+          {report.hiring_manager.risk && <p className="text-sm"><span className="font-semibold">Risk if hired:</span> {report.hiring_manager.risk}</p>}
+          {report.hiring_manager.bar_raiser_notes && <p className="text-sm leading-6 text-muted-foreground"><span className="font-semibold text-foreground">Bar-raiser:</span> {report.hiring_manager.bar_raiser_notes}</p>}
+        </CardContent>
+      </Card>
+    )}
     <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
       <Card><CardHeader><CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-primary" />Answer quality</CardTitle></CardHeader><CardContent className="space-y-4">{scores.length ? scores.map(([label, rawScore]) => { const score = Number(rawScore) || 0; return <div key={label}><div className="mb-1.5 flex justify-between text-sm"><span className="font-medium capitalize">{label.replace(/_/g, " ")}</span><span className="font-semibold">{score}/100</span></div><div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(0, Math.min(score, 100))}%` }} /></div></div>; }) : <p className="text-sm text-muted-foreground">No numerical scores were returned.</p>}</CardContent></Card>
       <Card><CardHeader><CardTitle className="flex items-center gap-2"><MessageSquareText className="h-5 w-5 text-primary" />Local presence signals</CardTitle><p className="text-xs text-muted-foreground">These measurements stayed in your browser.</p></CardHeader><CardContent className="grid grid-cols-2 gap-3">{presence.map(([label, value, detail]) => <div key={label} className="rounded-xl bg-secondary/50 p-3"><p className="text-2xl font-semibold">{value}</p><p className="mt-1 text-xs font-medium">{label}</p><p className="mt-1 text-[11px] text-muted-foreground">{detail}</p></div>)}</CardContent></Card>
