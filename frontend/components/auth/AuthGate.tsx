@@ -15,8 +15,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    const update = () => setIsOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    update();
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -164,6 +176,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
             </div>
           </nav>
           <div className="flex items-center gap-2">
+            {!isOnline && <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">● Offline — cached</span>}
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={signOut} className="gap-1.5">
               <LogOut className="h-3.5 w-3.5" />

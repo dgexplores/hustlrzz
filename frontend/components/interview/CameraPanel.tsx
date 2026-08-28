@@ -70,6 +70,9 @@ export function CameraPanel({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+        <span className="h-2 w-2 rounded-full bg-emerald-500" /> Video stays on your device — not uploaded. Works offline after install.
+      </div>
       <PresenceCoach active={live} cameraActive={live} sessionKey="camera-panel" />
       {status === "no-device" && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">

@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   },
   description:
     "Turn your resume into a practice pack, clear aptitude-style screens, and rehearse with an interviewer that focuses on what you need to improve. Private, in your browser.",
+  manifest: "/manifest.json",
+  themeColor: "#000000",
   openGraph: {
     title: "Hustlrzz — Interview practice that remembers you",
     description: "Preparation, screening rounds and live practice in one private workspace.",
@@ -31,9 +33,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
     } catch (_) {}
   `;
+  const swScript = `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}`;
   return (
     <html lang="en" suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: swScript }} />
+      </head>
       <body className="min-h-screen bg-background antialiased" suppressHydrationWarning>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
