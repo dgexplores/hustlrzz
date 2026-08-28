@@ -43,6 +43,7 @@ export function InterviewPanel() {
   const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
   const [workflowId, setWorkflowId] = useState("");
   const [duration, setDuration] = useState(15);
+  const [persona, setPersona] = useState("maya");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [phase, setPhase] = useState<SessionPhase>("setup");
@@ -134,7 +135,7 @@ export function InterviewPanel() {
     try {
       const response = await api<{ data: { session_id: string; websocket_parameter: string } }>("/interviews/start", {
         method: "POST",
-        body: JSON.stringify({ workflow_id: workflowId, duration, is_audio: audioMode && audioSupported }),
+        body: JSON.stringify({ workflow_id: workflowId, duration, is_audio: audioMode && audioSupported, persona }),
       });
       connectWs(response.data.session_id, response.data.websocket_parameter);
     } catch (error) {
@@ -142,7 +143,7 @@ export function InterviewPanel() {
       setSessionError(error instanceof Error ? error.message : "Unable to start the interview.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflowId, duration, audioMode, audioSupported, resetMetrics]);
+  }, [workflowId, duration, audioMode, audioSupported, persona, resetMetrics]);
 
   const connectWs = (sessionId: string, query: string) => {
     const generation = ++generationRef.current;
@@ -280,6 +281,23 @@ export function InterviewPanel() {
               {selectedWorkflow && <div className="grid gap-3 rounded-xl border bg-secondary/20 p-4 sm:grid-cols-3"><BriefStat label="Company" value={selectedWorkflow.company || "Target role"} /><BriefStat label="Questions" value={String(selectedWorkflow.questions?.length ?? 0)} /><BriefStat label="Role match" value={selectedWorkflow.match?.overall_match_percent != null ? `${selectedWorkflow.match.overall_match_percent}%` : "Prepared"} /></div>}
 
               <div className="space-y-2"><Label>Session length</Label><div className="grid grid-cols-4 gap-2">{[10, 15, 30, 45].map((minutes) => <button key={minutes} type="button" onClick={() => setDuration(minutes)} className={`min-h-11 rounded-lg border px-2 text-sm font-semibold surface-transition ${duration === minutes ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`}>{minutes} min</button>)}</div></div>
+
+              <div className="space-y-2">
+                <Label>Interviewer persona</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "maya", name: "Maya", desc: "Balanced" },
+                    { id: "alex", name: "Alex", desc: "Amazon LP" },
+                    { id: "priya", name: "Priya", desc: "Meta collab" },
+                  ].map((p) => (
+                    <button key={p.id} type="button" onClick={() => setPersona(p.id)} className={`rounded-xl border p-3 text-left surface-transition ${persona === p.id ? "border-primary bg-primary/10" : "bg-background hover:bg-accent"}`}>
+                      <span className="block text-sm font-semibold">{p.name}</span>
+                      <span className="block text-xs text-muted-foreground">{p.desc}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Maya is balanced, Alex pushes Amazon LPs, Priya explores collaboration at scale.</p>
+              </div>
 
               <label className={`flex min-h-16 cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 surface-transition ${audioMode ? "border-primary/40 bg-primary/5" : "bg-background"}`}>
                 <span className="flex items-center gap-3"><span className="rounded-lg bg-primary/10 p-2 text-primary"><Volume2 className="h-5 w-5" /></span><span><span className="block text-sm font-semibold">Voice interview</span><span className="block text-xs text-muted-foreground">Hear a natural voice and answer through your microphone.</span></span></span>

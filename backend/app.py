@@ -130,6 +130,13 @@ def health():
     }
 
 
+@router.get("/interview/personas")
+def list_personas():
+    from backend.agents.interviewer import PERSONAS
+
+    return {"success": True, "data": [{"id": k, **v} for k, v in PERSONAS.items()]}
+
+
 # --------------------------------------------------------------------------- #
 # Preparation workflow (resume + JD -> questions + match + salary + modes)
 # --------------------------------------------------------------------------- #
@@ -718,6 +725,7 @@ class InterviewStart(BaseModel):
     workflow_id: str
     duration: int = Field(15, ge=5, le=60)
     is_audio: bool = False
+    persona: str = Field(default="maya", max_length=20, pattern=r"^(maya|alex|priya)$")
 
 
 def _fallback_interview_report() -> dict:
@@ -747,9 +755,10 @@ async def start_interview(payload: InterviewStart, user: dict = Depends(rate_lim
     sess.state["workflow_id"] = payload.workflow_id
     sess.state["duration"] = payload.duration
     sess.state["is_audio"] = payload.is_audio
+    sess.state["persona"] = payload.persona
     qs = (
         f"?user_id={user['uid']}&workflow_id={payload.workflow_id}"
-        f"&duration={payload.duration}&is_audio={str(payload.is_audio).lower()}&token={ws_token}"
+        f"&duration={payload.duration}&is_audio={str(payload.is_audio).lower()}&persona={payload.persona}&token={ws_token}"
     )
     return {"success": True, "data": {"session_id": session_id, "websocket_parameter": qs}}
 
@@ -763,6 +772,7 @@ async def interview_ws(
     token: str = "",
     duration: int = 15,
     is_audio: bool = False,
+    persona: str = "maya",
 ):
     sess = await registry.get("hustlrzz", user_id, session_id)
     expected = sess.state.get("ws_token", "") if sess else ""
@@ -802,12 +812,14 @@ async def interview_ws(
         log.warning("workflow load failed for session %s: %s", session_id, exc)
 
     stored_match = workflow_record.get("match") if isinstance(workflow_record.get("match"), dict) else {}
+    persona_val = persona or (sess.state.get("persona", "maya") if sess else "maya")
     system = build_interviewer_system(
         workflow_record.get("company") or "the target company",
         workflow_record.get("title") or "the target role",
         questions,
         duration,
         company_context=stored_match.get("company_research") if isinstance(stored_match, dict) else None,
+        persona=persona_val,
     )
     # Memory: bias live probing toward previously weak areas
     try:

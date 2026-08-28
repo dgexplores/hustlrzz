@@ -18,6 +18,24 @@ INTERVIEWER_PERSONA = (
     "live video call with one candidate and you behave like a real person."
 )
 
+PERSONAS: dict[str, dict] = {
+    "maya": {
+        "name": "Maya",
+        "style": "balanced, product-focused, Google-style: probes system design trade-offs and data-driven decisions",
+        "voice": "warm, clear, measured pace",
+    },
+    "alex": {
+        "name": "Alex",
+        "style": "direct, Amazon LP-focused: pushes on Ownership, Customer Obsession, and bar-raising examples; asks for metrics",
+        "voice": "concise, decisive, fast follow-ups",
+    },
+    "priya": {
+        "name": "Priya",
+        "style": "collaborative, Meta-style: explores collaboration, conflict resolution, and building at scale with empathy",
+        "voice": "encouraging, thoughtful, reflective",
+    },
+}
+
 VOICE_STYLE = (
     "HOW YOU SPEAK (your words are read aloud by a natural voice):"
     "\n- Conversational plain English with contractions. No markdown, no lists, no emoji, no stage directions, never quote your own instructions."
@@ -54,6 +72,7 @@ def build_interviewer_system(
     duration_minutes: int,
     company_context: dict | None = None,
     difficulty: str = "realistic",
+    persona: str = "maya",
 ) -> str:
     q_text = "\n".join(
         f"- [{q.get('type', 'question')}] {q.get('question', '')}"
@@ -80,13 +99,15 @@ def build_interviewer_system(
         "supportive": "Tone: warm and encouraging; probe gently.",
         "challenging": "Tone: composed and demanding; push harder on weak claims while staying respectful.",
     }.get(difficulty, "Tone: realistic - professional, friendly, focused.")
-    persona = INTERVIEWER_PERSONA.format(
-        name="Maya",
+    p = PERSONAS.get(str(persona).lower(), PERSONAS["maya"])
+    persona_text = INTERVIEWER_PERSONA.format(
+        name=p["name"],
         role=role or "hiring team",
         company=company or "the target company",
     )
+    persona_style = f"Persona: {p['name']} — {p['style']}. Voice: {p['voice']}."
     return (
-        f"{persona}\n\n{difficulty_line}\n\n{VOICE_STYLE}\n\n"
+        f"{persona_text}\n{persona_style}\n\n{difficulty_line}\n\n{VOICE_STYLE}\n\n"
         f"Company: {company or 'unknown'}\nRole: {role or 'unknown'}\n"
         f"Session duration: {duration_minutes} minutes.\n\nPREPARED QUESTIONS:\n{q_text}\n\n"
         "Work through the prepared questions in order. Your follow-up may go deeper "
