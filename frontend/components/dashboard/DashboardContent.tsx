@@ -14,6 +14,7 @@ export function DashboardContent() {
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [attempts, setAttempts] = useState<any[]>([]);
+  const [memory, setMemory] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openWorkflow, setOpenWorkflow] = useState<string | null>(null);
@@ -24,10 +25,12 @@ export function DashboardContent() {
       api<{ data: any[] }>("/workflows").catch((e) => ({ data: [], error: e.message })),
       api<{ data: any[] }>("/interviews").catch(() => ({ data: [] })),
       api<{ data: any[] }>("/assessment/attempts").catch(() => ({ data: [] })),
-    ]).then(([w, s, a]: any[]) => {
+      api<{ data: any }>("/memory/profile").catch(() => ({ data: null })),
+    ]).then(([w, s, a, m]: any[]) => {
       setWorkflows(w.data || []);
       setSessions(s.data || []);
       setAttempts(a.data || []);
+      setMemory(m.data || null);
       setError(w.error || null);
       setLoading(false);
     });
@@ -39,6 +42,46 @@ export function DashboardContent() {
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-10">
       <section className="motion-enter flex flex-col gap-5 pb-2 md:flex-row md:items-end md:justify-between"><div className="max-w-2xl"><h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] md:text-5xl">Track what is improving.</h1><p className="mt-4 text-muted-foreground">Keep your preparation packs and interview reports together. Open any item to revisit the details.</p></div><Link href="/interview" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">Start an interview <ArrowRight className="h-4 w-4" /></Link></section>
       {error && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">{error}</p>}
+
+      {(memory?.digest?.summary || memory?.trends?.length > 0) && (
+        <section className="rounded-2xl border bg-card p-6">
+          <div className="flex items-center gap-2 mb-4"><Target className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Your trajectory</h2></div>
+          {memory.digest?.weak?.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Focus next</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {memory.digest.weak.map((w: string) => <span key={w} className="rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 px-3 py-1 text-xs font-semibold">{w}</span>)}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Recent sessions weigh more (decay 0.85). Next practice will bias 40% to these.</p>
+            </div>
+          )}
+          {memory.schedule?.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Spaced repetition — due soon</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {memory.schedule.map((s: any) => <div key={s.skill} className="rounded-lg border bg-secondary/30 p-3"><p className="text-sm font-medium">{s.skill}</p><p className="text-xs text-muted-foreground">due in {s.due_in_days}d</p></div>)}
+              </div>
+            </div>
+          )}
+          {memory.trends?.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Score over time</p>
+              <div className="mt-3 flex items-end gap-1.5 h-24">
+                {memory.trends.map((t: any, i: number) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    <div className="w-full rounded-t bg-primary" style={{ height: `${Math.max(8, Math.min(96, t.score))}%`, opacity: 0.6 + (i / memory.trends.length) * 0.4 }} title={`${t.date} ${t.score}% ${t.label}`} />
+                    <span className="text-[10px] text-muted-foreground">{t.date.slice(5)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+                {memory.trends.slice(-3).map((t: any) => <span key={t.date + t.score}>{t.date}: {t.score}% ({t.type})</span>)}
+              </div>
+            </div>
+          )}
+          {!memory.digest?.weak?.length && !memory.trends?.length && <p className="text-sm text-muted-foreground">Do a Prepare + Practice to see your trajectory. Memory builds after 2 sessions.</p>}
+        </section>
+      )}
 
       <section>
         <div className="mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Prepared packs</h2></div>

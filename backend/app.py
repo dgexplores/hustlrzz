@@ -689,6 +689,23 @@ async def search_knowledge(payload: KnowledgeSearchRequest, user: dict = Depends
 
 
 # --------------------------------------------------------------------------- #
+# Memory — weak/strong trends and spaced repetition
+# --------------------------------------------------------------------------- #
+@router.get("/memory/profile")
+async def memory_profile(user: dict = Depends(get_user)):
+    _db_or_503()
+    try:
+        from backend.memory.profile import get_weakness_digest, get_skill_trends, get_spaced_repetition_schedule
+
+        digest = get_weakness_digest(user["uid"])
+        trends = get_skill_trends(user["uid"])
+        schedule = get_spaced_repetition_schedule(user["uid"])
+        return {"success": True, "data": {"digest": digest, "trends": trends, "schedule": schedule}}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Memory profile temporarily unavailable.")
+
+
+# --------------------------------------------------------------------------- #
 # Live interview (WebSocket)
 # --------------------------------------------------------------------------- #
 def _now() -> str:
