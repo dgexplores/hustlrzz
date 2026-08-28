@@ -14,6 +14,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -115,11 +116,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const nav = [
     { href: "/", label: "Home" },
     { href: "/prepare", label: "Prepare" },
+    { href: "/interview", label: "Practice" },
+    { href: "/dashboard", label: "Progress" },
+  ];
+  const moreNav = [
     { href: "/resume-analyzer", label: "Resume Analyzer" },
     { href: "/assessment", label: "Assessment" },
-    { href: "/interview", label: "Interview" },
     { href: "/coaching", label: "Coaching" },
-    { href: "/dashboard", label: "Progress" },
+  ];
+  const workflowSteps = [
+    { href: "/prepare", label: "1. Prepare", active: pathname === "/prepare" },
+    { href: "/interview", label: "2. Practice", active: pathname === "/interview" },
+    { href: "/dashboard", label: "3. Progress", active: pathname === "/dashboard" },
   ];
 
   return (
@@ -142,6 +150,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 <span className={`absolute inset-x-3 bottom-2 h-0.5 origin-left rounded-full bg-primary transition-transform ${pathname === n.href ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"}`} />
               </Link>
             ))}
+            <div className="relative flex items-center">
+              <button onClick={() => setMoreOpen(!moreOpen)} onBlur={() => setTimeout(() => setMoreOpen(false), 150)} className={`flex items-center gap-1 px-3 text-sm font-medium ${moreNav.some(m => pathname === m.href) ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                More <span className={`transition-transform ${moreOpen ? "rotate-180" : ""}`}>▾</span>
+              </button>
+              {moreOpen && (
+                <div className="absolute top-full right-0 mt-2 w-48 rounded-xl border bg-background shadow-lg overflow-hidden">
+                  {moreNav.map(m => (
+                    <Link key={m.href} href={m.href} onClick={() => setMoreOpen(false)} className={`block px-4 py-2.5 text-sm ${pathname === m.href ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>{m.label}</Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </nav>
           <div className="flex items-center gap-2">
             <ThemeToggle />
@@ -152,7 +172,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
           </div>
         </div>
         <nav className="flex max-w-full items-center overflow-x-auto px-3 md:hidden" aria-label="Mobile navigation">
-          {nav.map((item) => (
+          {[...nav, ...moreNav].map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -162,6 +182,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
+        {(pathname === "/prepare" || pathname === "/interview" || pathname === "/dashboard") && (
+          <div className="border-t bg-secondary/30">
+            <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2.5 md:px-6">
+              {workflowSteps.map((step, i) => (
+                <div key={step.href} className="flex items-center gap-2">
+                  {i > 0 && <span className="text-muted-foreground/40">→</span>}
+                  <Link href={step.href} className={`text-xs font-medium px-2.5 py-1 rounded-full ${step.active ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground border"}`}>{step.label}</Link>
+                </div>
+              ))}
+              <span className="ml-auto hidden text-xs text-muted-foreground md:inline">Follow the steps — each one feeds the next.</span>
+            </div>
+          </div>
+        )}
       </header>
       {children}
     </div>

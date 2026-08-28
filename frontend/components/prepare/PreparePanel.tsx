@@ -130,22 +130,9 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
             <p>Your preparation material is used to personalise this workspace. Camera analysis remains in your browser.</p>
           </div>
           <form onSubmit={run} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="company">Target company</Label>
-              <Input id="company" placeholder="e.g. Google, Amazon, Meta" value={company} onChange={(e) => setCompany(e.target.value)} />
-              <p className="flex items-start gap-1.5 text-xs leading-5 text-muted-foreground"><Radio className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />Searched on demand to build a current, cited blueprint of role demands, interview stages, question patterns, evaluation criteria, culture, and market signals.</p>
-            </div>
-            <details className="rounded-lg border border-input bg-secondary/25 p-3">
-              <summary className="cursor-pointer text-sm font-semibold text-foreground">Add optional knowledge sources</summary>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">Paste portfolio details or career notes. They are indexed only when semantic knowledge search is configured.</p>
-              <div className="mt-3 space-y-3">
-                <div className="space-y-2"><Label htmlFor="portfolio">Portfolio or project context</Label><Textarea id="portfolio" rows={4} value={portfolioText} onChange={(e) => setPortfolioText(e.target.value)} placeholder="Key projects, architecture choices, measurable outcomes…" /></div>
-                <div className="space-y-2"><Label htmlFor="notes">Practice notes</Label><Textarea id="notes" rows={3} value={notesText} onChange={(e) => setNotesText(e.target.value)} placeholder="Areas to improve, previous feedback, target stories…" /></div>
-              </div>
-            </details>
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="resume">Resume</Label>
+                <Label htmlFor="resume">1. Your resume</Label>
                 <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
                   <Upload className="h-4 w-4" /> {resumeFile ? "Replace file" : "Upload PDF or DOCX"}
                 </Button>
@@ -182,17 +169,34 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
               <p className="text-xs text-muted-foreground">PDF and DOCX text is extracted securely for this preparation. Maximum file size: 5 MB.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="jd">Job description</Label>
-              <Textarea id="jd" rows={6} placeholder="Paste the job description…" value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} required />
+              <Label htmlFor="jd">2. Job description</Label>
+              <Textarea id="jd" rows={6} placeholder="Paste the job description…  The more specific it is, the better your questions." value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="nq">Number of questions</Label>
-              <Input id="nq" type="number" min={1} max={50} value={numQuestions} onChange={(e) => setNumQuestions(Number(e.target.value))} />
+              <Label htmlFor="company">3. Target company <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Input id="company" placeholder="e.g. Google, Amazon — we’ll add company-specific context" value={company} onChange={(e) => setCompany(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Leave blank for a faster 50s pack. Add a name for a 75s pack with company research.</p>
             </div>
+            <details className="rounded-lg border bg-secondary/20 p-3">
+              <summary className="cursor-pointer text-sm font-medium">Options</summary>
+              <div className="mt-3 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="nq">Questions</Label>
+                  <select id="nq" value={numQuestions} onChange={(e) => setNumQuestions(Number(e.target.value))} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                    <option value={5}>Quick — 5 questions</option>
+                    <option value={12}>Standard — 12 questions</option>
+                    <option value={20}>Deep — 20 questions</option>
+                  </select>
+                </div>
+                <div className="space-y-2"><Label htmlFor="portfolio">Portfolio context</Label><Textarea id="portfolio" rows={3} value={portfolioText} onChange={(e) => setPortfolioText(e.target.value)} placeholder="Optional: key projects, outcomes…" /></div>
+                <div className="space-y-2"><Label htmlFor="notes">Notes</Label><Textarea id="notes" rows={2} value={notesText} onChange={(e) => setNotesText(e.target.value)} placeholder="Optional: areas to improve…" /></div>
+              </div>
+            </details>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading || (!resumeFile && !resumeText.trim())}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate interview pack"}
+              {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generating — {company ? "~75s with research" : "~50s"} </> : "Generate interview pack → Step 2"}
             </Button>
+            <p className="text-center text-xs text-muted-foreground">Next: Practice this pack as a live interview.</p>
           </form>
         </CardContent>
       </Card>
@@ -200,12 +204,20 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
       <Card className="min-h-[620px]">
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle>Generated pack</CardTitle>
-          {result && <Button size="sm" variant="outline" onClick={() => downloadJson("hustlrzz-interview-pack.json", result)}><Download className="h-4 w-4" /> Export pack</Button>}
-          {result && <Link href="/interview"><Button size="sm">Practice this pack <ArrowRight className="h-4 w-4" /></Button></Link>}
+          <div className="flex gap-2">
+            {result && <Button size="sm" variant="outline" onClick={() => downloadJson("hustlrzz-interview-pack.json", result)}><Download className="h-4 w-4" /> Export</Button>}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {result && (
+            <div className="rounded-xl bg-primary p-4 text-primary-foreground">
+              <p className="text-sm font-semibold">Pack ready — {result.questions.length} questions • {result.company_match.overall_match_percent}% match</p>
+              <p className="mt-1 text-xs opacity-80">Your next step is Practice. The interviewer will use these questions.</p>
+              <Link href="/interview" className="mt-3 inline-flex"><Button size="sm" variant="secondary" className="bg-white text-primary hover:bg-white/90">Start Practice Interview <ArrowRight className="h-4 w-4" /></Button></Link>
+            </div>
+          )}
           {!result && (
-            <div className="py-20 text-center"><Database className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-3 text-sm font-medium">Your practice pack will appear here.</p><p className="mt-1 text-sm text-muted-foreground">Include a role, resume, and job description to begin.</p></div>
+            <div className="py-20 text-center"><Database className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-3 text-sm font-medium">Your practice pack will appear here.</p><p className="mt-1 text-sm text-muted-foreground">Step 1: Add resume + JD. Step 2: Practice. Step 3: Review progress.</p></div>
           )}
           {result?.knowledge && (
             <div className={`rounded-lg border p-3 text-sm ${result.knowledge.indexed ? "border-primary/30 bg-accent/50" : "border-amber-500/40 bg-amber-500/10 text-foreground"}`}>
