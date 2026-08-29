@@ -55,6 +55,13 @@ interface FlowResult {
   };
 }
 
+const SAMPLE_RESUME = `Senior Backend Engineer — 5 years building scalable APIs
+Stack: Python, FastAPI, PostgreSQL, Docker, AWS
+Led team of 3, built service handling 1M req/day, cut latency 40% via caching and DB tuning.`;
+
+const SAMPLE_JD = `Senior Backend Engineer at Google
+We need strong system design, Python, and leadership. You will design distributed systems for billions of users, mentor engineers, and own services end-to-end.`;
+
 export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
   const [resumeText, setResumeText] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
@@ -67,6 +74,14 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FlowResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fillSample = () => {
+    setResumeText(SAMPLE_RESUME);
+    setJobDescription(SAMPLE_JD);
+    setCompany("Google");
+    setResumeFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const run = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +140,16 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
           </p>
         </CardHeader>
         <CardContent className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-medium">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">1</span> Resume
+              <span className="text-muted-foreground">→</span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-muted-foreground">2</span> JD
+              <span className="text-muted-foreground">→</span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-muted-foreground">3</span> Pack
+            </div>
+            <Button type="button" variant="ghost" size="sm" onClick={fillSample} className="text-xs h-7">Try sample</Button>
+          </div>
           <div className="rounded-lg bg-secondary/70 p-3 flex gap-3 text-sm text-secondary-foreground">
             <ShieldCheck className="h-5 w-5 text-primary shrink-0" />
             <p>Your preparation material is used to personalise this workspace. Camera analysis remains in your browser.</p>

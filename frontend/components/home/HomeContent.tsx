@@ -53,12 +53,20 @@ export function HomeContent() {
             Walk into the interview prepared.
           </h1>
           <p className="mt-6 max-w-[50ch] text-lg leading-8 text-muted-foreground">
-            Prepare from your resume, practise a live conversation, and review what to improve next.
+            Paste your resume, get a focused question pack, and practice like it’s real — 3 steps, ~5 minutes.
           </p>
+          <div className="mt-6 flex items-center gap-2 text-xs font-medium">
+            <span className="flex items-center gap-1.5"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">1</span> Prepare</span>
+            <span className="text-muted-foreground">→</span>
+            <span className="flex items-center gap-1.5"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">2</span> Practice</span>
+            <span className="text-muted-foreground">→</span>
+            <span className="flex items-center gap-1.5"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">3</span> Progress</span>
+          </div>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/prepare"><Button size="lg">Start preparing <ArrowRight className="h-4 w-4" /></Button></Link>
-            <Link href="/interview"><Button size="lg" variant="outline">Open interview</Button></Link>
+            <Link href="/interview"><Button size="lg" variant="outline">Try sample interview</Button></Link>
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">No resume? Use sample data in Prepare — one click.</p>
         </div>
 
         <div className="motion-enter motion-enter-delay-1 relative lg:pl-8">

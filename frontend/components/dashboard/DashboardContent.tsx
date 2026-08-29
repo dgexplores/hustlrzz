@@ -40,7 +40,20 @@ export function DashboardContent() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-10">
-      <section className="motion-enter flex flex-col gap-5 pb-2 md:flex-row md:items-end md:justify-between"><div className="max-w-2xl"><h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] md:text-5xl">Track what is improving.</h1><p className="mt-4 text-muted-foreground">Keep your preparation packs and interview reports together. Open any item to revisit the details.</p></div><Link href="/interview" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">Start an interview <ArrowRight className="h-4 w-4" /></Link></section>
+      <section className="motion-enter flex flex-col gap-5 pb-2 md:flex-row md:items-end md:justify-between"><div className="max-w-2xl"><h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] md:text-5xl">Track what is improving.</h1><p className="mt-4 text-muted-foreground">Your packs and interviews in one place — clear next step, no clutter.</p></div><Link href="/interview" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">Start an interview <ArrowRight className="h-4 w-4" /></Link></section>
+      {!loading && (
+        <div className="rounded-2xl border bg-primary/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">
+              {workflows.length === 0 ? "Next: Prepare your first pack" : sessions.length === 0 ? "Next: Practice your pack" : "Next: Keep practicing to grow your trajectory"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {workflows.length === 0 ? "It takes 1 minute — paste resume + JD." : sessions.length === 0 ? `You have ${workflows.length} pack${workflows.length>1?"s": ""} ready.` : `You’ve done ${sessions.length} session${sessions.length>1?"s": ""} — check your trajectory above.`}
+            </p>
+          </div>
+          <Link href={workflows.length === 0 ? "/prepare" : "/interview"}><Button size="sm">{workflows.length === 0 ? "Go to Prepare" : "Go to Practice"} <ArrowRight className="h-4 w-4" /></Button></Link>
+        </div>
+      )}
       {error && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">{error}</p>}
 
       {(memory?.digest?.summary || memory?.trends?.length > 0) && (
