@@ -48,6 +48,19 @@ from backend.obs import get_logger, limiter
 
 log = get_logger("hustlrzz.app")
 
+
+def _init_sentry() -> None:
+    """No-op unless SENTRY_DSN is configured. sentry-sdk auto-instruments
+    FastAPI/Starlette once initialized, so no middleware is needed here."""
+    if not config.SENTRY_DSN:
+        return
+    import sentry_sdk
+
+    sentry_sdk.init(dsn=config.SENTRY_DSN, environment=config.ENVIRONMENT, traces_sample_rate=0.1)
+
+
+_init_sentry()
+
 app = FastAPI(title="Hustlrzz", version="3.1.0")
 
 app.add_middleware(

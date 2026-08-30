@@ -193,8 +193,11 @@ delivery with Resend.
   research bounded and lets preparation fall back safely when sources are slow.
 - **Google sign-in:** enable the Google provider and register the production
   callback URLs by following [the Google authentication setup](docs/GOOGLE_AUTH_SETUP.md).
-- **RAG:** configure `GEMINI_API_KEY` to enable embeddings; the app remains
+- **RAG:** configure `GEMINI_API_KEY` to enable embeddings. The app remains
   fully usable if candidate knowledge retrieval is unavailable.
+- **Error monitoring (optional):** set `SENTRY_DSN` on Railway and
+  `NEXT_PUBLIC_SENTRY_DSN` on Vercel to a [sentry.io](https://sentry.io) DSN.
+  Both apps run fine without it. Leaving either unset disables reporting there.
 - **Resume Analyzer:** apply the Resume Analyzer migration before deploying.
   It enforces a row-locked daily quota in Asia/Kolkata and stores structured
   results only; raw resume files and extracted text are not persisted.

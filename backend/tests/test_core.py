@@ -6,6 +6,8 @@ import zipfile
 from io import BytesIO
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.ai import provider  # noqa: E402
@@ -53,6 +55,27 @@ def test_preview_cors_pattern_matches_frontend_preview_only():
     assert re.fullmatch(config.CORS_ORIGIN_REGEX, "https://frontend-b6fqy2gmn-deepaklearn7878-6255s-projects.vercel.app")
     assert re.fullmatch(config.CORS_ORIGIN_REGEX, "https://frontend-deepaklearn7878-6255s-projects.vercel.app")
     assert not re.fullmatch(config.CORS_ORIGIN_REGEX, "https://malicious.example.com")
+
+
+def test_sentry_stays_off_without_a_dsn(monkeypatch):
+    import sentry_sdk
+    from backend import app as app_module
+
+    monkeypatch.setattr(app_module.config, "SENTRY_DSN", "")
+    monkeypatch.setattr(sentry_sdk, "init", lambda **_: pytest.fail("should not init without a DSN"))
+    app_module._init_sentry()
+
+
+def test_sentry_initializes_when_dsn_configured(monkeypatch):
+    import sentry_sdk
+    from backend import app as app_module
+
+    calls = {}
+    monkeypatch.setattr(app_module.config, "SENTRY_DSN", "https://public@example.com/1")
+    monkeypatch.setattr(app_module.config, "ENVIRONMENT", "staging")
+    monkeypatch.setattr(sentry_sdk, "init", lambda **kwargs: calls.update(kwargs))
+    app_module._init_sentry()
+    assert calls == {"dsn": "https://public@example.com/1", "environment": "staging", "traces_sample_rate": 0.1}
 
 
 def test_industry_faqs_skips_external_search_when_disabled(monkeypatch):

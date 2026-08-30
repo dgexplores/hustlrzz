@@ -11,3 +11,4 @@ google-generativeai==0.8.3
 supabase==2.13.0
 pypdf==6.16.2
 ddgs==9.15.0
+sentry-sdk==2.68.1

@@ -67,3 +67,7 @@ COMPANY_INTEL_TTL_DAYS = int(os.getenv("COMPANY_INTEL_TTL_DAYS", "7"))
 
 # DOCX decompression guard: a small zip entry can expand enormously.
 MAX_DOCX_XML_BYTES = int(os.getenv("MAX_DOCX_XML_BYTES", str(25 * 1024 * 1024)))
+
+# Error monitoring. Inert unless SENTRY_DSN is set.
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
