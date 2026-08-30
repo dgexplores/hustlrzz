@@ -83,7 +83,7 @@ async def ingest_document(*, user_id: str, title: str, source_type: str, content
         raise ValueError("Knowledge source is too large.")
 
     digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-    existing = dbc.select_where("knowledge_documents", {"content_hash": digest})
+    existing = await asyncio.to_thread(dbc.select_where, "knowledge_documents", {"content_hash": digest})
     owned = [doc for doc in existing if doc.get("user_id") == user_id]
     if owned:
         return {"document_id": owned[0]["document_id"], "chunk_count": owned[0].get("chunk_count", 0), "duplicate": True}
@@ -93,16 +93,16 @@ async def ingest_document(*, user_id: str, title: str, source_type: str, content
         raise ValueError("Knowledge source did not produce searchable content.")
     embeddings = await _embed_many(chunks, "retrieval_document")
     document_id = secrets.token_urlsafe(18)
-    dbc.insert("knowledge_documents", [{
+    await asyncio.to_thread(dbc.insert, "knowledge_documents", [{
         "document_id": document_id,
         "user_id": user_id,
-                "title": clean_title[:200],
+        "title": clean_title[:200],
         "source_type": source_type,
         "content_hash": digest,
         "chunk_count": len(chunks),
     }])
     try:
-        dbc.insert("knowledge_chunks", [{
+        await asyncio.to_thread(dbc.insert, "knowledge_chunks", [{
             "document_id": document_id,
             "user_id": user_id,
             "chunk_index": index,
@@ -112,7 +112,7 @@ async def ingest_document(*, user_id: str, title: str, source_type: str, content
     except Exception:
         # The document row is harmless without chunks, but deleting it prevents
         # a partial write from being mistaken for a successfully indexed source.
-        dbc.delete_where("knowledge_documents", {"document_id": document_id})
+        await asyncio.to_thread(dbc.delete_where, "knowledge_documents", {"document_id": document_id})
         raise
     return {"document_id": document_id, "chunk_count": len(chunks), "duplicate": False}
 
@@ -125,11 +125,13 @@ async def retrieve(*, user_id: str, query: str, top_k: int | None = None) -> lis
     embedding = await asyncio.to_thread(_embed, clean_query[:4000], "retrieval_query")
     count = max(1, min(top_k or config.RAG_TOP_K, 10))
     client = dbc.get_client()
-    response = client.rpc("match_knowledge_chunks", {
-        "query_embedding": embedding,
-        "match_user_id": user_id,
-        "match_count": count,
-    }).execute()
+    response = await asyncio.to_thread(
+        lambda: client.rpc("match_knowledge_chunks", {
+            "query_embedding": embedding,
+            "match_user_id": user_id,
+            "match_count": count,
+        }).execute()
+    )
     seen: set[str] = set()
     results: list[RetrievedChunk] = []
     for row in response.data or []:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import secrets
+from contextlib import asynccontextmanager
 from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
@@ -34,13 +35,34 @@ Use exactly this shape:
   "jd_match": {"score": 0-100, "matched": ["..."], "missing": ["..."], "summary": "..."}
 }"""
 
-_locks: dict[str, asyncio.Lock] = {}
+class _RefCountedLock:
+    __slots__ = ("lock", "refs")
+
+    def __init__(self) -> None:
+        self.lock = asyncio.Lock()
+        self.refs = 0
+
+
+_locks: dict[str, _RefCountedLock] = {}
 _locks_guard = asyncio.Lock()
 
 
-async def _lock_for(key: str) -> asyncio.Lock:
+@asynccontextmanager
+async def _lock_for(key: str):
+    """Per-(user, request) lock that is evicted once nothing references it,
+    so concurrent duplicate requests never see this dict grow unbounded over
+    the life of the process."""
     async with _locks_guard:
-        return _locks.setdefault(key, asyncio.Lock())
+        entry = _locks.setdefault(key, _RefCountedLock())
+        entry.refs += 1
+    try:
+        async with entry.lock:
+            yield
+    finally:
+        async with _locks_guard:
+            entry.refs -= 1
+            if entry.refs == 0:
+                _locks.pop(key, None)
 
 
 def request_hash(resume_text: str, job_description: str) -> str:
@@ -104,8 +126,7 @@ async def analyze(*, user_id: str, resume_text: str, job_description: str = "") 
     if existing:
         return existing, True
 
-    lock = await _lock_for(f"{user_id}:{digest}")
-    async with lock:
+    async with _lock_for(f"{user_id}:{digest}"):
         existing = await asyncio.to_thread(_existing, user_id, digest)
         if existing:
             return existing, True

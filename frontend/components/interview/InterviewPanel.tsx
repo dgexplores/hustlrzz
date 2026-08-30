@@ -37,8 +37,6 @@ interface WorkflowOption {
 }
 type SessionPhase = "setup" | "connecting" | "live" | "ending" | "complete" | "interrupted";
 
-const DRAFT_KEY = "hustlrzz-interview-draft";
-
 export function InterviewPanel() {
   const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
   const [workflowId, setWorkflowId] = useState("");
@@ -59,7 +57,6 @@ export function InterviewPanel() {
   // onclose can never clobber a fresh session (state race fix).
   const generationRef = useRef(0);
   const startedAtRef = useRef(0);
-  const draftTimerRef = useRef<number | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const metrics = useMetrics((state) => state.metrics);
   const resetMetrics = useMetrics((state) => state.reset);
@@ -108,17 +105,6 @@ export function InterviewPanel() {
     const timer = window.setInterval(() => setElapsedSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [phase]);
-
-  // Persist a lightweight draft (debounced) so an accidental refresh can be recovered
-  // without serializing the full transcript on every keystroke.
-  useEffect(() => {
-    if (phase !== "live" && phase !== "interrupted") return;
-    if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current);
-    draftTimerRef.current = window.setTimeout(() => {
-      try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ workflowId, turns: turns.slice(-40), at: Date.now() })); } catch {}
-    }, 1500);
-    return () => { if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current); };
-  }, [turns, phase, workflowId]);
 
   const begin = useCallback(async () => {
     if (!workflowId) {
@@ -230,7 +216,6 @@ export function InterviewPanel() {
 
   const restart = () => {
       teardownWs(wsRef.current)
-    try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
     setPhase("setup");
     setTurns([]);
     setReport(null);

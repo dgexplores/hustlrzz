@@ -10,6 +10,7 @@ English-native AI mock interview coach. Merges:
 
 from __future__ import annotations
 
+import asyncio
 import secrets
 import time
 import zipfile
@@ -108,14 +109,16 @@ def get_user(request: Request, credentials: Optional[HTTPAuthorizationCredential
 @router.get("/workflows")
 async def list_workflows(user: dict = Depends(get_user)):
     _db_or_503()
-    rows = dbc.select_where("workflows", {"user_id": user["uid"]}, order="created_at")
+    rows = await asyncio.to_thread(dbc.select_where, "workflows", {"user_id": user["uid"]}, order="created_at")
     return {"success": True, "data": rows}
 
 
 @router.get("/interviews")
 async def list_interviews(user: dict = Depends(get_user)):
     _db_or_503()
-    rows = dbc.select_where("interview_sessions", {"user_id": user["uid"]}, order="created_at")
+    rows = await asyncio.to_thread(
+        dbc.select_where, "interview_sessions", {"user_id": user["uid"]}, order="created_at"
+    )
     return {"success": True, "data": rows}
 
 
@@ -231,16 +234,22 @@ async def start_workflow(
                 **(result.get("company_match") or {}),
                 "company_research": result.get("company_research") or {},
             }
-            dbc.insert("workflows", [{
-                "workflow_id": result["workflow_id"],
-                "user_id": user["uid"],
-                "title": (result.get("company_match") or {}).get("summary", job_description[:80]),
-                "company": company_name,
-                "questions": result.get("questions", []),
-                "answers": result.get("answers", []),
-                "match": persisted_match,
-                "created_at": _now(),
-            }])
+            await asyncio.to_thread(
+                dbc.insert,
+                "workflows",
+                [{
+                    "workflow_id": result["workflow_id"],
+                    "user_id": user["uid"],
+                    "title": (result.get("company_match") or {}).get("summary", job_description[:80]),
+                    "company": company_name,
+                    "resume_text": resume_text[:config.RAG_MAX_DOCUMENT_CHARS],
+                    "job_description": job_description[:config.RAG_MAX_DOCUMENT_CHARS],
+                    "questions": result.get("questions", []),
+                    "answers": result.get("answers", []),
+                    "match": persisted_match,
+                    "created_at": _now(),
+                }],
+            )
         except Exception as e:
             log.warning("persist workflow failed: %s", e)
     return {"success": True, **result}
@@ -259,7 +268,7 @@ async def start_workflow_upload(
     user: dict = Depends(get_user),
 ):
     """Upload a PDF or DOCX resume and run the same preparation workflow."""
-    content = await file.read()
+    content = await file.read(config.MAX_FILE_SIZE + 1)
     if len(content) > config.MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large")
     resume_text = _extract_resume_text(file.filename or "", content)
@@ -353,9 +362,11 @@ async def resume_analyzer_usage(user: dict = Depends(get_user)):
 async def list_resume_analyses(user: dict = Depends(get_user)):
     _db_or_503()
     try:
-        response = dbc.get_client().table("resume_analysis").select(
-            "analysis_id,resume_score,extracted_skills,created_at"
-        ).eq("user_id", user["uid"]).order("created_at", desc=True).limit(50).execute()
+        response = await asyncio.to_thread(
+            lambda: dbc.get_client().table("resume_analysis").select(
+                "analysis_id,resume_score,extracted_skills,created_at"
+            ).eq("user_id", user["uid"]).order("created_at", desc=True).limit(50).execute()
+        )
         return {"success": True, "data": response.data or []}
     except Exception:
         raise HTTPException(status_code=503, detail="Resume Analyzer history is temporarily unavailable.")
@@ -365,9 +376,11 @@ async def list_resume_analyses(user: dict = Depends(get_user)):
 async def get_resume_analysis(analysis_id: str, user: dict = Depends(get_user)):
     _db_or_503()
     try:
-        response = dbc.get_client().table("resume_analysis").select("*").eq(
-            "analysis_id", analysis_id
-        ).eq("user_id", user["uid"]).limit(1).execute()
+        response = await asyncio.to_thread(
+            lambda: dbc.get_client().table("resume_analysis").select("*").eq(
+                "analysis_id", analysis_id
+            ).eq("user_id", user["uid"]).limit(1).execute()
+        )
         if not response.data:
             raise HTTPException(status_code=404, detail="Analysis not found")
         return {"success": True, "data": response.data[0]}
@@ -472,7 +485,8 @@ def salary_script(payload: SalaryRequest, user: dict = Depends(rate_limited("coa
 @router.post("/coaching/analyze")
 async def analyze(payload: MatchAnalysisRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
     try:
-        return {"success": True, "data": analysis.analyze_match(payload.job_description, payload.resume_text)}
+        data = await asyncio.to_thread(analysis.analyze_match, payload.job_description, payload.resume_text)
+        return {"success": True, "data": data}
     except provider.ProviderError as exc:
         status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
         raise HTTPException(status_code=status, detail="The role-fit coach is temporarily busy. Please retry shortly.")
@@ -501,22 +515,31 @@ def _sanitize_presence(metrics: dict | None) -> dict[str, float]:
 @router.post("/coaching/practice")
 async def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
     allowed_metrics = _sanitize_presence(payload.presence_metrics)
-    # Memory + RAG grounding for the next drill
-    try:
-        from backend.memory.profile import get_weakness_context
 
-        weakness_ctx = get_weakness_context(user["uid"])
-    except Exception:
-        weakness_ctx = ""
-    rag_ctx = ""
-    if rag.is_ready():
+    # Memory + RAG grounding for the next drill. Neither depends on the
+    # other, so fetch them concurrently instead of paying both latencies
+    # back-to-back.
+    async def _weakness_ctx() -> str:
+        try:
+            from backend.memory.profile import get_weakness_context
+
+            return await asyncio.to_thread(get_weakness_context, user["uid"])
+        except Exception:
+            return ""
+
+    async def _rag_ctx() -> str:
+        if not rag.is_ready():
+            return ""
         try:
             chunks = await rag.retrieve(user_id=user["uid"], query=payload.answer[:1200], top_k=2)
-            rag_ctx = rag.format_context(chunks, max_chars=1200)
+            return rag.format_context(chunks, max_chars=1200)
         except Exception:
-            rag_ctx = ""
+            return ""
+
+    weakness_ctx, rag_ctx = await asyncio.gather(_weakness_ctx(), _rag_ctx())
     try:
-        result = analysis.evaluate_coaching_practice(
+        result = await asyncio.to_thread(
+            analysis.evaluate_coaching_practice,
             scenario=payload.scenario,
             prompt=payload.prompt,
             answer=payload.answer,
@@ -538,10 +561,11 @@ async def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depe
         from backend.memory.profile import get_weakness_context
 
         try:
-            weakness_ctx = get_weakness_context(user["uid"])
+            weakness_ctx = await asyncio.to_thread(get_weakness_context, user["uid"])
         except Exception:
             weakness_ctx = ""
-        result = analysis.coaching_practice_turn(
+        result = await asyncio.to_thread(
+            analysis.coaching_practice_turn,
             scenario=payload.scenario,
             difficulty=payload.difficulty,
             coach_style=payload.coach_style,
@@ -589,7 +613,9 @@ async def assessment_start(payload: AssessmentStartRequest, user: dict = Depends
 async def assessment_submit(attempt_id: str, payload: AssessmentSubmitRequest, user: dict = Depends(get_user)):
     _db_or_503()
     try:
-        data = assessment_service.submit_round(user["uid"], attempt_id, payload.round_index, payload.responses)
+        data = await asyncio.to_thread(
+            assessment_service.submit_round, user["uid"], attempt_id, payload.round_index, payload.responses
+        )
         # Memory: feed the completed assessment into RAG so future sessions remember it
         if data.get("completed") and data.get("report") and rag.is_ready():
             try:
@@ -622,7 +648,8 @@ async def assessment_submit(attempt_id: str, payload: AssessmentSubmitRequest, u
 async def assessment_attempts(user: dict = Depends(get_user)):
     _db_or_503()
     try:
-        return {"success": True, "data": assessment_service.list_attempts(user["uid"])}
+        data = await asyncio.to_thread(assessment_service.list_attempts, user["uid"])
+        return {"success": True, "data": data}
     except Exception:
         raise HTTPException(status_code=503, detail="Assessment history is temporarily unavailable.")
 
@@ -631,7 +658,7 @@ async def assessment_attempts(user: dict = Depends(get_user)):
 async def assessment_attempt(attempt_id: str, user: dict = Depends(get_user)):
     _db_or_503()
     try:
-        data = assessment_service.get_attempt(user["uid"], attempt_id)
+        data = await asyncio.to_thread(assessment_service.get_attempt, user["uid"], attempt_id)
         if not data:
             raise HTTPException(status_code=404, detail="Attempt not found.")
         return {"success": True, "data": data}
@@ -742,7 +769,7 @@ def _fallback_interview_report() -> dict:
 @router.post("/interviews/start")
 async def start_interview(payload: InterviewStart, user: dict = Depends(rate_limited("interview", config.RATE_INTERVIEW_STARTS_PER_MIN, 60))):
     try:
-        workflow = dbc.select_where("workflows", {"workflow_id": payload.workflow_id}) or []
+        workflow = await asyncio.to_thread(dbc.select_where, "workflows", {"workflow_id": payload.workflow_id}) or []
     except Exception:
         workflow = []
     owned = [w for w in workflow if w.get("user_id") == user["uid"]]
@@ -800,10 +827,10 @@ async def interview_ws(
 
     questions: list[dict] = []
     workflow_record: dict = {}
-    resume_text = ""
-    job_description = ""
     try:
-        rows = dbc.select_where("workflows", {"workflow_id": workflow_id, "user_id": user_id})
+        rows = await asyncio.to_thread(
+            dbc.select_where, "workflows", {"workflow_id": workflow_id, "user_id": user_id}
+        )
         for r in rows:
             workflow_record = r
             if isinstance(r.get("questions"), list):
@@ -812,6 +839,8 @@ async def interview_ws(
         # Never kill the socket over persistence trouble, but make it visible.
         log.warning("workflow load failed for session %s: %s", session_id, exc)
 
+    resume_text = workflow_record.get("resume_text") or ""
+    job_description = workflow_record.get("job_description") or ""
     stored_match = workflow_record.get("match") if isinstance(workflow_record.get("match"), dict) else {}
     persona_val = persona or (sess.state.get("persona", "maya") if sess else "maya")
     system = build_interviewer_system(
@@ -826,7 +855,7 @@ async def interview_ws(
     try:
         from backend.memory.profile import get_weakness_context
 
-        _weak = get_weakness_context(user_id)
+        _weak = await asyncio.to_thread(get_weakness_context, user_id)
         if _weak:
             system += f"\n\n{_weak}\nPrioritize probing these weak areas with specific follow-ups."
     except Exception:
@@ -860,7 +889,8 @@ async def interview_ws(
                         # or unavailable; the prepared question script remains.
                         retrieval_context = ""
                 try:
-                    reply = interviewer_turn(
+                    reply = await asyncio.to_thread(
+                        interviewer_turn,
                         system,
                         transcript,
                         text,
@@ -890,22 +920,28 @@ async def interview_ws(
         report = {}
         if transcript:
             try:
-                report = judge_report(questions, transcript, resume_text, job_description, presence_metrics=end_presence)
+                report = await asyncio.to_thread(
+                    judge_report, questions, transcript, resume_text, job_description, presence_metrics=end_presence
+                )
             except Exception as exc:
                 log.warning("judge failed: %s", exc)
                 report = _fallback_interview_report()
         if dbc.is_ready() and transcript:
             try:
-                dbc.insert("interview_sessions", [{
-                    "session_id": session_id,
-                    "user_id": user_id,
-                    "workflow_id": workflow_id,
-                    "transcript": transcript,
-                    "report": report,
-                    "is_audio": is_audio,
-                    "duration_seconds": elapsed_seconds,
-                    "created_at": _now(),
-                }])
+                await asyncio.to_thread(
+                    dbc.insert,
+                    "interview_sessions",
+                    [{
+                        "session_id": session_id,
+                        "user_id": user_id,
+                        "workflow_id": workflow_id,
+                        "transcript": transcript,
+                        "report": report,
+                        "is_audio": is_audio,
+                        "duration_seconds": elapsed_seconds,
+                        "created_at": _now(),
+                    }],
+                )
             except Exception as exc:
                 log.warning("persist interview failed: %s", exc)
         if report and rag.is_ready():

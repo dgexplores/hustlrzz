@@ -6,6 +6,7 @@ import { initializePoseDetection } from "../lib/mediapipe/poseDetection";
 import { clamp, isFacingForward, postureDetails, smooth } from "../lib/analytics";
 import { drawHandLandmarks, drawPoseLandmarkers } from "../lib/drawing";
 import { useMetrics } from "@/context/MetricsContext";
+import { useLatestRef } from "./useLatestRef";
 
 // Pin the WASM runtime to the exact installed package version so a CDN
 // "@latest" drift can never silently break camera analysis.
@@ -44,11 +45,7 @@ export const useMediapipe = (
   const postureScoreRef = useRef(100);
   const lastStorePushRef = useRef(0);
 
-  const overlayRef = useRef(overlayEnabled);
-
-  useEffect(() => {
-    overlayRef.current = overlayEnabled;
-  }, [overlayEnabled]);
+  const overlayRef = useLatestRef(overlayEnabled);
 
   const isHandOnScreenRef = useRef(false);
   const isEyeContactRef = useRef(true);
@@ -66,6 +63,10 @@ export const useMediapipe = (
   const handDetectorRef = useRef<HandLandmarker>();
   const faceDetectorRef = useRef<FaceLandmarker>();
   const poseDetectorRef = useRef<PoseLandmarker>();
+  // Mirrors `ready` for the detect() loop to read without being a dependency
+  // of the loading effect below. Putting `ready` itself in that effect's
+  // deps would make setReady(true) re-trigger the effect and reload models.
+  const readyRef = useLatestRef(ready);
   const { updateMetrics } = useMetrics();
 
   // Counters/durations flow into the global store as before.
@@ -141,7 +142,7 @@ export const useMediapipe = (
     const detect = () => {
       frame = requestAnimationFrame(detect);
       const video = videoRef.current;
-      if (!ready || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+      if (!readyRef.current || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
       const now = performance.now();
       if (now - lastProcessed < FRAME_INTERVAL_MS) return;
       lastProcessed = now;
@@ -200,11 +201,12 @@ export const useMediapipe = (
     detect();
     return () => {
       cancelled = true; cancelAnimationFrame(frame);
+      setReady(false);
       handDetectorRef.current?.close(); faceDetectorRef.current?.close(); poseDetectorRef.current?.close();
       handDetectorRef.current = undefined; faceDetectorRef.current = undefined; poseDetectorRef.current = undefined;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasRef, enabled, videoRef, ready]);
+  }, [canvasRef, enabled, videoRef]);
 
   return {
     ready, processingError,

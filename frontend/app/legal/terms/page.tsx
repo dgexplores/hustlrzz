@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Hustlrzz",
+  title: "Terms of Service",
   description: "The terms that govern your use of the Hustlrzz AI interview coaching platform.",
 };
 

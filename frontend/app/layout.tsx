@@ -1,6 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  themeColor: "#000000",
+};
 
 export const metadata: Metadata = {
   title: {
@@ -10,7 +14,6 @@ export const metadata: Metadata = {
   description:
     "Turn your resume into a practice pack, clear aptitude-style screens, and rehearse with an interviewer that focuses on what you need to improve. Private, in your browser.",
   manifest: "/manifest.json",
-  themeColor: "#000000",
   openGraph: {
     title: "Hustlrzz — Interview practice that remembers you",
     description: "Preparation, screening rounds and live practice in one private workspace.",

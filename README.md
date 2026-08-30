@@ -178,8 +178,11 @@ delivery with Resend.
 
 - **Supabase:** apply the schema or migrations **including
   `supabase/migrations/20260826120000_intelligence_assessment.sql`** (company
-  intelligence cache + assessment rounds). Never expose
-  `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
+  intelligence cache + assessment rounds) **and
+  `supabase/migrations/20260830120000_workflow_interview_context.sql`**
+  (persists the resume text and job description behind a workflow so the live
+  interview judge scores against real context instead of an empty one). Never
+  expose `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
 - **Vercel:** set the project root to `frontend`; configure
   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
   `NEXT_PUBLIC_API_URL` for Preview and Production.

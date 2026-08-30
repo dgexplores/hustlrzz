@@ -25,3 +25,18 @@ export function getSupabase() {
   }
   return client;
 }
+
+/**
+ * Wait for the session a redirect (OAuth or password-recovery) just produced.
+ * The client is created with detectSessionInUrl: true, so it already
+ * exchanges the ?code= PKCE param during its own initialization.
+ * getSession() awaits that same initialization internally, so it is the
+ * correct way to wait for the result. Calling exchangeCodeForSession
+ * again here would try to reuse a PKCE verifier the automatic exchange
+ * already consumed, and fail deterministically.
+ */
+export async function waitForRedirectSession() {
+  const { data, error } = await getSupabase().auth.getSession();
+  if (error) throw error;
+  return data.session;
+}

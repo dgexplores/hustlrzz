@@ -144,7 +144,7 @@ async def ensure_fresh(company_name: str, role: str = "", force: bool = False) -
     ttl = timedelta(days=max(1, config.COMPANY_INTEL_TTL_DAYS))
     if dbc.is_ready():
         try:
-            rows = dbc.select_where(TABLE, {"company_key": key})
+            rows = await asyncio.to_thread(dbc.select_where, TABLE, {"company_key": key})
             if rows and not force:
                 fetched = rows[0].get("fetched_at")
                 fetched_dt = datetime.fromisoformat(str(fetched).replace("Z", "+00:00")) if fetched else None
@@ -191,13 +191,18 @@ async def ensure_fresh(company_name: str, role: str = "", force: bool = False) -
     }
     if dbc.is_ready():
         try:
-            dbc.upsert(TABLE, [{
-                "company_key": key,
-                "company_name": company[:160],
-                "data": data,
-                "confidence": confidence,
-                "fetched_at": fetched_at,
-            }], on_conflict="company_key")
+            await asyncio.to_thread(
+                dbc.upsert,
+                TABLE,
+                [{
+                    "company_key": key,
+                    "company_name": company[:160],
+                    "data": data,
+                    "confidence": confidence,
+                    "fetched_at": fetched_at,
+                }],
+                on_conflict="company_key",
+            )
         except Exception as exc:
             log.warning("intel cache write failed: %s", exc)
     return record
@@ -211,10 +216,17 @@ async def refresh_async(company_name: str, role: str = "") -> None:
         log.warning("background intel refresh failed: %s", exc)
 
 
+_background_tasks: set[asyncio.Task] = set()
+
+
 def start_background_refresh(company_name: str, role: str = "") -> None:
     if not (company_name or "").strip():
         return
     try:
-        asyncio.get_running_loop().create_task(refresh_async(company_name, role))
+        task = asyncio.get_running_loop().create_task(refresh_async(company_name, role))
     except RuntimeError:
-        pass
+        return
+    # asyncio only holds a weak reference to scheduled tasks, so keep a strong
+    # one here or the task can be garbage-collected before it finishes.
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)

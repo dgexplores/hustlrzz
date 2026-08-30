@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Loader2 } from "lucide-react";
-import { getSupabase } from "@/lib/supabase/client";
+import { waitForRedirectSession } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -23,15 +23,8 @@ export default function AuthCallbackPage() {
       }
 
       try {
-        const code = params.get("code");
-        if (code) {
-          const { error: exchangeError } = await getSupabase().auth.exchangeCodeForSession(code);
-          if (exchangeError) throw exchangeError;
-        }
-
-        const { data, error: sessionError } = await getSupabase().auth.getSession();
-        if (sessionError) throw sessionError;
-        if (!data.session) throw new Error("Google returned without creating a session. Verify the Google provider and redirect URLs in Supabase.");
+        const session = await waitForRedirectSession();
+        if (!session) throw new Error("Google returned without creating a session. Verify the Google provider and redirect URLs in Supabase.");
 
         const requested = params.get("next") || "/prepare";
         const destination = requested.startsWith("/") && !requested.startsWith("//") ? requested : "/prepare";

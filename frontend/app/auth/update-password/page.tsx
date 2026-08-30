@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { getSupabase } from "@/lib/supabase/client";
+import { getSupabase, waitForRedirectSession } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/input";
@@ -21,18 +21,8 @@ export default function UpdatePasswordPage() {
   useEffect(() => {
     async function verify() {
       try {
-        const supabase = getSupabase();
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get("code");
-        // PKCE flow: exchange code for session
-        if (code) {
-          const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
-          if (exErr) throw exErr;
-        }
-        // Check we have a recovery session
-        const { data, error: sessErr } = await supabase.auth.getSession();
-        if (sessErr) throw sessErr;
-        if (!data.session) {
+        const session = await waitForRedirectSession();
+        if (!session) {
           throw new Error("Reset link is invalid or expired. Request a new one from the sign-in page.");
         }
         setPhase("ready");

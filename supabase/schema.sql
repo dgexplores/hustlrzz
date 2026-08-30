@@ -8,6 +8,8 @@ create table if not exists workflows (
   user_id uuid not null,
   title text,
   company text default '',
+  resume_text text not null default '',
+  job_description text not null default '',
   questions jsonb not null default '[]',
   answers jsonb not null default '[]',
   match jsonb not null default '{}',

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy | Hustlrzz",
+  title: "Privacy",
   description: "How Hustlrzz handles resumes, transcripts, camera signals, and account data.",
 };
 

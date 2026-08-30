@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMetrics } from "@/context/MetricsContext";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import {
   Activity, Eye, Hand, Sparkles, X,
 } from "lucide-react";
@@ -75,6 +76,7 @@ export function PresenceCoach({
 }) {
   const [nudges, setNudges] = useState<Nudge[]>([]);
   const [exiting, setExiting] = useState<Set<number>>(new Set());
+  const nudgesRef = useLatestRef(nudges);
   const lastShownRef = useRef<Record<string, number>>({});
   const idRef = useRef(0);
   const countersRef = useRef({ badPosture: 0, notFacing: 0, gestures: 0 });
@@ -152,7 +154,7 @@ export function PresenceCoach({
         handDetectionCounter === 0 &&
         postureScore >= 60 &&
         Date.now() - (lastShownRef.current.gesture || 0) > COOLDOWN_MS * 3 &&
-        nudges.length === 0
+        nudgesRef.current.length === 0
       ) {
         lastShownRef.current.gesture = Date.now();
         enqueue("gesture");

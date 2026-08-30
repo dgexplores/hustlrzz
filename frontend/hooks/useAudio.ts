@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLatestRef } from "./useLatestRef";
 
 // Browser-only speech support (STT via webkit SpeechRecognition, TTS via SpeechSynthesis).
 const SR = typeof window !== "undefined"
@@ -57,10 +58,7 @@ export function useAudio(onTranscript: (text: string) => void) {
   // to stay on mic we restart it automatically for a natural conversation flow.
   const shouldListenRef = useRef(false);
   const cachedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
-  const onTranscriptRef = useRef(onTranscript);
-  useEffect(() => {
-    onTranscriptRef.current = onTranscript;
-  }, [onTranscript]);
+  const onTranscriptRef = useLatestRef(onTranscript);
 
   const supported = !!SR && typeof window !== "undefined" && "speechSynthesis" in window;
 
@@ -168,6 +166,10 @@ export function useAudio(onTranscript: (text: string) => void) {
     rec.interimResults = true;
     rec.continuous = true;
     rec.onresult = (e: any) => {
+      // A previous recognizer instance can still fire events briefly after
+      // stop() + a new start(); ignore anything not from the active instance
+      // so an answer is never transcribed twice.
+      if (recRef.current !== rec) return;
       const interimParts: string[] = [];
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const text = e.results[i][0].transcript.trim();
@@ -178,10 +180,13 @@ export function useAudio(onTranscript: (text: string) => void) {
       setInterim(interimParts.join(" "));
     };
     rec.onend = () => {
+      // Same staleness guard as onresult: only the current recognizer
+      // instance is allowed to restart itself or clear listening state.
+      if (recRef.current !== rec) return;
       setListening(false); setInterim("");
       if (shouldListenRef.current) {
         window.setTimeout(() => {
-          if (!shouldListenRef.current) return;
+          if (!shouldListenRef.current || recRef.current !== rec) return;
           try {
             rec.start();
             setListening(true);
@@ -192,6 +197,7 @@ export function useAudio(onTranscript: (text: string) => void) {
       }
     };
     rec.onerror = (event: any) => {
+      if (recRef.current !== rec) return;
       const messages: Record<string, string> = {
         "not-allowed": "Microphone permission is blocked. Allow it in the browser address bar and retry.",
         "audio-capture": "No microphone is available. Check your input device and browser permissions.",
@@ -209,7 +215,7 @@ export function useAudio(onTranscript: (text: string) => void) {
     rec.start();
     recRef.current = rec;
     setListening(true);
-  }, [supported, stopSpeaking]);
+  }, [supported, stopSpeaking, onTranscriptRef]);
 
   useEffect(() => () => {
     shouldListenRef.current = false;

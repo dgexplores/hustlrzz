@@ -22,10 +22,13 @@ export function ResumeAnalyzerPanel() {
   const [result, setResult] = useState<Analysis | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usageError, setUsageError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => {
-    api<{ data: Usage }>("/resume-analyzer/usage").then((r) => setUsage(r.data)).catch(() => undefined);
+    api<{ data: Usage }>("/resume-analyzer/usage")
+      .then((r) => { setUsage(r.data); setUsageError(false); })
+      .catch(() => setUsageError(true));
     api<{ data: typeof history }>("/resume-analyzer/analyses").then((r) => setHistory(r.data)).catch(() => undefined);
   };
   useEffect(refresh, []);
@@ -52,7 +55,7 @@ export function ResumeAnalyzerPanel() {
   return <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-6">
     <section className="motion-enter flex flex-col gap-5 border-b border-border pb-8 lg:flex-row lg:items-end lg:justify-between">
       <div className="max-w-3xl"><p className="text-sm font-semibold text-primary">Resume Analyzer</p><h1 className="mt-2 text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Make your resume easier to shortlist.</h1><p className="mt-4 leading-7 text-muted-foreground">Upload a PDF or DOCX for a structured, ATS-aware review. Your original file is parsed in memory and is not saved by the analyzer.</p></div>
-      <div className="rounded-2xl border bg-card px-5 py-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today’s allowance</p><p className="mt-1 text-2xl font-semibold">{remaining ?? "—"}<span className="text-base font-normal text-muted-foreground"> / {usage?.free_limit ?? "—"} free reviews</span></p><p className="mt-1 text-xs text-muted-foreground">{usage?.paid_remaining ?? 0} paid credits · resets in IST</p></div>
+      <div className="rounded-2xl border bg-card px-5 py-4 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today’s allowance</p>{usageError ? <p className="mt-1 flex items-center gap-2 text-sm text-destructive">Could not load your usage.<button type="button" onClick={refresh} className="font-semibold underline underline-offset-2">Retry</button></p> : <><p className="mt-1 text-2xl font-semibold">{remaining ?? "—"}<span className="text-base font-normal text-muted-foreground"> / {usage?.free_limit ?? "—"} free reviews</span></p><p className="mt-1 text-xs text-muted-foreground">{usage?.paid_remaining ?? 0} paid credits · resets in IST</p></>}</div>
     </section>
 
     <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
@@ -62,7 +65,8 @@ export function ResumeAnalyzerPanel() {
         </div>
         <div className="space-y-2"><Label htmlFor="analyzer-jd">Job description <span className="font-normal text-muted-foreground">(optional)</span></Label><Textarea id="analyzer-jd" rows={7} maxLength={60000} value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} placeholder="Paste the role requirements to identify matched and missing skills…" /></div>
         {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
-        <Button type="submit" className="w-full" size="lg" disabled={!file || busy || remaining === 0}>{busy ? <><Loader2 className="h-4 w-4 animate-spin" />Analyzing securely…</> : <><Sparkles className="h-4 w-4" />Analyze resume</>}</Button>
+        <Button type="submit" className="w-full" size="lg" disabled={!file || busy || remaining === 0 || usageError}>{busy ? <><Loader2 className="h-4 w-4 animate-spin" />Analyzing securely…</> : <><Sparkles className="h-4 w-4" />Analyze resume</>}</Button>
+        {usageError && <p className="text-center text-xs text-muted-foreground">Retry loading your usage above before analyzing.</p>}
       </form></CardContent></Card>
 
       <ResultPanel result={result} />
