@@ -7,9 +7,17 @@ Branch: `prometheus-edu` (this code) · Deadline: Oct 14, 2026 11:45pm EDT
 ## Links (fill after deploy)
 
 - Live app: https://hustlrzz.vercel.app
-- API health: https://hustlrzzv2-production.up.railway.app/health (expect `ai_configured:true, db_ready:true`)
+- API health: https://hustlrzz-api.onrender.com/health (expect `ai_configured:true, db_ready:true`)
 - Demo video: <YouTube/unlisted link>
 - Devpost project: <link after submitting>
+
+## Backend hosting (Railway trial expired → Render free)
+
+`render.yaml` blueprint at repo root, validated. Deploy (3 clicks, keys stay in dashboard):
+1. render.com → New → Blueprint → select `dgexplores/hustlrzz`, branch `prometheus-edu` → Apply.
+2. Fill sync:false secrets from old Railway variables: `GROQ_API_KEY`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (+ optional `SENTRY_DSN`).
+3. Wait for live → set Vercel `NEXT_PUBLIC_API_URL` to the onrender URL → redeploy frontend.
+Warm `GET /health` before recording and before judges click (free tier sleeps ~15 min).
 
 ## Pitch (paste into Devpost)
 
@@ -32,7 +40,7 @@ interviewer, and learn WHY every model answer works — standard or explained si
 
 ## Pre-submit checklist
 
-- [ ] Railway service running (currently OFFLINE — needs plan, trial expired)
+- [ ] Backend live on Render (Railway trial expired — blueprint ready, needs 3-click deploy)
 - [ ] `hustlrzz.vercel.app` live (needs dashboard Root Directory fix: `frontend/mocker_web` → `frontend`, then redeploy)
 - [ ] `/health` shows ai_configured + db_ready true
 - [ ] Judge demo account created + seeded (resume/JD/pack), quota fresh — see below
