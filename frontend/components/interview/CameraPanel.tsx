@@ -19,8 +19,11 @@ export function CameraPanel({ compact = false }: { compact?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [overlay, setOverlay] = useState(true);
   const [retryKey, setRetryKey] = useState(0);
+  // Camera stays off until the user opts in — typed practice works without it,
+  // and presence metrics are optional server-side.
+  const [camOn, setCamOn] = useState(false);
 
-  const { status } = useCamera(videoRef, retryKey);
+  const { status } = useCamera(videoRef, retryKey, camOn);
   const live = status === "live";
 
   // PiP view skips landmark drawing to save CPU during live interviews.
@@ -49,7 +52,16 @@ export function CameraPanel({ compact = false }: { compact?: boolean }) {
       <div className={`relative h-full w-full overflow-hidden rounded-2xl border bg-secondary ${auraClass(aura)}`}>
         <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
-        {!live && (
+        {status === "off" && (
+          <button
+            onClick={() => setCamOn(true)}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <CameraOff className="h-4 w-4" /> Enable camera
+            <span className="text-[10px]">optional — typing works without it</span>
+          </button>
+        )}
+        {status !== "off" && !live && (
           <p className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
             {live === false && status === "denied" ? "Camera blocked" : "Camera off"}
           </p>
@@ -74,23 +86,30 @@ export function CameraPanel({ compact = false }: { compact?: boolean }) {
         <span className="h-2 w-2 rounded-full bg-emerald-500" /> Video stays on your device — not uploaded. Works offline after install.
       </div>
       <PresenceCoach active={live} cameraActive={live} sessionKey="camera-panel" />
+      {status === "off" && (
+        <div className="rounded-lg border p-3 text-sm">
+          <p className="font-semibold">Camera is off — practice works fully by typing.</p>
+          <p className="mt-1 text-muted-foreground">Enable it for private, on-device posture and gaze feedback. Video never leaves your browser.</p>
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => setCamOn(true)}>Enable camera</Button>
+        </div>
+      )}
       {status === "no-device" && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
           <p className="font-semibold flex items-center gap-2"><CameraOff className="h-4 w-4" /> No camera detected (browser reports 0 devices).</p>
           <p className="mt-1">Open the MacBook lid or check System Settings → Privacy &amp; Security → Camera so your browser is enabled, then reload.</p>
-          <Button size="sm" variant="outline" className="mt-2" onClick={() => setRetryKey((k) => k + 1)}>Retry camera</Button>
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => { setCamOn(true); setRetryKey((k) => k + 1); }}>Retry camera</Button>
         </div>
       )}
       {status === "denied" && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
           Camera permission blocked. Allow it in the browser address bar, then retry.
-          <Button size="sm" variant="outline" className="mt-2" onClick={() => setRetryKey((k) => k + 1)}>Retry</Button>
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => { setCamOn(true); setRetryKey((k) => k + 1); }}>Retry</Button>
         </div>
       )}
       {status === "in-use" && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
           Camera busy. Close Zoom, FaceTime, or Meet, then retry.
-          <Button size="sm" variant="outline" className="mt-2" onClick={() => setRetryKey((k) => k + 1)}>Retry</Button>
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => { setCamOn(true); setRetryKey((k) => k + 1); }}>Retry</Button>
         </div>
       )}
 

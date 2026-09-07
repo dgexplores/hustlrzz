@@ -27,9 +27,27 @@ const PROMPTS: Record<string, string> = {
 };
 
 const HISTORY_KEY = "hustlrzz-coaching-attempts-v1";
+const DRILL_KEY = "hustlrzz-drill-v1";
+
+/** One-shot drill handoff from the dashboard (consumed on mount, then cleared). */
+function readDrill(): { scenario: string; prompt: string } | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(DRILL_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const prompt = typeof parsed?.prompt === "string" ? parsed.prompt.trim().slice(0, 2000) : "";
+    if (!prompt) return null;
+    const scenario = typeof parsed?.scenario === "string" && PROMPTS[parsed.scenario] ? parsed.scenario : "behavioral interview";
+    return { scenario, prompt };
+  } catch {
+    return null;
+  }
+}
 
 export function PracticeRoom() {
   const [phase, setPhase] = useState<Phase>("setup");
+  const [drillPrompt, setDrillPrompt] = useState<string | null>(null);
   const [scenario, setScenario] = useState("behavioral interview");
   const [difficulty, setDifficulty] = useState("realistic");
   const [coachStyle, setCoachStyle] = useState("recruiter");
@@ -46,7 +64,7 @@ export function PracticeRoom() {
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const metrics = useMetrics((state) => state.metrics);
   const resetMetrics = useMetrics((state) => state.reset);
-  const openingPrompt = PROMPTS[scenario];
+  const openingPrompt = drillPrompt ?? PROMPTS[scenario];
 
   const { supported, listening, interim, error: voiceError, start, stop, speak } = useAudio((text) => {
     setInput((current) => `${current}${current ? " " : ""}${text}`);
@@ -58,6 +76,16 @@ export function PracticeRoom() {
       if (Array.isArray(parsed)) setAttempts(parsed.slice(0, 8));
     } catch {
       localStorage.removeItem(HISTORY_KEY);
+    }
+    const drill = readDrill();
+    if (drill) {
+      setScenario(drill.scenario);
+      setDrillPrompt(drill.prompt);
+      try {
+        localStorage.removeItem(DRILL_KEY);
+      } catch {
+        /* private mode */
+      }
     }
   }, []);
 
@@ -180,13 +208,22 @@ export function PracticeRoom() {
   };
 
   if (phase === "setup") {
-    return <Setup
+    return <>
+      {drillPrompt && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 p-3 text-sm">
+          <span><span className="font-semibold">Due drill loaded</span> <span className="text-muted-foreground">— spaced repetition from your weak areas.</span></span>
+          <button type="button" onClick={() => setDrillPrompt(null)} className="shrink-0 text-xs font-semibold text-muted-foreground hover:text-foreground">Clear</button>
+        </div>
+      )}
+      <Setup
       scenario={scenario} setScenario={setScenario} difficulty={difficulty} setDifficulty={setDifficulty}
       coachStyle={coachStyle} setCoachStyle={setCoachStyle} cameraEnabled={cameraEnabled}
       setCameraEnabled={setCameraEnabled} voiceEnabled={voiceEnabled && supported}
       setVoiceEnabled={setVoiceEnabled} autoSpeak={autoSpeak} setAutoSpeak={setAutoSpeak}
       voiceSupported={supported} prompt={openingPrompt} attempts={attempts} onBegin={begin}
-    />;
+      onClearDrill={() => setDrillPrompt(null)}
+    />
+    </>;
   }
 
   if (phase === "complete" && result) {
@@ -210,7 +247,7 @@ export function PracticeRoom() {
 }
 
 function Setup(props: any) {
-  return <div className="grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]"><Card><CardHeader><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Session setup</p><CardTitle className="text-2xl">Build the pressure you want to practise</CardTitle><p className="text-sm leading-6 text-muted-foreground">Choose the conversation, response mode, and feedback level before any device permission is requested.</p></CardHeader><CardContent className="space-y-6"><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="scenario">Scenario</Label><select id="scenario" value={props.scenario} onChange={(event) => props.setScenario(event.target.value)} className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm">{Object.keys(PROMPTS).map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}</select></div><div className="space-y-2"><Label htmlFor="coach-style">Conversation partner</Label><select id="coach-style" value={props.coachStyle} onChange={(event) => props.setCoachStyle(event.target.value)} className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm"><option value="recruiter">Recruiter</option><option value="hiring-manager">Hiring manager</option><option value="negotiator">Offer negotiator</option></select></div></div><div className="space-y-2"><Label>Pressure level</Label><div className="grid grid-cols-3 gap-2">{["supportive", "realistic", "challenging"].map((item) => <button key={item} type="button" onClick={() => props.setDifficulty(item)} className={`min-h-11 rounded-lg border px-2 text-sm font-semibold capitalize ${props.difficulty === item ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent"}`}>{item}</button>)}</div></div><div className="rounded-xl border bg-secondary/25 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Opening prompt</p><p className="mt-2 text-base font-medium leading-7">{props.prompt}</p></div><div className="grid gap-3 sm:grid-cols-3"><Capability icon={<Keyboard className="h-5 w-5" />} title="Typing" description="Always available" active /><Capability icon={<Mic className="h-5 w-5" />} title="Voice" description={props.voiceSupported ? "Browser supported" : "Unavailable here"} active={props.voiceEnabled} onClick={() => props.voiceSupported && props.setVoiceEnabled(!props.voiceEnabled)} /><Capability icon={<Camera className="h-5 w-5" />} title="Camera" description="Local processing" active={props.cameraEnabled} onClick={() => props.setCameraEnabled(!props.cameraEnabled)} /></div><label className="flex items-center justify-between gap-3 rounded-xl border p-4"><span><span className="block text-sm font-semibold">Read coach responses aloud</span><span className="block text-xs text-muted-foreground">You can still read every response on screen.</span></span><input type="checkbox" checked={props.autoSpeak && props.voiceSupported} disabled={!props.voiceSupported} onChange={(event) => props.setAutoSpeak(event.target.checked)} className="h-5 w-5 accent-primary" /></label><div className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-xs leading-5 text-muted-foreground"><ShieldCheck className="mb-2 h-5 w-5 text-primary" />Your video never leaves this device. The service receives only the transcript you approve and numerical posture, gaze, and gesture summaries. Camera and microphone remain optional.</div><Button size="lg" className="w-full" onClick={props.onBegin}>Enter coaching studio <ArrowRight className="h-4 w-4" /></Button></CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2 text-xl"><History className="h-5 w-5" />Recent attempts</CardTitle><p className="text-sm text-muted-foreground">Stored only in this browser for quick comparison.</p></CardHeader><CardContent>{props.attempts.length ? <div className="space-y-2">{props.attempts.slice(0, 6).map((attempt: Attempt) => <div key={attempt.id} className="flex items-center justify-between rounded-xl border p-3"><div><p className="text-sm font-medium capitalize">{attempt.scenario}</p><p className="mt-0.5 text-xs text-muted-foreground">{new Date(attempt.createdAt).toLocaleString()}</p></div><span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">{attempt.score}</span></div>)}</div> : <div className="flex min-h-[340px] flex-col items-center justify-center text-center"><Target className="h-7 w-7 text-muted-foreground" /><p className="mt-3 font-semibold">Your progress starts here</p><p className="mt-1 max-w-xs text-sm leading-6 text-muted-foreground">Complete a session to unlock attempt comparisons and a focused next drill.</p></div>}</CardContent></Card></div>;
+  return <div className="grid gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]"><Card><CardHeader><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Session setup</p><CardTitle className="text-2xl">Build the pressure you want to practise</CardTitle><p className="text-sm leading-6 text-muted-foreground">Choose the conversation, response mode, and feedback level before any device permission is requested.</p></CardHeader><CardContent className="space-y-6"><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="scenario">Scenario</Label><select id="scenario" value={props.scenario} onChange={(event) => { props.setScenario(event.target.value); props.onClearDrill?.(); }} className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm">{Object.keys(PROMPTS).map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}</select></div><div className="space-y-2"><Label htmlFor="coach-style">Conversation partner</Label><select id="coach-style" value={props.coachStyle} onChange={(event) => props.setCoachStyle(event.target.value)} className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm"><option value="recruiter">Recruiter</option><option value="hiring-manager">Hiring manager</option><option value="negotiator">Offer negotiator</option></select></div></div><div className="space-y-2"><Label>Pressure level</Label><div className="grid grid-cols-3 gap-2">{["supportive", "realistic", "challenging"].map((item) => <button key={item} type="button" onClick={() => props.setDifficulty(item)} className={`min-h-11 rounded-lg border px-2 text-sm font-semibold capitalize ${props.difficulty === item ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent"}`}>{item}</button>)}</div></div><div className="rounded-xl border bg-secondary/25 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Opening prompt</p><p className="mt-2 text-base font-medium leading-7">{props.prompt}</p></div><div className="grid gap-3 sm:grid-cols-3"><Capability icon={<Keyboard className="h-5 w-5" />} title="Typing" description="Always available" active /><Capability icon={<Mic className="h-5 w-5" />} title="Voice" description={props.voiceSupported ? "Browser supported" : "Unavailable here"} active={props.voiceEnabled} onClick={() => props.voiceSupported && props.setVoiceEnabled(!props.voiceEnabled)} /><Capability icon={<Camera className="h-5 w-5" />} title="Camera" description="Local processing" active={props.cameraEnabled} onClick={() => props.setCameraEnabled(!props.cameraEnabled)} /></div><label className="flex items-center justify-between gap-3 rounded-xl border p-4"><span><span className="block text-sm font-semibold">Read coach responses aloud</span><span className="block text-xs text-muted-foreground">You can still read every response on screen.</span></span><input type="checkbox" checked={props.autoSpeak && props.voiceSupported} disabled={!props.voiceSupported} onChange={(event) => props.setAutoSpeak(event.target.checked)} className="h-5 w-5 accent-primary" /></label><div className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-xs leading-5 text-muted-foreground"><ShieldCheck className="mb-2 h-5 w-5 text-primary" />Your video never leaves this device. The service receives only the transcript you approve and numerical posture, gaze, and gesture summaries. Camera and microphone remain optional.</div><Button size="lg" className="w-full" onClick={props.onBegin}>Enter coaching studio <ArrowRight className="h-4 w-4" /></Button></CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2 text-xl"><History className="h-5 w-5" />Recent attempts</CardTitle><p className="text-sm text-muted-foreground">Stored only in this browser for quick comparison.</p></CardHeader><CardContent>{props.attempts.length ? <div className="space-y-2">{props.attempts.slice(0, 6).map((attempt: Attempt) => <div key={attempt.id} className="flex items-center justify-between rounded-xl border p-3"><div><p className="text-sm font-medium capitalize">{attempt.scenario}</p><p className="mt-0.5 text-xs text-muted-foreground">{new Date(attempt.createdAt).toLocaleString()}</p></div><span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">{attempt.score}</span></div>)}</div> : <div className="flex min-h-[340px] flex-col items-center justify-center text-center"><Target className="h-7 w-7 text-muted-foreground" /><p className="mt-3 font-semibold">Your progress starts here</p><p className="mt-1 max-w-xs text-sm leading-6 text-muted-foreground">Complete a session to unlock attempt comparisons and a focused next drill.</p></div>}</CardContent></Card></div>;
 }
 
 function Result({ result, attempts, onRetry, onReset, onSpeak }: any) {

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 
-type CameraStatus = "loading" | "live" | "denied" | "no-device" | "in-use";
+type CameraStatus = "off" | "loading" | "live" | "denied" | "no-device" | "in-use";
 
 export const useCamera = (
   videoRef: React.RefObject<HTMLVideoElement>,
-  retryKey: number
+  retryKey: number,
+  enabled: boolean = false,
 ) => {
-  const [status, setStatus] = useState<CameraStatus>("loading");
+  const [status, setStatus] = useState<CameraStatus>("off");
   const [devicesFound, setDevicesFound] = useState(0);
   const [errorName, setErrorName] = useState<string>("");
   const streamRef = useRef<MediaStream | null>(null);
@@ -54,12 +55,21 @@ export const useCamera = (
       }
     };
 
+    // Camera is opt-in: browsers prompt for permission on first getUserMedia,
+    // so never request it until the user explicitly enables it.
+    if (!enabled) {
+      stopStream();
+      setStatus("off");
+      return () => {
+        cancelled = true;
+      };
+    }
     start();
     return () => {
       cancelled = true;
       stopStream();
     };
-  }, [videoRef, retryKey]);
+  }, [videoRef, retryKey, enabled]);
 
   return { status, devicesFound, errorName };
 };

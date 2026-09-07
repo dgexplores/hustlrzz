@@ -1,0 +1,24 @@
+[
+  {
+    "id": "strong-backend-answer",
+    "resume": "Asha Rao, backend engineer, 3 years Python/FastAPI. Cut p95 latency 40% via Redis caching at ShopKart.",
+    "jd": "Backend Engineer: Python, APIs, caching, ownership of production services.",
+    "questions": [{"question": "Tell me about a time you improved performance."}],
+    "transcript": [
+      {"from": "interviewer", "text": "Tell me about a time you improved performance."},
+      {"from": "candidate", "text": "At ShopKart our checkout p95 was 900ms. I added Redis caching for product lookups, which I owned end to end, and p95 fell to 540ms over two weeks."}
+    ],
+    "expect": {"min_scored_areas": 4, "must_mention": ["540ms", "Redis"]}
+  },
+  {
+    "id": "thin-generic-answer",
+    "resume": "Rahul Verma, fresher, B.Tech CS. Coursework in DBMS and Java.",
+    "jd": "Backend Engineer: Python, APIs, caching, ownership of production services.",
+    "questions": [{"question": "Tell me about a time you improved performance."}],
+    "transcript": [
+      {"from": "interviewer", "text": "Tell me about a time you improved performance."},
+      {"from": "candidate", "text": "I am a hard worker and I always try my best with my team."}
+    ],
+    "expect": {"min_scored_areas": 4, "must_mention": []}
+  }
+]

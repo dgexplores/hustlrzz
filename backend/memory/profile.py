@@ -172,3 +172,32 @@ def get_spaced_repetition_schedule(user_id: str) -> list[dict]:
     for idx, skill in enumerate(weak[:3]):
         schedule.append({"skill": skill, "due_in_days": intervals[idx], "reason": "needs work"})
     return schedule
+
+
+def get_due_drills(user_id: str) -> list[dict]:
+    """Turn the repetition schedule into one-tap practice drills.
+
+    Template-based (no LLM call): deterministic, instant, and free. Each drill
+    drops straight into the coaching practice flow as scenario + prompt.
+    """
+    drills = []
+    for item in get_spaced_repetition_schedule(user_id):
+        skill = item["skill"]
+        drills.append({
+            "skill": skill,
+            "due_in_days": item["due_in_days"],
+            "reason": item["reason"],
+            "drill": {
+                "scenario": "behavioral",
+                "prompt": (
+                    f"Describe a specific time you demonstrated {skill}. "
+                    "Give the situation in one sentence, what YOU personally did, "
+                    "and the measurable result."
+                ),
+                "tip": (
+                    f"Interviewers probe {skill} with follow-ups about numbers and "
+                    "your personal decisions — prepare one story with both."
+                ),
+            },
+        })
+    return drills

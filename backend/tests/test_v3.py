@@ -168,6 +168,22 @@ def test_interviewer_system_contains_humanization_directives():
         assert phrase in system
 
 
+def test_interviewer_system_discloses_ai_identity():
+    from backend.agents.interviewer import build_interviewer_system
+
+    system = build_interviewer_system("Acme", "Backend Engineer", [{"question": "q"}], 30)
+    assert "AI practice coach" in system
+    assert "deflect" not in system
+
+
+def test_prep_systems_mark_inputs_untrusted():
+    from backend.workflow import preparation
+
+    assert "untrusted" in preparation.PERSONAL_SUMMARY_SYSTEM
+    assert "untrusted" in preparation.QUESTION_SYSTEM
+    assert "untrusted" in preparation.ANSWER_SYSTEM
+
+
 def test_interviewer_pacing_wrap_hint():
     from backend.agents.interviewer import _pacing_hint
 

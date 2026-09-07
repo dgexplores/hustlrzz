@@ -486,6 +486,12 @@ class CoachingTurnRequest(BaseModel):
     candidate_answer: str = Field(min_length=10, max_length=4000)
 
 
+class ExplainRequest(BaseModel):
+    question: str = Field(min_length=10, max_length=2000)
+    answer: str = Field(min_length=20, max_length=12000)
+    level: Literal["standard", "eli5"] = "standard"
+
+
 @router.post("/coaching/salary")
 def salary_script(payload: SalaryRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
     try:
@@ -593,6 +599,21 @@ async def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depe
     except provider.ProviderError as exc:
         status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
         raise HTTPException(status_code=status, detail="The live coach is temporarily busy. Your transcript remains available.")
+
+
+@router.post("/coaching/explain")
+async def coaching_explain(payload: ExplainRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
+    """Learn mode: teach why a model answer works, standard or ELI5 level."""
+    try:
+        result = await asyncio.to_thread(
+            analysis.explain_answer, payload.question, payload.answer, payload.level,
+        )
+        if result.get("error"):
+            raise HTTPException(status_code=502, detail="The explainer returned an incomplete response. Please retry.")
+        return {"success": True, "data": result}
+    except provider.ProviderError as exc:
+        status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
+        raise HTTPException(status_code=status, detail="The explainer is temporarily busy. Please retry shortly.")
 
 
 # --------------------------------------------------------------------------- #
@@ -750,6 +771,18 @@ async def memory_profile(user: dict = Depends(get_user)):
         return {"success": True, "data": {"digest": digest, "trends": trends, "schedule": schedule}}
     except Exception:
         raise HTTPException(status_code=503, detail="Memory profile temporarily unavailable.")
+
+
+@router.get("/memory/drills")
+async def memory_drills(user: dict = Depends(get_user)):
+    """Due spaced-repetition drills, each ready to start as a practice prompt."""
+    _db_or_503()
+    try:
+        from backend.memory.profile import get_due_drills
+
+        return {"success": True, "data": await asyncio.to_thread(get_due_drills, user["uid"])}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Practice drills temporarily unavailable.")
 
 
 # --------------------------------------------------------------------------- #
