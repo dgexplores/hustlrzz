@@ -7,7 +7,7 @@ import { downloadJson } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, Building2, Clock3, ExternalLink, Loader2, Brain, Database, Download, FileText, Radio, ShieldCheck, Upload } from "lucide-react";
+import { ArrowRight, Building2, Clock3, ExternalLink, GraduationCap, Loader2, Brain, Database, Download, FileText, Radio, ShieldCheck, Upload } from "lucide-react";
 import type { Question } from "@/lib/types";
 
 interface FlowResult {
@@ -228,8 +228,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
 
       <Card className="min-h-[620px]">
         <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>Generated pack</CardTitle>
-          <div className="flex gap-2">
+          <CardTitle>Generated pack</CardTitle>          <div className="flex gap-2">
             {result && <Button size="sm" variant="outline" onClick={() => downloadJson("hustlrzz-interview-pack.json", result)}><Download className="h-4 w-4" /> Export</Button>}
           </div>
         </CardHeader>
@@ -386,6 +385,9 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
                   </p>
                   {q.answer_hint && <p className="text-xs mt-1">{q.answer_hint}</p>}
                   {q.follow_up && <p className="text-xs mt-1 text-amber-600">Follow-up: {q.follow_up}</p>}
+                  {result.answers?.[i]?.answer && (
+                    <ExplainButton question={q.question} answer={result.answers[i].answer as string} />
+                  )}
                 </div>
               ))}
             </div>
@@ -393,6 +395,72 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
         </CardContent>
       </Card>
       </div>
+    </div>
+  );
+}
+
+function ExplainButton({ question, answer }: { question: string; answer: string }) {
+  const [open, setOpen] = useState(false);
+  const [level, setLevel] = useState<"standard" | "eli5">("standard");
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async (lv: "standard" | "eli5") => {
+    setLevel(lv);
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api<{ data: any }>("/coaching/explain", {
+        method: "POST",
+        body: JSON.stringify({ question, answer, level: lv }),
+      });
+      setData(res.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Explainer failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-2">
+      {!open ? (
+        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setOpen(true); load("standard"); }}>
+          <GraduationCap className="h-3.5 w-3.5" /> Why it works
+        </Button>
+      ) : (
+        <div className="rounded-md bg-primary/5 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex gap-1">
+              {(["standard", "eli5"] as const).map((lv) => (
+                <button
+                  key={lv}
+                  type="button"
+                  onClick={() => load(lv)}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${level === lv ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
+                >
+                  {lv === "eli5" ? "Explain simply" : "Standard"}
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-muted-foreground hover:text-foreground">Hide</button>
+          </div>
+          {loading && <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Teaching the technique…</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          {data && !loading && (
+            <div className="space-y-1.5 text-xs leading-5">
+              {(data.why_it_works || []).map((w: string, j: number) => <p key={j}>• {w}</p>)}
+              {data.structure && <p><span className="font-semibold">Structure:</span> {data.structure}</p>}
+              {(data.strong_phrases || []).slice(0, 3).map((p: any, j: number) => (
+                <p key={j}>"{p.quote}" <span className="text-muted-foreground">— {p.why}</span></p>
+              ))}
+              {(data.upgrades || []).slice(0, 2).map((u: string, j: number) => <p key={j} className="text-amber-700 dark:text-amber-300">↗ {u}</p>)}
+              {data.reuse_rule && <p className="rounded bg-secondary/60 p-2"><span className="font-semibold">Reuse:</span> {data.reuse_rule}</p>}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

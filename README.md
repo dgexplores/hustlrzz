@@ -121,10 +121,12 @@ interview if embeddings or the knowledge database are unavailable.
 ## For evaluators: demo flow
 
 1. Open the [live application](https://hustlrzz.vercel.app) and create an account.
-2. In **Prepare**, add a short resume and a target job description.
-3. Review the tailored question pack, then begin an interview.
-4. Answer using text or microphone and enable the camera for local posture signals.
-5. End the interview to view the scored coaching report and saved history.
+2. In **Prepare**, add a short resume and a target job description (or Try sample).
+3. Open any generated question's **Why it works** to learn the technique (Standard or Explain simply).
+4. Review the tailored question pack, then begin an interview.
+5. Answer using text or microphone and enable the camera for local posture signals.
+6. End the interview to view the scored coaching report and saved history.
+7. Revisit **Progress → Due practice** for spaced-repetition drills from your weak areas.
 
 ## Project layout
 
@@ -216,6 +218,8 @@ delivery with Resend.
 | `POST /coaching/salary` | Salary negotiation coaching |
 | `POST /coaching/practice` | Typed/voice rehearsal → combined content and delivery coaching |
 | `POST /coaching/practice/turn` | Secure multi-turn coaching follow-up or objection |
+| `POST /coaching/explain` | Learn mode: why a model answer works (standard or ELI5) |
+| `GET /memory/drills` | Due spaced-repetition drills from your weak areas |
 | `GET /knowledge/status`, `POST /knowledge/documents`, `POST /knowledge/search` | Candidate-owned RAG knowledge |
 | `POST /resume-analyzer/analyze`, `GET /resume-analyzer/usage` | In-memory PDF/DOCX analysis with quota and history |
 

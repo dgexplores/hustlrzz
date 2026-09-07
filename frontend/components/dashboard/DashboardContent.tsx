@@ -15,6 +15,7 @@ export function DashboardContent() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [attempts, setAttempts] = useState<any[]>([]);
   const [memory, setMemory] = useState<any>(null);
+  const [drills, setDrills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openWorkflow, setOpenWorkflow] = useState<string | null>(null);
@@ -26,11 +27,13 @@ export function DashboardContent() {
       api<{ data: any[] }>("/interviews").catch(() => ({ data: [] })),
       api<{ data: any[] }>("/assessment/attempts").catch(() => ({ data: [] })),
       api<{ data: any }>("/memory/profile").catch(() => ({ data: null })),
-    ]).then(([w, s, a, m]: any[]) => {
+      api<{ data: any[] }>("/memory/drills").catch(() => ({ data: [] })),
+    ]).then(([w, s, a, m, d]: any[]) => {
       setWorkflows(w.data || []);
       setSessions(s.data || []);
       setAttempts(a.data || []);
       setMemory(m.data || null);
+      setDrills(d.data || []);
       setError(w.error || null);
       setLoading(false);
     });
@@ -73,6 +76,33 @@ export function DashboardContent() {
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Spaced repetition — due soon</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
                 {memory.schedule.map((s: any) => <div key={s.skill} className="rounded-lg border bg-secondary/30 p-3"><p className="text-sm font-medium">{s.skill}</p><p className="text-xs text-muted-foreground">due in {s.due_in_days}d</p></div>)}
+              </div>
+            </div>
+          )}
+          {drills.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Due practice — one tap to start</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {drills.map((d: any) => (
+                  <div key={d.skill} className="rounded-lg border border-primary/25 bg-primary/5 p-3">
+                    <p className="text-sm font-medium">{d.skill} <span className="font-normal text-muted-foreground">· due in {d.due_in_days}d</span></p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{d.drill?.tip}</p>
+                    <Link
+                      href="/coaching"
+                      onClick={() => {
+                        try {
+                          localStorage.setItem("hustlrzz-drill-v1", JSON.stringify({
+                            scenario: d.drill?.scenario || "behavioral",
+                            prompt: d.drill?.prompt || "",
+                          }));
+                        } catch { /* private mode */ }
+                      }}
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    >
+                      Practice this <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  </div>
+                ))}
               </div>
             </div>
           )}
