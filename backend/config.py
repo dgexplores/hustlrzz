@@ -13,7 +13,7 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 # Preferred provider: "groq" (free tier, no card) or "gemini".
 AI_PROVIDER = os.getenv("AI_PROVIDER", "groq").lower()
 
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # Retrieval is intentionally independent of chat-provider selection. Gemini's
