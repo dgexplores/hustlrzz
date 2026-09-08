@@ -120,6 +120,9 @@ interview if embeddings or the knowledge database are unavailable.
 
 ## For evaluators: demo flow
 
+> Hackathon submission pack (pitch, judging map, video script, checklist):
+> [`docs/SUBMISSION_prometheus.md`](docs/SUBMISSION_prometheus.md).
+
 1. Open the [live application](https://hustlrzz.vercel.app) and create an account.
 2. In **Prepare**, add a short resume and a target job description (or Try sample).
 3. Open any generated question's **Why it works** to learn the technique (Standard or Explain simply).

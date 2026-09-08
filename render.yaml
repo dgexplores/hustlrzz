@@ -1,0 +1,41 @@
+# Hustlrzz API on Render's free tier (Railway trial expired).
+#
+# Only the API lives here. The app is served from Vercel
+# (https://hustlrzz.vercel.app), so point its NEXT_PUBLIC_API_URL at this
+# service's URL once it is live, and add this URL to nothing else.
+#
+# Free-tier note: the service sleeps after ~15 min idle and takes about a
+# minute to answer the next request. Warm GET /health before demos/judging.
+# Secrets are sync:false — fill them once in the dashboard (copy from the
+# old Railway service variables); they never touch this file.
+services:
+  - type: web
+    name: hustlrzz-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: AI_PROVIDER
+        value: groq
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: CORS_ORIGINS
+        value: https://hustlrzz.vercel.app,http://localhost:3000
+      - key: ENABLE_WEB_SEARCH
+        value: true
+      - key: ENVIRONMENT
+        value: production
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
