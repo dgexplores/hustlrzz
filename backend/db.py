@@ -20,11 +20,19 @@ def get_client():
         if not (config.SUPABASE_URL and config.SUPABASE_SERVICE_ROLE_KEY):
             _ready = False
             return None
-        _client = create_client(
-            config.SUPABASE_URL,
-            config.SUPABASE_SERVICE_ROLE_KEY,
-            options=ClientOptions(postgrest_client_timeout=30),
-        )
+        try:
+            _client = create_client(
+                config.SUPABASE_URL,
+                config.SUPABASE_SERVICE_ROLE_KEY,
+                options=ClientOptions(postgrest_client_timeout=30),
+            )
+        except Exception:
+            # Bad/rotated key must degrade to "not ready" (503s with a clear
+            # message), never crash the process or the /health check that
+            # deploy platforms use to decide the service is alive.
+            _client = None
+            _ready = False
+            return None
         _ready = True
     return _client
 

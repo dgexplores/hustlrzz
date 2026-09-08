@@ -54,6 +54,19 @@ def test_select_where_supports_multi_key(monkeypatch):
     assert ("eq", "user_id", "u1") in eqs
 
 
+def test_db_invalid_key_degrades_to_not_ready(monkeypatch):
+    """Bad key must never raise: health checks depend on it (Render deploy)."""
+    from backend import config as backend_config
+    from backend import db as dbc
+
+    monkeypatch.setattr(backend_config, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(backend_config, "SUPABASE_SERVICE_ROLE_KEY", "definitely-not-a-key")
+    monkeypatch.setattr(dbc, "_client", None)
+    monkeypatch.setattr(dbc, "_ready", False)
+    assert dbc.is_ready() is False
+    assert dbc.get_client() is None
+
+
 # --------------------------------------------------------------------------- #
 # Rate limiter
 # --------------------------------------------------------------------------- #
