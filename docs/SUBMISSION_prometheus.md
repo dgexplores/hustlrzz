@@ -2,7 +2,7 @@
 
 Hackathon: educational AI tool · $1,500 ($1k 1st) · solo ok (1-4) · students only
 Submit: 2-min demo video + public source code + live URL
-Branch: `prometheus-edu` (this code) · Deadline: Oct 14, 2026 11:45pm EDT
+Branch: `main` (merged from `prometheus-edu`, deleted) · Deadline: Oct 14, 2026 11:45pm EDT
 
 ## Links (fill after deploy)
 
@@ -14,7 +14,7 @@ Branch: `prometheus-edu` (this code) · Deadline: Oct 14, 2026 11:45pm EDT
 ## Backend hosting (Railway trial expired → Render free)
 
 `render.yaml` blueprint at repo root, validated. Deploy (3 clicks, keys stay in dashboard):
-1. render.com → New → Blueprint → select `dgexplores/hustlrzz`, branch `prometheus-edu` → Apply.
+1. render.com → New → Blueprint → select `dgexplores/hustlrzz`, branch `main` → Apply.
 2. Fill sync:false secrets from old Railway variables: `GROQ_API_KEY`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (+ optional `SENTRY_DSN`).
 3. Wait for live → set Vercel `NEXT_PUBLIC_API_URL` to the onrender URL → redeploy frontend.
 Warm `GET /health` before recording and before judges click (free tier sleeps ~15 min).
