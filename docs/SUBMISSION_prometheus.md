@@ -46,7 +46,7 @@ interviewer, and learn WHY every model answer works — standard or explained si
 
 ## Pre-submit checklist
 
-- [ ] Backend live on Render (Railway trial expired — blueprint ready, needs 3-click deploy)
+- [x] Backend live on Render: `{"status":"ok","ai_configured":true,"provider":"groq","db_ready":true}` + CORS verified for frontend origin
 - [x] Frontend live at https://hustlrzz-app.vercel.app (fresh project; old `hustlrzz` project hijacked by unrelated `mocker_web` settings)
 - [ ] `/health` shows ai_configured + db_ready true
 - [ ] Judge demo account created + seeded (resume/JD/pack), quota fresh — see below
