@@ -357,16 +357,31 @@ async def run_preparation_workflow(
             f"Questions:\n{json.dumps(questions, ensure_ascii=False)}\n\n"
             'Return JSON list aligned to questions: [{"question":"...","answer":"...","tags":[]}]'
         )
-        try:
-            answers_data = await asyncio.wait_for(
-                asyncio.to_thread(provider.chat_json_strict, ANSWER_SYSTEM, answers_user),
-                timeout=config.AI_REQUEST_TIMEOUT_SECONDS,
-            )
-            if not isinstance(answers_data, list):
-                answers_data = answers_data.get("answers", []) if isinstance(answers_data, dict) else []
-            answers_data = answers_data[: len(questions)]
-        except Exception as exc:
-            log.warning("answer generation failed: %s", exc)
+        # One retry: free-tier rate limits usually clear within seconds, and a
+        # pack without answers halves the product (no Learn mode, thin practice).
+        answers_data: list = []
+        for attempt in range(2):
+            try:
+                answers_data = await asyncio.wait_for(
+                    asyncio.to_thread(provider.chat_json_strict, ANSWER_SYSTEM, answers_user),
+                    timeout=config.AI_REQUEST_TIMEOUT_SECONDS,
+                )
+                if not isinstance(answers_data, list):
+                    answers_data = answers_data.get("answers", []) if isinstance(answers_data, dict) else []
+                answers_data = answers_data[: len(questions)]
+                break
+            except provider.ProviderError as exc:
+                if attempt == 0:
+                    await asyncio.sleep(8)
+                    continue
+                log.warning("answer generation failed after retry: %s", exc)
+                answers_data = []
+                break
+            except Exception as exc:
+                log.warning("answer generation failed: %s", exc)
+                answers_data = []
+                break
+        else:
             answers_data = []
 
         return {

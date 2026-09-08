@@ -197,6 +197,36 @@ def test_prep_systems_mark_inputs_untrusted():
     assert "untrusted" in preparation.ANSWER_SYSTEM
 
 
+def test_answers_retry_recovers_from_transient_rate_limit(monkeypatch):
+    import asyncio
+
+    from backend.ai.provider import ProviderError
+    from backend.workflow import preparation
+
+    calls = {"answers": 0}
+
+    def fake_strict(system, user):
+        if "Write strong, realistic model answers" in system:
+            calls["answers"] += 1
+            if calls["answers"] == 1:
+                raise ProviderError("429 rate limit")
+            return [{"question": "q", "answer": "a", "tags": []}]
+        return {"questions": [{"question": "q", "type": "behavioral"}],
+                "match": {"matched_skills": [], "gap_skills": [], "resume_weaknesses": [],
+                          "overall_match_percent": 50, "summary": "s"}}
+
+    monkeypatch.setattr(preparation.provider, "chat_json_strict", fake_strict)
+    monkeypatch.setattr(preparation.provider, "chat_json", lambda system, user, temperature=0.4: {"profile": "x"})
+    monkeypatch.setattr(preparation.provider, "is_configured", lambda: True)
+    monkeypatch.setattr(preparation.config, "ENABLE_WEB_SEARCH", False)
+
+    out = asyncio.run(preparation.run_preparation_workflow(
+        user_id="u", resume_text="r" * 200, job_description="j" * 200, num_questions=1))
+    assert out["success"] is True
+    assert len(out["answers"]) == 1
+    assert calls["answers"] == 2
+
+
 def test_interviewer_pacing_wrap_hint():
     from backend.agents.interviewer import _pacing_hint
 
