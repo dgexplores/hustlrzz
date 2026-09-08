@@ -19,6 +19,12 @@ Branch: `main` (merged from `prometheus-edu`, deleted) · Deadline: Oct 14, 2026
 3. Wait for live → set Vercel `NEXT_PUBLIC_API_URL` to the onrender URL → redeploy frontend.
 Warm `GET /health` before recording and before judges click (free tier sleeps ~15 min).
 
+Backend verified working with prod env (local smoke 2026-09-08):
+`{"status":"ok","ai_configured":true,"provider":"groq","db_ready":true}`.
+Video can be recorded TODAY against local backend
+(`railway run -- uvicorn backend.app:app --port 8123` + frontend `.env.local`
+`NEXT_PUBLIC_API_URL=http://localhost:8123`) — no cloud needed for filming.
+
 ## Pitch (paste into Devpost)
 
 **Title:** CampusPrep AI — Learn the interview, not just survive it
