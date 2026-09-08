@@ -4,8 +4,8 @@
 
 > Prepare from your own resume. Practice with a live AI interviewer. Improve what you say — and how you say it.
 
-[**Launch the live app ↗**](https://hustlrzz.vercel.app) &nbsp;·&nbsp;
-[Backend health ↗](https://hustlrzzv2-production.up.railway.app/health) &nbsp;·&nbsp;
+[**Launch the live app ↗**](https://hustlrzz-app.vercel.app) &nbsp;·&nbsp;
+[Backend health ↗](https://hustlrzz-api.onrender.com/health) &nbsp;·&nbsp;
 [Explore the code](https://github.com/dgexplores/hustlrzz)
 
 [Launch readiness, privacy boundaries, and rollout gates](docs/LAUNCH_READINESS.md)
@@ -123,7 +123,7 @@ interview if embeddings or the knowledge database are unavailable.
 > Hackathon submission pack (pitch, judging map, video script, checklist):
 > [`docs/SUBMISSION_prometheus.md`](docs/SUBMISSION_prometheus.md).
 
-1. Open the [live application](https://hustlrzz.vercel.app) and create an account.
+1. Open the [live application](https://hustlrzz-app.vercel.app) and create an account.
 2. In **Prepare**, add a short resume and a target job description (or Try sample).
 3. Open any generated question's **Why it works** to learn the technique (Standard or Explain simply).
 4. Review the tailored question pack, then begin an interview.
