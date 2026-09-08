@@ -88,10 +88,10 @@ negotiation wording, risky phrases to avoid, and decision guardrails.
 | --- | --- |
 | **Interface** | Next.js 15, TypeScript, Tailwind, accessible responsive UI with light, dark, and system themes |
 | **Live service** | Python FastAPI and WebSockets |
-| **AI resilience** | Groq primary provider with optional Gemini fallback |
+| **AI resilience** | Groq (Qwen) primary with automatic Gemini fallback + one retry on rate limits |
 | **Data & identity** | Supabase Auth + PostgreSQL with Row-Level Security |
 | **Voice & camera** | Browser-native Web Speech and in-browser MediaPipe |
-| **Deployment** | Vercel frontend + Railway API |
+| **Deployment** | Vercel frontend + Render API (Docker, free tier) |
 
 ## Retrieval-Augmented Generation (RAG)
 
@@ -138,7 +138,7 @@ backend/         FastAPI: preparation, live interviewer, judge, coaching, RAG
 frontend/        Next.js: auth, prepare, interview, coaching, dashboard
 supabase/        schema, migrations, hosted Auth configuration
 docs/            operations guidance, including future verified-email setup
-Dockerfile       backend image for Railway or another Docker host
+Dockerfile       backend image for Render, Railway, or another Docker host
 ```
 
 ## Run it locally
@@ -191,8 +191,7 @@ delivery with Resend.
 - **Vercel:** set the project root to `frontend`; configure
   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
   `NEXT_PUBLIC_API_URL` for Preview and Production.
-- **Railway:** deploy the repository Dockerfile; configure provider and
-  Supabase server keys; add permitted custom origins to `CORS_ORIGINS`.
+- **Render:** apply `render.yaml` (Docker, free tier, `/health` check); fill `GROQ_API_KEY`, `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` once in the dashboard; add permitted custom origins to `CORS_ORIGINS`.
   Set `ENABLE_WEB_SEARCH=true` for on-demand company intelligence (enabled by
   default in new deployments). `WEB_SEARCH_TIMEOUT_SECONDS=15` keeps broad web
   research bounded and lets preparation fall back safely when sources are slow.
@@ -200,7 +199,7 @@ delivery with Resend.
   callback URLs by following [the Google authentication setup](docs/GOOGLE_AUTH_SETUP.md).
 - **RAG:** configure `GEMINI_API_KEY` to enable embeddings. The app remains
   fully usable if candidate knowledge retrieval is unavailable.
-- **Error monitoring (optional):** set `SENTRY_DSN` on Railway and
+- **Error monitoring (optional):** set `SENTRY_DSN` on Render and
   `NEXT_PUBLIC_SENTRY_DSN` on Vercel to a [sentry.io](https://sentry.io) DSN.
   Both apps run fine without it. Leaving either unset disables reporting there.
 - **Resume Analyzer:** apply the Resume Analyzer migration before deploying.
