@@ -120,12 +120,19 @@ export function useAudio(onTranscript: (text: string) => void) {
     });
     // Speak sequentially with a small breath between sentences.
     const speakNext = (index: number) => {
+      const utterance = queueRef.current[index];
+      // stopSpeaking() during the inter-chunk gap clears the queue; the
+      // pending timer must no-op instead of throwing on undefined.
+      if (!utterance) {
+        speakingRef.current = false;
+        setSpeaking(false);
+        return;
+      }
       if (index >= queueRef.current.length) {
         speakingRef.current = false;
         setSpeaking(false);
         return;
       }
-      const utterance = queueRef.current[index];
       utterance.onend = () => {
         window.setTimeout(() => speakNext(index + 1), 140);
       };

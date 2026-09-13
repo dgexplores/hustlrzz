@@ -42,20 +42,27 @@ def is_ready() -> bool:
     return _ready
 
 
-def insert(table: str, rows: list[dict]) -> list[dict]:
+def _require_client():
     client = get_client()
+    if client is None:
+        raise RuntimeError("Supabase not configured")
+    return client
+
+
+def insert(table: str, rows: list[dict]) -> list[dict]:
+    client = _require_client()
     resp = client.table(table).insert(rows).execute()
     return resp.data
 
 
 def upsert(table: str, rows: list[dict], on_conflict: str) -> list[dict]:
-    client = get_client()
+    client = _require_client()
     resp = client.table(table).upsert(rows, on_conflict=on_conflict).execute()
     return resp.data
 
 
 def update(table: str, match: dict, values: dict) -> dict | None:
-    client = get_client()
+    client = _require_client()
     query = client.table(table).update(values)
     for key, value in match.items():
         query = query.eq(key, value)
@@ -64,7 +71,7 @@ def update(table: str, match: dict, values: dict) -> dict | None:
 
 
 def select_where(table: str, match: dict = None, order: str = None) -> list[dict]:
-    client = get_client()
+    client = _require_client()
     q = client.table(table).select("*")
     for key, value in (match or {}).items():
         q = q.eq(key, value)
@@ -75,7 +82,7 @@ def select_where(table: str, match: dict = None, order: str = None) -> list[dict
 
 
 def delete_where(table: str, match: dict) -> None:
-    client = get_client()
+    client = _require_client()
     q = client.table(table).delete()
     for key, value in match.items():
         q = q.eq(key, value)

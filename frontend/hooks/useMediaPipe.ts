@@ -63,6 +63,8 @@ export const useMediapipe = (
   const handDetectorRef = useRef<HandLandmarker>();
   const faceDetectorRef = useRef<FaceLandmarker>();
   const poseDetectorRef = useRef<PoseLandmarker>();
+  const canvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const canvasNodeRef = useRef<HTMLCanvasElement | null>(null);
   // Mirrors `ready` for the detect() loop to read without being a dependency
   // of the loading effect below. Putting `ready` itself in that effect's
   // deps would make setReady(true) re-trigger the effect and reload models.
@@ -93,7 +95,12 @@ export const useMediapipe = (
           initializeFaceDetection(vision),
           initializePoseDetection(vision),
         ]);
-        if (cancelled) return;
+        if (cancelled) {
+          // Models resolved after unmount/toggle-off: release immediately so
+          // the GPU/WASM instances never leak.
+          hand.close(); face.close(); pose.close();
+          return;
+        }
         handDetectorRef.current = hand;
         faceDetectorRef.current = face;
         poseDetectorRef.current = pose;
@@ -143,6 +150,12 @@ export const useMediapipe = (
       frame = requestAnimationFrame(detect);
       const video = videoRef.current;
       if (!readyRef.current || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+      // Background tabs get no frames: skip inference so a hidden studio
+      // cannot pile up stale timestamps or burn CPU.
+      if (typeof document !== "undefined" && document.hidden) {
+        lastProcessed = performance.now();
+        return;
+      }
       const now = performance.now();
       if (now - lastProcessed < FRAME_INTERVAL_MS) return;
       lastProcessed = now;
@@ -163,7 +176,12 @@ export const useMediapipe = (
       if (canvas && (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight)) {
         canvas.width = video.videoWidth; canvas.height = video.videoHeight;
       }
-      const context = canvas?.getContext("2d");
+      // Cache the 2d context per canvas node instead of fetching it per frame.
+      if (canvas && canvasNodeRef.current !== canvas) {
+        canvasNodeRef.current = canvas;
+        canvasCtxRef.current = canvas.getContext("2d");
+      }
+      const context = canvasCtxRef.current;
       context?.clearRect(0, 0, canvas?.width || 0, canvas?.height || 0);
       const hand = handDetectorRef.current?.detectForVideo(video, now);
       if (hand) {

@@ -72,8 +72,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen" role="status" aria-label="Loading">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="sr-only">Loading…</span>
       </div>
     );
   }
@@ -114,6 +115,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
           <div className="flex justify-center mb-6">
             <span className="text-xl font-bold tracking-[-0.04em]">HUSTLRZZ</span>
           </div>
+          {!isOnline && <p role="status" className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-center text-xs text-foreground">You are offline — sign-in needs a connection.</p>}
           <AuthForm />
           <p className="mt-4 text-center text-xs text-muted-foreground">
             By continuing you agree to our{" "}
@@ -163,11 +165,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
               </Link>
             ))}
             <div className="relative flex items-center">
-              <button onClick={() => setMoreOpen(!moreOpen)} onBlur={() => setTimeout(() => setMoreOpen(false), 150)} className={`flex items-center gap-1 px-3 text-sm font-medium ${moreNav.some(m => pathname === m.href) ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              <button
+                onClick={() => setMoreOpen(!moreOpen)}
+                onKeyDown={(e) => { if (e.key === "Escape") setMoreOpen(false); }}
+                aria-expanded={moreOpen}
+                aria-haspopup="menu"
+                className={`flex items-center gap-1 px-3 text-sm font-medium ${moreNav.some(m => pathname === m.href) ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
                 More <span className={`transition-transform ${moreOpen ? "rotate-180" : ""}`}>▾</span>
               </button>
               {moreOpen && (
-                <div className="absolute top-full right-0 mt-2 w-48 rounded-xl border bg-background shadow-lg overflow-hidden">
+                <div role="menu" className="absolute top-full right-0 mt-2 w-48 rounded-xl border bg-background shadow-lg overflow-hidden">
                   {moreNav.map(m => (
                     <Link key={m.href} href={m.href} onClick={() => setMoreOpen(false)} className={`block px-4 py-2.5 text-sm ${pathname === m.href ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>{m.label}</Link>
                   ))}

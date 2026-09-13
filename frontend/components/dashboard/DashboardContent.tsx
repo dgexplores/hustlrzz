@@ -18,26 +18,37 @@ export function DashboardContent() {
   const [drills, setDrills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [feedErrors, setFeedErrors] = useState<string[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
   const [openWorkflow, setOpenWorkflow] = useState<string | null>(null);
   const [openSession, setOpenSession] = useState<string | null>(null);
 
+  const formatDateTime = (value?: string) => {
+    if (!value) return "Unknown date";
+    const time = new Date(value).getTime();
+    return Number.isNaN(time) ? "Unknown date" : new Date(value).toLocaleString();
+  };
+
   useEffect(() => {
+    setLoading(true);
+    setFeedErrors([]);
     Promise.all([
       api<{ data: any[] }>("/workflows").catch((e) => ({ data: [], error: e.message })),
-      api<{ data: any[] }>("/interviews").catch(() => ({ data: [] })),
-      api<{ data: any[] }>("/assessment/attempts").catch(() => ({ data: [] })),
-      api<{ data: any }>("/memory/profile").catch(() => ({ data: null })),
-      api<{ data: any[] }>("/memory/drills").catch(() => ({ data: [] })),
+      api<{ data: any[] }>("/interviews").catch(() => ({ data: [], error: "Interview history" })),
+      api<{ data: any[] }>("/assessment/attempts").catch(() => ({ data: [], error: "Assessment history" })),
+      api<{ data: any }>("/memory/profile").catch(() => ({ data: null, error: "Memory trajectory" })),
+      api<{ data: any[] }>("/memory/drills").catch(() => ({ data: [], error: "Practice drills" })),
     ]).then(([w, s, a, m, d]: any[]) => {
       setWorkflows(w.data || []);
       setSessions(s.data || []);
       setAttempts(a.data || []);
       setMemory(m.data || null);
       setDrills(d.data || []);
-      setError(w.error || null);
+      setError(w.error && typeof w.error === "string" ? w.error : null);
+      setFeedErrors([s, a, m, d].map((f) => f.error).filter((e) => typeof e === "string"));
       setLoading(false);
     });
-  }, []);
+  }, [reloadKey]);
 
   if (loading) return <div className="p-16 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 
@@ -58,6 +69,12 @@ export function DashboardContent() {
         </div>
       )}
       {error && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">{error}</p>}
+      {feedErrors.length > 0 && (
+        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
+          Some sections could not load ({feedErrors.join(", ")}).{" "}
+          <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="font-semibold underline underline-offset-2">Retry</button>
+        </p>
+      )}
 
       {(memory?.digest?.summary || memory?.trends?.length > 0) && (
         <section className="rounded-2xl border bg-card p-6">
@@ -75,7 +92,7 @@ export function DashboardContent() {
             <div className="mb-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Spaced repetition — due soon</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {memory.schedule.map((s: any) => <div key={s.skill} className="rounded-lg border bg-secondary/30 p-3"><p className="text-sm font-medium">{s.skill}</p><p className="text-xs text-muted-foreground">due in {s.due_in_days}d</p></div>)}
+                {memory.schedule.map((s: any, i: number) => <div key={`${s.skill}-${s.due_in_days}-${i}`} className="rounded-lg border bg-secondary/30 p-3"><p className="text-sm font-medium">{s.skill}</p><p className="text-xs text-muted-foreground">due in {s.due_in_days}d</p></div>)}
               </div>
             </div>
           )}
@@ -83,8 +100,8 @@ export function DashboardContent() {
             <div className="mb-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Due practice — one tap to start</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {drills.map((d: any) => (
-                  <div key={d.skill} className="rounded-lg border border-primary/25 bg-primary/5 p-3">
+                {drills.map((d: any, i: number) => (
+                  <div key={`${d.skill}-${d.due_in_days}-${i}`} className="rounded-lg border border-primary/25 bg-primary/5 p-3">
                     <p className="text-sm font-medium">{d.skill} <span className="font-normal text-muted-foreground">· due in {d.due_in_days}d</span></p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">{d.drill?.tip}</p>
                     <Link
@@ -111,14 +128,14 @@ export function DashboardContent() {
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Score over time</p>
               <div className="mt-3 flex items-end gap-1.5 h-24">
                 {memory.trends.map((t: any, i: number) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="w-full rounded-t bg-primary" style={{ height: `${Math.max(8, Math.min(96, t.score))}%`, opacity: 0.6 + (i / memory.trends.length) * 0.4 }} title={`${t.date} ${t.score}% ${t.label}`} />
-                    <span className="text-[10px] text-muted-foreground">{t.date.slice(5)}</span>
+                  <div key={`${t.date}-${t.score}-${i}`} className="flex-1 flex flex-col items-center gap-1">
+                    <div className="w-full rounded-t bg-primary" style={{ height: `${Math.max(8, Math.min(96, Number(t.score) || 0))}%`, opacity: 0.6 + (i / memory.trends.length) * 0.4 }} title={`${t.date ?? "Unknown date"} ${t.score ?? "—"}% ${t.label ?? ""}`} />
+                    <span className="text-[10px] text-muted-foreground">{typeof t.date === "string" ? t.date.slice(5) : "—"}</span>
                   </div>
                 ))}
               </div>
               <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
-                {memory.trends.slice(-3).map((t: any) => <span key={t.date + t.score}>{t.date}: {t.score}% ({t.type})</span>)}
+                {memory.trends.slice(-3).map((t: any, i: number) => <span key={`${t.date}-${t.score}-${i}`}>{t.date}: {t.score}% ({t.type})</span>)}
               </div>
             </div>
           )}
@@ -142,7 +159,7 @@ export function DashboardContent() {
                 >
                   <span>
                     <span className="block text-sm font-semibold">{w.company ? `${w.company}: ` : ""}{w.title || "Prepared interview"}</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{new Date(w.created_at).toLocaleString()} · {w.questions?.length ?? 0} questions</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{formatDateTime(w.created_at)} · {w.questions?.length ?? 0} questions</span>
                     <span className="mt-1 block text-sm">{w.match?.overall_match_percent != null ? `${w.match.overall_match_percent}% match` : ""}</span>
                   </span>
                   <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
@@ -178,7 +195,7 @@ export function DashboardContent() {
       <section>
         <div className="mb-4 flex items-center gap-2"><BookOpenCheck className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Interview history</h2></div>
         <div className="divide-y divide-foreground/15 border-y border-foreground/20">
-          {sessions.length === 0 && <p className="py-3 text-sm text-muted-foreground">No sessions yet.</p>}
+          {sessions.length === 0 && <p className="py-3 text-sm text-muted-foreground">{feedErrors.includes("Interview history") ? "Interview history could not be loaded — retry above." : "No sessions yet."}</p>}
           {sessions.map((s) => {
             const open = openSession === s.session_id;
             return (
@@ -190,7 +207,7 @@ export function DashboardContent() {
                   className="grid w-full grid-cols-[1fr_auto] gap-2 px-1 py-4 text-left surface-transition hover:bg-accent/45"
                 >
                   <span>
-                    <span className="block text-sm font-semibold">Session · {new Date(s.created_at).toLocaleString()}</span>
+                    <span className="block text-sm font-semibold">Session · {formatDateTime(s.created_at)}</span>
                     <span className="mt-0.5 block text-xs text-muted-foreground">{s.is_audio ? "voice" : "typed"} · {s.transcript?.length ?? 0} transcript lines{s.duration_seconds ? ` · ${Math.round(s.duration_seconds / 60)} min` : ""}</span>
                     {s.report?.scores && (
                       <span className="mt-2 flex flex-wrap gap-2">
@@ -234,7 +251,7 @@ export function DashboardContent() {
                   <p className="truncate text-sm font-semibold">{row.role}{row.company ? ` · ${row.company}` : ""}</p>
                   <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${Number(row.total_percent) >= 70 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : Number(row.total_percent) >= 50 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-red-500/10 text-red-600 dark:text-red-400"}`}>{Number(row.total_percent)}%</span>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">{row.band || "in progress"} · {row.level}{row.created_at ? ` · ${new Date(row.created_at).toLocaleDateString()}` : ""}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{row.band || "in progress"} · {row.level}{row.created_at && !Number.isNaN(new Date(row.created_at).getTime()) ? ` · ${new Date(row.created_at).toLocaleDateString()}` : ""}</p>
               </div>
             ))}
           </div>

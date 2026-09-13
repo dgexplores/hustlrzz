@@ -26,10 +26,10 @@ RAG_CHUNK_CHARS = int(os.getenv("RAG_CHUNK_CHARS", "900"))
 RAG_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "120"))
 RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
 
-CORS_ORIGINS = os.getenv(
+CORS_ORIGINS = [origin.strip() for origin in os.getenv(
     "CORS_ORIGINS",
     "http://localhost:3000,https://hustlrzzv2.vercel.app",
-).split(",")
+).split(",") if origin.strip()]
 # Vercel creates a unique Preview hostname for every deployment. Keep the
 # expression narrow: it permits only this team's `frontend` Vercel hosts.
 CORS_ORIGIN_REGEX = os.getenv(
