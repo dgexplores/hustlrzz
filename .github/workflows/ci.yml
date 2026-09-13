@@ -2,8 +2,12 @@ name: ci
 
 on:
   push:
-    branches: [main, prometheus-edu]
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend:
@@ -15,8 +19,34 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+      - name: Whitespace check
+        run: git diff --check
       - name: Run tests
         run: python -m pytest backend/tests/
+      - name: Dependency audit (high/critical gate)
+        run: pip install pip-audit && pip-audit --desc -r backend/requirements.txt
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
 
   frontend:
     runs-on: ubuntu-latest

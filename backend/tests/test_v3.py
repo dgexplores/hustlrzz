@@ -145,6 +145,8 @@ def test_company_profile_rejects_substring_collisions():
 # DOCX zip-bomb cap
 # --------------------------------------------------------------------------- #
 def test_docx_extraction_caps_decompression(monkeypatch):
+    from fastapi import HTTPException
+
     from backend import app as fastapi_app
     from backend import config
 
@@ -152,8 +154,9 @@ def test_docx_extraction_caps_decompression(monkeypatch):
     buffer = BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("word/document.xml", huge)
-    text = fastapi_app._extract_docx_text(buffer.getvalue())
-    assert len(text) <= config.MAX_DOCX_XML_BYTES
+    with pytest.raises(HTTPException) as exc_info:
+        fastapi_app._extract_docx_text(buffer.getvalue())
+    assert exc_info.value.status_code == 413
 
 
 def test_docx_extracts_paragraph_text():
@@ -451,3 +454,68 @@ def test_sanitize_presence_filters_unknown_keys():
         "headTiltDeg": float("nan"), "handDetectionCounter": 3,
     })
     assert cleaned == {"postureScore": 88.4, "handDetectionCounter": 3.0}
+
+
+# --------------------------------------------------------------------------- #
+# Hardening regressions (refine/production-hardening)
+# --------------------------------------------------------------------------- #
+def test_upload_route_shares_workflow_rate_limit():
+    import inspect
+
+    from backend.app import start_workflow_upload
+
+    source = inspect.getsource(start_workflow_upload)
+    assert 'rate_limited("workflows"' in source
+
+
+def test_assessment_start_rejects_empty_rounds(monkeypatch):
+    import asyncio
+
+    from backend.assessment import service
+
+    monkeypatch.setattr(service, "_generate_rounds", lambda *a, **k: [])
+    with pytest.raises(ValueError, match="no rounds"):
+        asyncio.run(service.start_attempt("u1", "Backend Engineer", "", "mid"))
+
+
+def test_assessment_update_scopes_user(monkeypatch):
+    import asyncio
+
+    from backend.assessment import service
+
+    calls = {}
+
+    def fake_load(attempt_id, user_id):
+        return {"attempt_id": attempt_id, "user_id": user_id, "status": "in_progress",
+                "current_round": 0, "round_scores": [],
+                "rounds": [{"key": "aptitude", "name": "A", "questions": [
+                    {"prompt": "p", "options": ["a", "b", "c", "d"],
+                     "answer_index": 0, "skill": "s", "explanation": "e"}]}]}
+
+    def fake_update(table, match, values):
+        calls.update(match)
+        return None
+
+    monkeypatch.setattr(service, "_load_owned", fake_load)
+    monkeypatch.setattr(service.dbc, "update", fake_update)
+    service.submit_round("u9", "att1", 0, {"q1": 0})
+    assert calls.get("user_id") == "u9"
+    assert calls.get("attempt_id") == "att1"
+
+
+def test_rate_limit_helper_covers_quota_variants():
+    from backend.ai.provider import is_rate_limit_error
+
+    assert is_rate_limit_error(RuntimeError("429 Too Many Requests"))
+    assert is_rate_limit_error(RuntimeError("quota exceeded, retry shortly"))
+    assert not is_rate_limit_error(RuntimeError("connection reset"))
+
+
+def test_db_helpers_fail_closed_without_client(monkeypatch):
+    from backend import db as dbc
+
+    monkeypatch.setattr(dbc, "get_client", lambda: None)
+    with pytest.raises(RuntimeError, match="not configured"):
+        dbc.insert("workflows", [{}])
+    with pytest.raises(RuntimeError, match="not configured"):
+        dbc.select_where("workflows", {})

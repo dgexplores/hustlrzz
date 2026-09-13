@@ -83,7 +83,7 @@ export function CameraPanel({ compact = false }: { compact?: boolean }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-        <span className="h-2 w-2 rounded-full bg-emerald-500" /> Video stays on your device — not uploaded. Works offline after install.
+        <span className="h-2 w-2 rounded-full bg-emerald-500" /> Video stays on your device — not uploaded.
       </div>
       <PresenceCoach active={live} cameraActive={live} sessionKey="camera-panel" />
       {status === "off" && (
@@ -128,8 +128,8 @@ export function CameraPanel({ compact = false }: { compact?: boolean }) {
       </div>
 
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">Show posture and hand guide</span>
-        <Switch checked={overlay} onCheckedChange={setOverlay} />
+        <span id="overlay-guide-label" className="text-xs text-muted-foreground">Show posture and hand guide</span>
+        <Switch checked={overlay} onCheckedChange={setOverlay} aria-label="Show posture and hand guide" />
       </div>
       {processingError && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-foreground">{processingError}</p>}
 
@@ -143,10 +143,13 @@ export function CameraPanel({ compact = false }: { compact?: boolean }) {
 }
 
 function PresenceDot({ good, label, invert = false }: { good: boolean; label: string; invert?: boolean }) {
-  const positive = invert ? good : good;
+  // Hands differ from posture/gaze: violet = gesture activity, grey = idle.
+  // Posture/gaze: green = good, grey = needs attention.
+  const active = invert ? good : good;
+  const text = invert ? (good ? "active" : "idle") : good ? "good" : "needs attention";
   return (
-    <span title={`${label}: ${invert ? (good ? "active" : "idle") : good ? "good" : "off"}`}>
-      <span className={`block h-2 w-2 rounded-full ${positive ? (invert ? "bg-violet-400" : "bg-emerald-400") : "bg-muted-foreground/50"}`} />
+    <span role="img" aria-label={`${label}: ${text}`} title={`${label}: ${text}`}>
+      <span className={`block h-2 w-2 rounded-full ${active ? (invert ? "bg-violet-400" : "bg-emerald-400") : "bg-muted-foreground/50"}`} />
     </span>
   );
 }

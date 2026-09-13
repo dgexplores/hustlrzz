@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +59,14 @@ export function AssessmentPanel() {
   const [history, setHistory] = useState<AttemptRow[]>([]);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  // Guards the manual-submit vs auto-submit race and lets reset/unmount
+  // cancel a pending next-round transition.
+  const submittingRef = useRef(false);
+  const nextRoundTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (nextRoundTimerRef.current !== null) window.clearTimeout(nextRoundTimerRef.current);
+  }, []);
 
   const loadHistory = useCallback(() => {
     api<{ data: AttemptRow[] }>("/assessment/attempts")
@@ -105,12 +113,13 @@ export function AssessmentPanel() {
   };
 
   const handleSubmit = async (auto = false) => {
-    if (!attemptId || !round || submitting) return;
+    if (!attemptId || !round || submitting || submittingRef.current) return;
     const unanswered = round.questions.length - Object.keys(responses).length;
     if (unanswered > 0 && !auto) {
       setError(`Answer every question first (${unanswered} left).`);
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -132,7 +141,8 @@ export function AssessmentPanel() {
         setRound(null);
         loadHistory();
       } else {
-        window.setTimeout(() => {
+        if (nextRoundTimerRef.current !== null) window.clearTimeout(nextRoundTimerRef.current);
+        nextRoundTimerRef.current = window.setTimeout(() => {
           setRoundIndex(data.next_round_index);
           setRound(data.next_round);
           setResponses({});
@@ -143,11 +153,17 @@ export function AssessmentPanel() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scoring failed. Your answers were saved.");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
 
   const reset = () => {
+    if (nextRoundTimerRef.current !== null) {
+      window.clearTimeout(nextRoundTimerRef.current);
+      nextRoundTimerRef.current = null;
+    }
+    submittingRef.current = false;
     setAttemptId(null);
     setRound(null);
     setReport(null);
@@ -190,11 +206,13 @@ export function AssessmentPanel() {
             </div>
             <div className="space-y-2">
               <Label>Seniority</Label>
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div role="radiogroup" aria-label="Seniority" className="grid gap-2 sm:grid-cols-3">
                 {LEVELS.map((item) => (
                   <button
                     key={item.value}
                     type="button"
+                    role="radio"
+                    aria-checked={level === item.value}
                     onClick={() => setLevel(item.value)}
                     className={`min-h-11 rounded-lg border px-3 text-sm font-semibold surface-transition ${level === item.value ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`}
                   >
@@ -328,7 +346,7 @@ export function AssessmentPanel() {
           <CardContent className="space-y-2">
             {history.slice(0, 6).map((row) => (
               <div key={row.attempt_id} className="flex items-center justify-between rounded-lg border p-3 text-sm">
-                <div><span className="font-semibold">{row.role}</span>{row.company ? ` · ${row.company}` : ""}<span className="ml-2 text-xs text-muted-foreground">{row.level}{row.created_at ? ` · ${new Date(row.created_at).toLocaleDateString()}` : ""}</span></div>
+                <div><span className="font-semibold">{row.role}</span>{row.company ? ` · ${row.company}` : ""}<span className="ml-2 text-xs text-muted-foreground">{row.level}{row.created_at && !Number.isNaN(new Date(row.created_at).getTime()) ? ` · ${new Date(row.created_at).toLocaleDateString()}` : ""}</span></div>
                 <div className="text-right">
                   {row.status === "completed"
                     ? <span className="font-semibold text-primary">{row.total_percent}% · {row.band}</span>

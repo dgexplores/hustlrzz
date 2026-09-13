@@ -29,6 +29,7 @@ create table if not exists interview_sessions (
   transcript jsonb not null default '[]',
   report jsonb not null default '{}',
   is_audio boolean not null default false,
+  duration_seconds integer not null default 0,
   created_at timestamptz not null default now()
 );
 

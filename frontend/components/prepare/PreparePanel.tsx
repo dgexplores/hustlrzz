@@ -157,7 +157,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
           <form onSubmit={run} className="space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
-                <Label htmlFor="resume">1. Your resume</Label>
+                <Label htmlFor={resumeFile ? "resume-file" : "resume"}>1. Your resume</Label>
                 <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
                   <Upload className="h-4 w-4" /> {resumeFile ? "Replace file" : "Upload PDF or DOCX"}
                 </Button>
@@ -217,7 +217,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
                 <div className="space-y-2"><Label htmlFor="notes">Notes</Label><Textarea id="notes" rows={2} value={notesText} onChange={(e) => setNotesText(e.target.value)} placeholder="Optional: areas to improve…" /></div>
               </div>
             </details>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading || (!resumeFile && !resumeText.trim())}>
               {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generating — {company ? "~75s with research" : "~50s"} </> : "Generate interview pack → Step 2"}
             </Button>
@@ -453,7 +453,7 @@ function ExplainButton({ question, answer }: { question: string; answer: string 
               {(data.why_it_works || []).map((w: string, j: number) => <p key={j}>• {w}</p>)}
               {data.structure && <p><span className="font-semibold">Structure:</span> {data.structure}</p>}
               {(data.strong_phrases || []).slice(0, 3).map((p: any, j: number) => (
-                <p key={j}>"{p.quote}" <span className="text-muted-foreground">— {p.why}</span></p>
+                <p key={j}>&ldquo;{p.quote}&rdquo; <span className="text-muted-foreground">— {p.why}</span></p>
               ))}
               {(data.upgrades || []).slice(0, 2).map((u: string, j: number) => <p key={j} className="text-amber-700 dark:text-amber-300">↗ {u}</p>)}
               {data.reuse_rule && <p className="rounded bg-secondary/60 p-2"><span className="font-semibold">Reuse:</span> {data.reuse_rule}</p>}

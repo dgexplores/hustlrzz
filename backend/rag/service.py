@@ -93,14 +93,24 @@ async def ingest_document(*, user_id: str, title: str, source_type: str, content
         raise ValueError("Knowledge source did not produce searchable content.")
     embeddings = await _embed_many(chunks, "retrieval_document")
     document_id = secrets.token_urlsafe(18)
-    await asyncio.to_thread(dbc.insert, "knowledge_documents", [{
-        "document_id": document_id,
-        "user_id": user_id,
-        "title": clean_title[:200],
-        "source_type": source_type,
-        "content_hash": digest,
-        "chunk_count": len(chunks),
-    }])
+    try:
+        await asyncio.to_thread(dbc.insert, "knowledge_documents", [{
+            "document_id": document_id,
+            "user_id": user_id,
+            "title": clean_title[:200],
+            "source_type": source_type,
+            "content_hash": digest,
+            "chunk_count": len(chunks),
+        }])
+    except Exception as exc:
+        # Concurrent duplicate ingest can win the race on the unique
+        # (user_id, content_hash) constraint. Return the winner instead of 500.
+        if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+            existing = await asyncio.to_thread(dbc.select_where, "knowledge_documents", {"content_hash": digest})
+            owned = [doc for doc in existing if doc.get("user_id") == user_id]
+            if owned:
+                return {"document_id": owned[0]["document_id"], "chunk_count": owned[0].get("chunk_count", 0), "duplicate": True}
+        raise
     try:
         await asyncio.to_thread(dbc.insert, "knowledge_chunks", [{
             "document_id": document_id,

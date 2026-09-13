@@ -68,9 +68,17 @@ app.add_middleware(
     allow_origins=config.CORS_ORIGINS,
     allow_origin_regex=config.CORS_ORIGIN_REGEX or None,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
+
+
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
 
 bearer = HTTPBearer(auto_error=False)
 router = APIRouter()
@@ -237,7 +245,7 @@ async def start_workflow(
     if not result.get("success"):
         err = str(result.get("error", "Workflow failed"))
         # Surface provider quota limits as a retryable 429, not a 500.
-        if any(k in err for k in ("429", "Rate limit", "rate_limit")):
+        if provider.is_rate_limit_error(Exception(err)):
             raise HTTPException(status_code=429, detail=err)
         raise HTTPException(status_code=500, detail=err)
     # Persist workflow record (if db ready).
@@ -278,7 +286,7 @@ async def start_workflow_upload(
     portfolio_link: str = Form(""),
     additional_info: str = Form(""),
     num_questions: int = Form(config.DEFAULT_QUESTION_COUNT),
-    user: dict = Depends(get_user),
+    user: dict = Depends(rate_limited("workflows", config.RATE_WORKFLOWS_PER_MIN, 60)),
 ):
     """Upload a PDF or DOCX resume and run the same preparation workflow."""
     content = await file.read(config.MAX_FILE_SIZE + 1)
@@ -330,7 +338,7 @@ def _extract_docx_text(content: bytes) -> str:
             with archive.open("word/document.xml") as member:
                 raw = member.read(config.MAX_DOCX_XML_BYTES + 1)
             if len(raw) > config.MAX_DOCX_XML_BYTES:
-                log.warning("docx document exceeded decompression cap; truncated")
+                raise HTTPException(status_code=413, detail="DOCX is too large to process safely.")
             root = ElementTree.fromstring(raw)
         namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
         paragraphs = []
@@ -339,6 +347,8 @@ def _extract_docx_text(content: bytes) -> str:
             if parts:
                 paragraphs.append("".join(parts))
         return "\n".join(paragraphs)
+    except HTTPException:
+        raise
     except (KeyError, zipfile.BadZipFile, ElementTree.ParseError):
         return ""
 
@@ -497,17 +507,19 @@ def salary_script(payload: SalaryRequest, user: dict = Depends(rate_limited("coa
     try:
         return {"success": True, "data": analysis.salary_script(**payload.model_dump())}
     except provider.ProviderError as exc:
-        status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
+        status = 429 if provider.is_rate_limit_error(exc) else 503
         raise HTTPException(status_code=status, detail="The negotiation coach is temporarily busy. Please retry shortly.")
 
 
 @router.post("/coaching/analyze")
 async def analyze(payload: MatchAnalysisRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
     try:
-        data = await asyncio.to_thread(analysis.analyze_match, payload.job_description, payload.resume_text)
+        data = await asyncio.wait_for(asyncio.to_thread(analysis.analyze_match, payload.job_description, payload.resume_text), timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
         return {"success": True, "data": data}
+    except (asyncio.TimeoutError, TimeoutError):
+        raise HTTPException(status_code=503, detail="The role-fit coach timed out. Please retry shortly.")
     except provider.ProviderError as exc:
-        status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
+        status = 429 if provider.is_rate_limit_error(exc) else 503
         raise HTTPException(status_code=status, detail="The role-fit coach is temporarily busy. Please retry shortly.")
 
 
@@ -557,7 +569,7 @@ async def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depen
 
     weakness_ctx, rag_ctx = await asyncio.gather(_weakness_ctx(), _rag_ctx())
     try:
-        result = await asyncio.to_thread(
+        result = await asyncio.wait_for(asyncio.to_thread(
             analysis.evaluate_coaching_practice,
             scenario=payload.scenario,
             prompt=payload.prompt,
@@ -565,12 +577,14 @@ async def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depen
             presence_metrics=allowed_metrics,
             weakness_context=weakness_ctx,
             rag_context=rag_ctx,
-        )
+        ), timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
         if not result or result.get("error"):
             raise HTTPException(status_code=502, detail="The coach returned incomplete feedback. Please retry.")
         return {"success": True, "data": result}
+    except (asyncio.TimeoutError, TimeoutError):
+        raise HTTPException(status_code=503, detail="The practice coach timed out. Please retry shortly.")
     except provider.ProviderError as exc:
-        status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
+        status = 429 if provider.is_rate_limit_error(exc) else 503
         raise HTTPException(status_code=status, detail="The practice coach is temporarily busy. Please retry shortly.")
 
 
@@ -583,7 +597,7 @@ async def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depe
             weakness_ctx = await asyncio.to_thread(get_weakness_context, user["uid"])
         except Exception:
             weakness_ctx = ""
-        result = await asyncio.to_thread(
+        result = await asyncio.wait_for(asyncio.to_thread(
             analysis.coaching_practice_turn,
             scenario=payload.scenario,
             difficulty=payload.difficulty,
@@ -592,12 +606,14 @@ async def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depe
             history=[item.model_dump() for item in payload.history],
             candidate_answer=payload.candidate_answer,
             weakness_context=weakness_ctx,
-        )
+        ), timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
         if result.get("error"):
             raise HTTPException(status_code=502, detail="The coach returned an incomplete response. Please retry.")
         return {"success": True, "data": result}
+    except (asyncio.TimeoutError, TimeoutError):
+        raise HTTPException(status_code=503, detail="The live coach timed out. Your transcript remains available.")
     except provider.ProviderError as exc:
-        status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
+        status = 429 if provider.is_rate_limit_error(exc) else 503
         raise HTTPException(status_code=status, detail="The live coach is temporarily busy. Your transcript remains available.")
 
 
@@ -605,14 +621,16 @@ async def coaching_practice_turn(payload: CoachingTurnRequest, user: dict = Depe
 async def coaching_explain(payload: ExplainRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
     """Learn mode: teach why a model answer works, standard or ELI5 level."""
     try:
-        result = await asyncio.to_thread(
+        result = await asyncio.wait_for(asyncio.to_thread(
             analysis.explain_answer, payload.question, payload.answer, payload.level,
-        )
+        ), timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
         if result.get("error"):
             raise HTTPException(status_code=502, detail="The explainer returned an incomplete response. Please retry.")
         return {"success": True, "data": result}
+    except (asyncio.TimeoutError, TimeoutError):
+        raise HTTPException(status_code=503, detail="The explainer timed out. Please retry shortly.")
     except provider.ProviderError as exc:
-        status = 429 if "429" in str(exc) or "rate" in str(exc).lower() else 503
+        status = 429 if provider.is_rate_limit_error(exc) else 503
         raise HTTPException(status_code=status, detail="The explainer is temporarily busy. Please retry shortly.")
 
 
@@ -634,17 +652,19 @@ class AssessmentSubmitRequest(BaseModel):
 async def assessment_start(payload: AssessmentStartRequest, user: dict = Depends(rate_limited("assessment", config.RATE_ASSESSMENT_PER_HOUR, 3600))):
     _db_or_503()
     try:
-        data = await assessment_service.start_attempt(user["uid"], payload.role, payload.company, payload.level)
+        data = await asyncio.wait_for(assessment_service.start_attempt(user["uid"], payload.role, payload.company, payload.level), timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
         return {"success": True, "data": data}
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    except (asyncio.TimeoutError, TimeoutError):
+        raise HTTPException(status_code=503, detail="The assessment generator timed out. Please retry shortly.")
     except Exception:
         log.exception("assessment start failed")
         raise HTTPException(status_code=503, detail="The assessment generator is busy. Please retry shortly.")
 
 
 @router.post("/assessment/attempts/{attempt_id}/submit")
-async def assessment_submit(attempt_id: str, payload: AssessmentSubmitRequest, user: dict = Depends(get_user)):
+async def assessment_submit(attempt_id: str, payload: AssessmentSubmitRequest, user: dict = Depends(rate_limited("assessment_submit", config.RATE_COACHING_PER_MIN, 60))):
     _db_or_503()
     try:
         data = await asyncio.to_thread(
@@ -740,7 +760,7 @@ async def ingest_knowledge(payload: KnowledgeIngestRequest, user: dict = Depends
 
 
 @router.post("/knowledge/search")
-async def search_knowledge(payload: KnowledgeSearchRequest, user: dict = Depends(get_user)):
+async def search_knowledge(payload: KnowledgeSearchRequest, user: dict = Depends(rate_limited("knowledge", config.RATE_KNOWLEDGE_PER_MIN, 60))):
     try:
         chunks = await rag.retrieve(user_id=user["uid"], query=payload.query, top_k=payload.top_k)
         return {"success": True, "data": [{
@@ -865,6 +885,8 @@ async def interview_ws(
         await websocket.close(code=1013)
         return
     sess.state["active"] = True
+    # Single-use handshake token: a captured ?token= URL cannot open a second socket.
+    sess.state["ws_issued_at"] = 0.0
     duration = max(5, min(60, int(duration or 15)))
     started_at = time.monotonic()
 
@@ -935,7 +957,7 @@ async def interview_ws(
                         # or unavailable; the prepared question script remains.
                         retrieval_context = ""
                 try:
-                    reply = await asyncio.to_thread(
+                    reply = await asyncio.wait_for(asyncio.to_thread(
                         interviewer_turn,
                         system,
                         transcript,
@@ -944,7 +966,10 @@ async def interview_ws(
                         elapsed_seconds=int(time.monotonic() - started_at),
                         duration_minutes=duration,
                         total_questions=len(questions),
-                    )
+                    ), timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
+                except (asyncio.TimeoutError, TimeoutError):
+                    await websocket.send_json({"type": "error", "data": {"message": "The interviewer timed out. Please try your answer again in a moment."}})
+                    continue
                 except provider.ProviderError:
                     await websocket.send_json({"type": "error", "data": {"message": "The interviewer is temporarily unavailable. Please try your answer again in a moment."}})
                     continue
@@ -966,10 +991,10 @@ async def interview_ws(
         report = {}
         if transcript:
             try:
-                report = await asyncio.to_thread(
+                report = await asyncio.wait_for(asyncio.to_thread(
                     judge_report, questions, transcript, resume_text, job_description, presence_metrics=end_presence
-                )
-            except Exception as exc:
+                ), timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
+            except (asyncio.TimeoutError, TimeoutError, Exception) as exc:
                 log.warning("judge failed: %s", exc)
                 report = _fallback_interview_report()
         if dbc.is_ready() and transcript:

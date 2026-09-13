@@ -24,17 +24,21 @@ export const Switch = ({
   onCheckedChange,
   id,
   className,
+  ...aria
 }: {
   checked: boolean;
   onCheckedChange: (v: boolean) => void;
   id?: string;
   className?: string;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
 }) => (
   <button
     id={id}
     type="button"
     role="switch"
     aria-checked={checked}
+    {...aria}
     onClick={() => onCheckedChange(!checked)}
     className={cn(
       "inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none",

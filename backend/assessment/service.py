@@ -184,6 +184,8 @@ async def start_attempt(user_id: str, role: str, company: str, level: str) -> di
     if not role:
         raise ValueError("Target role is required.")
     rounds = await __import__("asyncio").to_thread(_generate_rounds, role, company, level)
+    if not rounds:
+        raise ValueError("The assessment generator returned no rounds. Please retry shortly.")
     attempt_id = secrets.token_urlsafe(16)
     dbc.insert(TABLE, [{
         "attempt_id": attempt_id,
@@ -234,7 +236,7 @@ def submit_round(user_id: str, attempt_id: str, round_index: int, responses: dic
         nxt = rounds[current + 1]
         updates["current_round"] = current + 1
         updates["round_scores"] = scores
-        dbc.update(TABLE, {"attempt_id": attempt_id}, updates)
+        dbc.update(TABLE, {"attempt_id": attempt_id, "user_id": user_id}, updates)
         return {**result_payload, "completed": False,
                 "next_round_index": current + 1,
                 "next_round": _sanitize_round(nxt)}
@@ -251,7 +253,7 @@ def submit_round(user_id: str, attempt_id: str, round_index: int, responses: dic
         "gap_skills": gap_skills,
         "strength_skills": strength_skills,
     })
-    dbc.update(TABLE, {"attempt_id": attempt_id}, updates)
+    dbc.update(TABLE, {"attempt_id": attempt_id, "user_id": user_id}, updates)
     return {**result_payload, "completed": True,
             "report": {"round_scores": scores, "total_percent": total_percent,
                        "band": band, "recommendation": recommendation,

@@ -57,6 +57,9 @@ export function InterviewPanel() {
   // onclose can never clobber a fresh session (state race fix).
   const generationRef = useRef(0);
   const startedAtRef = useRef(0);
+  const reportRef = useRef<any>(null);
+  // A dropped reply must never lock the composer: awaitingReply auto-expires.
+  const replyTimeoutRef = useRef<number | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const metrics = useMetrics((state) => state.metrics);
   const resetMetrics = useMetrics((state) => state.reset);
@@ -70,13 +73,37 @@ export function InterviewPanel() {
   const { supported: audioSupported, listening, speaking, interim, start: startMic, stop: stopMic, speak, stopSpeaking } =
     useAudio(send);
 
+  const clearReplyTimeout = () => {
+    if (replyTimeoutRef.current !== null) {
+      window.clearTimeout(replyTimeoutRef.current);
+      replyTimeoutRef.current = null;
+    }
+  };
+
+  const armReplyTimeout = () => {
+    clearReplyTimeout();
+    // Server budget is 60s; 25s client-side surfaces a resendable state early.
+    replyTimeoutRef.current = window.setTimeout(() => {
+      setAwaitingReply(false);
+      setSessionError("No response arrived — check your connection, then resend your answer.");
+    }, 25000);
+  };
+
   function send(override?: string) {
     const text = (override ?? input).trim();
-    if (!text || awaitingReply || wsRef.current?.readyState !== WebSocket.OPEN) return;
+    if (!text || wsRef.current?.readyState !== WebSocket.OPEN) return;
+    // Spoken answers arriving while the interviewer responds are kept in the
+    // composer instead of vanishing silently.
+    if (awaitingReply) {
+      setInput(text);
+      setSessionError("Held your answer — the interviewer is responding. Review and resend.");
+      return;
+    }
     wsRef.current.send(JSON.stringify({ type: "message", text }));
     stopSpeaking(); // barge-in
     setSessionError(null);
     setAwaitingReply(true);
+    armReplyTimeout();
     setTurns((current) => [...current, { role: "candidate", text }]);
     setInput("");
   }
@@ -91,7 +118,9 @@ export function InterviewPanel() {
       .catch((error) => setSessionError(error instanceof Error ? error.message : "Prepared packs could not be loaded."))
       .finally(() => setLoadingWorkflows(false));
     return () => {
-      teardownWs(wsRef.current)
+      clearReplyTimeout();
+      teardownWs(wsRef.current);
+      wsRef.current = null;
       if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     };
   }, []);
@@ -115,6 +144,8 @@ export function InterviewPanel() {
     setPhase("connecting");
     setSessionError(null);
     setReport(null);
+    reportRef.current = null;
+    clearReplyTimeout();
     setTurns([]);
     setElapsedSeconds(0);
     resetMetrics();
@@ -154,6 +185,7 @@ export function InterviewPanel() {
       try {
         message = JSON.parse(event.data);
       } catch {
+        clearReplyTimeout();
         setAwaitingReply(false);
         setSessionError("The interviewer sent an unreadable response. Restart this session.");
         return;
@@ -161,31 +193,39 @@ export function InterviewPanel() {
       if (message.type === "question" || message.type === "message") {
         const data = message.data || {};
         const text = data.message || data.question || "";
+        clearReplyTimeout();
         setAwaitingReply(false);
         if (text) {
           setTurns((current) => [...current, { role: "interviewer", text }]);
           if (audioMode && audioSupported) speak(text);
         }
       } else if (message.type === "report") {
+        clearReplyTimeout();
         setAwaitingReply(false);
         stopSpeaking();
+        reportRef.current = message.data;
         setReport(message.data);
         setPhase("complete");
       } else if (message.type === "error") {
+        clearReplyTimeout();
         setAwaitingReply(false);
         setSessionError(message.data?.message || "The interviewer could not process that answer. Try again.");
       }
     };
     socket.onerror = () => {
       if (generation !== generationRef.current) return;
+      clearReplyTimeout();
       setAwaitingReply(false);
     };
     socket.onclose = () => {
       if (generation !== generationRef.current) return;
+      clearReplyTimeout();
       setAwaitingReply(false);
       stopSpeaking();
+      // A close during scoring without a report means scoring never landed:
+      // route to interrupted (transcript recovery) instead of a dead studio.
       setPhase((current) =>
-        current === "complete" ? current : current === "ending" ? "complete" : "interrupted",
+        current === "complete" ? current : current === "ending" ? (reportRef.current ? "complete" : "interrupted") : "interrupted",
       );
     };
   };
@@ -215,7 +255,10 @@ export function InterviewPanel() {
   };
 
   const restart = () => {
-      teardownWs(wsRef.current)
+    clearReplyTimeout();
+    teardownWs(wsRef.current);
+    wsRef.current = null;
+    generationRef.current += 1;
     setPhase("setup");
     setTurns([]);
     setReport(null);
@@ -265,17 +308,17 @@ export function InterviewPanel() {
 
               {selectedWorkflow && <div className="grid gap-3 rounded-xl border bg-secondary/20 p-4 sm:grid-cols-3"><BriefStat label="Company" value={selectedWorkflow.company || "Target role"} /><BriefStat label="Questions" value={String(selectedWorkflow.questions?.length ?? 0)} /><BriefStat label="Role match" value={selectedWorkflow.match?.overall_match_percent != null ? `${selectedWorkflow.match.overall_match_percent}%` : "Prepared"} /></div>}
 
-              <div className="space-y-2"><Label>Session length</Label><div className="grid grid-cols-4 gap-2">{[10, 15, 30, 45].map((minutes) => <button key={minutes} type="button" onClick={() => setDuration(minutes)} className={`min-h-11 rounded-lg border px-2 text-sm font-semibold surface-transition ${duration === minutes ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`}>{minutes} min</button>)}</div></div>
+              <div className="space-y-2"><Label>Session length</Label><div role="radiogroup" aria-label="Session length" className="grid grid-cols-4 gap-2">{[10, 15, 30, 45].map((minutes) => <button key={minutes} type="button" role="radio" aria-checked={duration === minutes} onClick={() => setDuration(minutes)} className={`min-h-11 rounded-lg border px-2 text-sm font-semibold surface-transition ${duration === minutes ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`}>{minutes} min</button>)}</div></div>
 
               <div className="space-y-2">
                 <Label>Interviewer persona</Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div role="radiogroup" aria-label="Interviewer persona" className="grid grid-cols-3 gap-2">
                   {[
                     { id: "maya", name: "Maya", desc: "Balanced" },
                     { id: "alex", name: "Alex", desc: "Amazon LP" },
                     { id: "priya", name: "Priya", desc: "Meta collab" },
                   ].map((p) => (
-                    <button key={p.id} type="button" onClick={() => setPersona(p.id)} className={`rounded-xl border p-3 text-left surface-transition ${persona === p.id ? "border-primary bg-primary/10" : "bg-background hover:bg-accent"}`}>
+                    <button key={p.id} type="button" role="radio" aria-checked={persona === p.id} onClick={() => setPersona(p.id)} className={`rounded-xl border p-3 text-left surface-transition ${persona === p.id ? "border-primary bg-primary/10" : "bg-background hover:bg-accent"}`}>
                       <span className="block text-sm font-semibold">{p.name}</span>
                       <span className="block text-xs text-muted-foreground">{p.desc}</span>
                     </button>
@@ -374,6 +417,9 @@ export function InterviewPanel() {
 
           {/* Stage */}
           <div className="relative grid min-h-[520px] place-items-center px-4 pb-40 pt-14 md:pb-44">
+            {sessionError && (
+              <div role="alert" className="absolute left-1/2 top-3 z-40 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 items-start gap-2 rounded-xl border border-amber-400/40 bg-black/70 p-3 text-xs text-amber-200 backdrop-blur-md"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{sessionError}</span></div>
+            )}
             <InterviewerStage speaking={speaking} awaitingReply={awaitingReply} lastLine={lastInterviewerLine} />
 
             {/* Candidate PiP camera */}

@@ -81,10 +81,10 @@ export function CoachingPanel() {
       </section>
 
       <nav aria-label="Coaching workspaces" className="motion-enter motion-enter-delay-1 grid gap-1 rounded-2xl border bg-secondary/45 p-1.5 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
-        <WorkspaceButton active={workspace === "fit"} onClick={() => setWorkspace("fit")} icon={<Target className="h-4 w-4" />} title="Role fit" description="Find evidence and gaps" />
-        <WorkspaceButton active={workspace === "company"} onClick={() => setWorkspace("company")} icon={<Building2 className="h-4 w-4" />} title="Company playbooks" description="Understand interview style" />
-        <WorkspaceButton active={workspace === "salary"} onClick={() => setWorkspace("salary")} icon={<CircleDollarSign className="h-4 w-4" />} title="Offer negotiation" description="Build your exact script" />
-        <WorkspaceButton active={workspace === "practice"} onClick={() => setWorkspace("practice")} icon={<Camera className="h-4 w-4" />} title="Practice room" description="Speak or type with presence feedback" />
+        <WorkspaceButton active={workspace === "fit"} onClick={() => { setWorkspace("fit"); setError(null); }} icon={<Target className="h-4 w-4" />} title="Role fit" description="Find evidence and gaps" />
+        <WorkspaceButton active={workspace === "company"} onClick={() => { setWorkspace("company"); setError(null); }} icon={<Building2 className="h-4 w-4" />} title="Company playbooks" description="Understand interview style" />
+        <WorkspaceButton active={workspace === "salary"} onClick={() => { setWorkspace("salary"); setError(null); }} icon={<CircleDollarSign className="h-4 w-4" />} title="Offer negotiation" description="Build your exact script" />
+        <WorkspaceButton active={workspace === "practice"} onClick={() => { setWorkspace("practice"); setError(null); }} icon={<Camera className="h-4 w-4" />} title="Practice room" description="Speak or type with presence feedback" />
       </nav>
 
       {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>}

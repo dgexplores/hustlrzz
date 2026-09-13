@@ -11,8 +11,8 @@ coaching without uploading camera video.
 - Backend unit suite must pass.
 - Frontend lint, TypeScript, and production build must pass.
 - Production dependency audit must report no high or critical vulnerabilities.
-- Railway `/health` must report AI configured and database ready.
-- Vercel and Railway deployments must both complete for the same commit.
+- Render `/health` must report AI configured and database ready.
+- Vercel and Render deployments must both complete for the same commit.
 - Camera and microphone failure must not block typed practice.
 
 ## Privacy boundary

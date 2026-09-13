@@ -21,6 +21,14 @@ class ProviderError(RuntimeError):
     pass
 
 
+RATE_LIMIT_HINTS = ("429", "rate limit", "rate_limit", "quota", "overloaded", "capacity")
+
+
+def is_rate_limit_error(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return any(hint in message for hint in RATE_LIMIT_HINTS)
+
+
 def is_configured() -> bool:
     return bool(_providers())
 
@@ -31,7 +39,7 @@ def is_configured() -> bool:
 def _groq_chat(system: str, user: str, temperature: float = 0.4) -> str:
     from groq import Groq
 
-    client = Groq(api_key=config.GROQ_API_KEY)
+    client = Groq(api_key=config.GROQ_API_KEY, timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
     resp = client.chat.completions.create(
         model=config.GROQ_MODEL,
         messages=[
@@ -53,7 +61,7 @@ def _gemini_chat(system: str, user: str, temperature: float = 0.4) -> str:
     )
     resp = model.generate_content(user, generation_config={
         "temperature": temperature,
-    })
+    }, request_options={"timeout": config.AI_REQUEST_TIMEOUT_SECONDS})
     return (resp.text or "").strip()
 
 
