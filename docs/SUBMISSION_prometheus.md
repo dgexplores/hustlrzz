@@ -6,7 +6,7 @@ Branch: `main` (merged from `prometheus-edu`, deleted) · Deadline: Oct 14, 2026
 
 ## Links (fill after deploy)
 
-- Live app: https://hustlrzz-app.vercel.app
+- Live app: https://hustlrzz.vercel.app
 - API health: https://hustlrzz-api.onrender.com/health (expect `ai_configured:true, db_ready:true`)
 - Demo video: <YouTube/unlisted link>
 - Devpost project: <link after submitting>
@@ -47,7 +47,7 @@ interviewer, and learn WHY every model answer works — standard or explained si
 ## Pre-submit checklist
 
 - [x] Backend live on Render: `{"status":"ok","ai_configured":true,"provider":"groq","db_ready":true}` + CORS verified for frontend origin
-- [x] Frontend live at https://hustlrzz-app.vercel.app (fresh project; old `hustlrzz` project hijacked by unrelated `mocker_web` settings)
+- [x] Frontend live at https://hustlrzz.vercel.app
 - [ ] `/health` shows ai_configured + db_ready true
 - [ ] Judge demo account created + seeded (resume/JD/pack), quota fresh — see below
 - [ ] Video uploaded unlisted, link first frame + description
