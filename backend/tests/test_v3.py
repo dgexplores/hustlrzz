@@ -390,6 +390,22 @@ def test_submit_round_full_flow(monkeypatch):
     assert wrong["completed"] is True
 
 
+def test_grade_round_tolerates_bad_answer_index():
+    from backend.assessment.service import _grade_round
+
+    state = {"questions": [{
+        "prompt": "Which SQL clause filters groups?",
+        "options": ["WHERE", "HAVING"],
+        "answer_index": 5,
+        "skill": "sql",
+        "explanation": "HAVING filters aggregates.",
+    }]}
+    graded = _grade_round(state, {"q1": 0})
+    assert graded["total"] == 1
+    assert graded["correct"] == 0
+    assert graded["review"][0]["correct_text"] == ""
+
+
 def test_submit_round_wrong_user_rejected(monkeypatch):
     from backend.assessment import service as svc
 
