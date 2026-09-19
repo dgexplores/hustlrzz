@@ -1,8 +1,10 @@
 "use client";
 
 import { useRef } from "react";
+import { useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { Outfit } from "next/font/google";
+import { motion } from "motion/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
@@ -17,6 +19,7 @@ import {
   Play,
   ShieldCheck,
 } from "lucide-react";
+import { usePressAndHover, useFlexSpring, useHoverSpring } from "@/hooks/useSprings";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -58,12 +61,149 @@ const MODES = [
   },
 ];
 
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  const { scale, handlers } = useHoverSpring(1, 1);
+  return (
+    <motion.span {...handlers} style={{ scale }} className="pressable text-[13px] font-medium text-white/70 transition-none">
+      <Link href={href} className="block hover:text-white">{children}</Link>
+    </motion.span>
+  );
+}
+
+function NavCTA({ href, children }: { href: string; children: React.ReactNode }) {
+  const { scale, handlers } = usePressAndHover(0.97, 1.03);
+  return (
+    <motion.span {...handlers} style={{ scale }} className="pressable rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#05070d] transition-none">
+      <Link href={href} className="block">{children}</Link>
+    </motion.span>
+  );
+}
+
+function HeroCTA({ href, children, primary = true }: { href: string; children: React.ReactNode; primary?: boolean }) {
+  const { scale, handlers } = usePressAndHover(0.97, 1.03);
+  return (
+    <motion.span {...handlers} style={{ scale }} className="pressable inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold transition-none">
+      <Link
+        href={href}
+        className={`block ${
+          primary
+            ? "bg-white text-[#05070d] shadow-[0_10px_40px_rgba(255,255,255,0.25)]"
+            : "border border-white/25 bg-white/10 text-white backdrop-blur-md hover:bg-white/20"
+        }`}
+      >
+        {children}
+      </Link>
+    </motion.span>
+  );
+}
+
+function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+  const { scale, handlers } = useHoverSpring(1, 1);
+  return (
+    <motion.span {...handlers} style={{ scale }} className="pressable transition-none">
+      <Link href={href} className="hover:text-white">{children}</Link>
+    </motion.span>
+  );
+}
+
+function AccordionSlice({ mode }: { mode: typeof MODES[0] }) {
+  const { flex, isExpanded, expand, collapse } = useFlexSpring(1, 2.4);
+  const { scale: imgScale } = useHoverSpring(1, 1.05);
+
+  return (
+    <motion.a
+      href={mode.href}
+      className="acc-slice pressable group relative min-h-[220px] flex-1 overflow-hidden rounded-3xl border border-white/10 md:min-h-0"
+      style={{ flexGrow: flex }}
+      onMouseEnter={expand}
+      onMouseLeave={collapse}
+      onFocus={expand}
+      onBlur={collapse}
+    >
+      <motion.div
+        style={{ scale: imgScale }}
+        className="absolute inset-0 bg-cover bg-center grayscale transition-none"
+        aria-hidden="true"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-t from-[#05070d] via-[#05070d]/45 to-transparent"
+      />
+      <div className="absolute inset-x-0 bottom-0 p-6">
+        <p className={`${display.className} text-2xl font-semibold text-white`}>{mode.title}</p>
+        <motion.p
+          style={{ opacity: isExpanded ? 1 : 0, y: isExpanded ? 0 : 10 }}
+          className="mt-2 max-w-[36ch] text-sm leading-6 text-white/70 transition-none"
+        >
+          {mode.copy}
+        </motion.p>
+        <span className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-white">
+          Open <ArrowUpRight className="h-4 w-4" />
+        </span>
+      </div>
+      <style jsx>{`
+        .acc-slice:hover {
+          filter: saturate(.6) brightness(.75);
+        }
+        .acc-slice:hover > * {
+          filter: none;
+        }
+        .acc-slice .absolute.inset-0.bg-cover.bg-center.grayscale:hover {
+          transform: scale(1.05);
+        }
+      `}</style>
+    </motion.a>
+  );
+}
+
+function BentoCard({ span, icon, title, copy, seed }: { span: string; icon: React.ReactNode; title: string; copy: string; seed: string }) {
+  const { scale, handlers } = useHoverSpring(1, 1.02);
+  const { scale: imgScale } = useHoverSpring(1, 1.05);
+
+  return (
+    <motion.article
+      {...handlers}
+      style={{ scale }}
+      className={`group relative ${span} min-h-64 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-7 md:p-9 transition-none spring-scale`}
+    >
+      <motion.div
+        {...handlers}
+        style={{ scale: imgScale, opacity: 0.25, backgroundImage: `url(https://picsum.photos/seed/${seed}/1000/700)` }}
+        className="absolute inset-0 bg-cover bg-center grayscale mix-blend-luminosity transition-none"
+        aria-hidden="true"
+      />
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#05070d] via-[#05070d]/55 to-transparent" />
+      <div className="relative">
+        {icon}
+        <h3 className="mt-16 max-w-md text-xl font-semibold tracking-tight text-white md:mt-20">{title}</h3>
+        <p className="mt-3 max-w-lg text-sm leading-6 text-white/65">{copy}</p>
+      </div>
+    </motion.article>
+  );
+}
+
+function GalleryImage({ seed }: { seed: string }) {
+  const { scale, handlers } = useHoverSpring(1, 1.05);
+  return (
+    <motion.div {...handlers} style={{ scale }} className="group overflow-hidden rounded-3xl border border-white/10 spring-scale">
+      {/* Plain img: GSAP scale/scrub transforms on the raw element; next/image wrappers break the effect. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`https://picsum.photos/seed/${seed}/1200/800`}
+        alt=""
+        loading="lazy"
+        className="rise-fade aspect-[3/2] w-full object-cover grayscale contrast-125 transition-none"
+      />
+    </motion.div>
+  );
+}
+
 export function HomeContent() {
   const root = useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
 
   useGSAP(
     () => {
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (reduce) {
         root.current?.classList.add("no-scrub");
         return;
@@ -106,7 +246,7 @@ export function HomeContent() {
 
   return (
     <main ref={root} className="w-full max-w-full overflow-x-hidden">
-      {/* Floating glass navigation */}
+      {/* Floating glass navigation - spring-driven */}
       <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4">
         <nav
           aria-label="Primary"
@@ -115,17 +255,12 @@ export function HomeContent() {
           <Link href="/" className="pressable text-sm font-bold tracking-tight text-white">
             Hustlrzz
           </Link>
-          <div className="hidden items-center gap-6 text-[13px] font-medium text-white/70 sm:flex">
-            <Link className="pressable transition-colors hover:text-white" href="/prepare">Prepare</Link>
-            <Link className="pressable transition-colors hover:text-white" href="/assessment">Assess</Link>
-            <Link className="pressable transition-colors hover:text-white" href="/coaching">Coach</Link>
+          <div className="hidden items-center gap-6 sm:flex">
+            <NavLink href="/prepare">Prepare</NavLink>
+            <NavLink href="/assessment">Assess</NavLink>
+            <NavLink href="/coaching">Coach</NavLink>
           </div>
-          <Link
-            href="/prepare"
-            className="pressable rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#05070d] transition-transform hover:scale-[1.03]"
-          >
-            Start preparing
-          </Link>
+          <NavCTA href="/prepare">Start preparing</NavCTA>
         </nav>
       </header>
 
@@ -170,18 +305,12 @@ export function HomeContent() {
             Paste your resume, get a focused question pack, and practice like it is real. Three steps, about five minutes.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/prepare"
-              className="pressable inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-semibold text-[#05070d] shadow-[0_10px_40px_rgba(255,255,255,0.25)] transition-transform hover:scale-[1.03]"
-            >
+            <HeroCTA href="/prepare" primary>
               Start preparing <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/interview"
-              className="pressable inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-7 py-3.5 text-sm font-semibold text-white backdrop-blur-md transition-colors hover:bg-white/20"
-            >
+            </HeroCTA>
+            <HeroCTA href="/interview" primary={false}>
               <Play className="h-4 w-4" /> Try sample interview
-            </Link>
+            </HeroCTA>
           </div>
 
           <div className="hero-frame relative mx-auto mt-16 max-w-4xl overflow-hidden rounded-[1.5rem] border border-white/15 bg-white/[0.06] shadow-[0_40px_120px_rgba(0,0,0,0.55)] backdrop-blur-xl">
@@ -303,7 +432,7 @@ export function HomeContent() {
         </div>
       </section>
 
-      {/* INTEREST II — horizontal accordions */}
+      {/* INTEREST II — horizontal accordions with spring expand/collapse */}
       <section className="border-t border-white/10 bg-[#070b16] px-5 py-32 md:px-10 md:py-48">
         <div className="mx-auto max-w-6xl">
           <h2
@@ -314,27 +443,7 @@ export function HomeContent() {
           </h2>
           <div className="acc-group mt-12 flex flex-col gap-3 md:h-[420px] md:flex-row">
             {MODES.map((mode) => (
-              <Link
-                key={mode.key}
-                href={mode.href}
-                className="acc-slice pressable group relative min-h-[220px] flex-1 overflow-hidden rounded-3xl border border-white/10 hover:flex-[2.4] focus-visible:flex-[2.4] md:min-h-0"
-              >
-                <div
-                  aria-hidden="true"
-                  className="absolute inset-0 bg-cover bg-center grayscale transition-transform duration-700 ease-out group-hover:scale-105"
-                  style={{ backgroundImage: `url(https://picsum.photos/seed/${mode.seed}/900/900)` }}
-                />
-                <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#05070d] via-[#05070d]/45 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-6">
-                  <p className={`${display.className} text-2xl font-semibold text-white`}>{mode.title}</p>
-                  <p className="mt-2 max-w-[36ch] text-sm leading-6 text-white/70 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-visible:opacity-100">
-                    {mode.copy}
-                  </p>
-                  <span className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-white">
-                    Open <ArrowUpRight className="h-4 w-4" />
-                  </span>
-                </div>
-              </Link>
+              <AccordionSlice key={mode.key} mode={mode} />
             ))}
           </div>
         </div>
@@ -353,16 +462,7 @@ export function HomeContent() {
         </div>
         <div className="mx-auto mt-20 grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-2">
           {["stage-light", "quiet-booth"].map((seed) => (
-            <div key={seed} className="group overflow-hidden rounded-3xl border border-white/10">
-              {/* Plain img: GSAP scale/scrub transforms on the raw element; next/image wrappers break the effect. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`https://picsum.photos/seed/${seed}/1200/800`}
-                alt=""
-                loading="lazy"
-                className="rise-fade aspect-[3/2] w-full object-cover grayscale contrast-125 transition-transform duration-700 ease-out group-hover:scale-105"
-              />
-            </div>
+            <GalleryImage key={seed} seed={seed} />
           ))}
         </div>
       </section>
@@ -381,64 +481,26 @@ export function HomeContent() {
             Your next interview starts tonight.
           </h2>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/prepare"
-              className="pressable inline-flex items-center gap-2 rounded-full bg-[#05070d] px-8 py-4 text-sm font-semibold text-white transition-transform hover:scale-[1.03]"
-            >
+            <HeroCTA href="/prepare" primary>
               Build my question pack <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/coaching"
-              className="pressable inline-flex items-center gap-2 rounded-full border border-white/40 px-8 py-4 text-sm font-semibold text-white transition-colors hover:bg-white/10"
-            >
+            </HeroCTA>
+            <HeroCTA href="/coaching" primary={false}>
               Open coaching
-            </Link>
+            </HeroCTA>
           </div>
           <footer className="mt-24 flex flex-col items-center justify-between gap-6 border-t border-white/25 pt-8 text-[13px] text-white/80 sm:flex-row">
             <p className="font-bold text-white">Hustlrzz</p>
             <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-6">
-              <Link className="pressable hover:text-white" href="/prepare">Prepare</Link>
-              <Link className="pressable hover:text-white" href="/assessment">Assessment</Link>
-              <Link className="pressable hover:text-white" href="/interview">Interview</Link>
-              <Link className="pressable hover:text-white" href="/coaching">Coaching</Link>
-              <Link className="pressable hover:text-white" href="/legal/privacy">Privacy</Link>
+              <FooterLink href="/prepare">Prepare</FooterLink>
+              <FooterLink href="/assessment">Assessment</FooterLink>
+              <FooterLink href="/interview">Interview</FooterLink>
+              <FooterLink href="/coaching">Coaching</FooterLink>
+              <FooterLink href="/legal/privacy">Privacy</FooterLink>
             </nav>
             <p>Private by design. Your camera never leaves the browser.</p>
           </footer>
         </div>
       </section>
     </main>
-  );
-}
-
-function BentoCard({
-  span,
-  icon,
-  title,
-  copy,
-  seed,
-}: {
-  span: string;
-  icon: React.ReactNode;
-  title: string;
-  copy: string;
-  seed: string;
-}) {
-  return (
-    <article
-      className={`group relative ${span} min-h-64 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-7 md:p-9`}
-    >
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-cover bg-center opacity-25 grayscale mix-blend-luminosity transition-transform duration-700 ease-out group-hover:scale-105"
-        style={{ backgroundImage: `url(https://picsum.photos/seed/${seed}/1000/700)` }}
-      />
-      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#05070d] via-[#05070d]/55 to-transparent" />
-      <div className="relative">
-        {icon}
-        <h3 className="mt-16 max-w-md text-xl font-semibold tracking-tight text-white md:mt-20">{title}</h3>
-        <p className="mt-3 max-w-lg text-sm leading-6 text-white/65">{copy}</p>
-      </div>
-    </article>
   );
 }
