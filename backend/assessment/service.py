@@ -143,7 +143,7 @@ def _grade_round(round_state: dict, responses: dict) -> dict:
             "chosen_index": chosen_index,
             "chosen_text": question["options"][chosen_index] if 0 <= chosen_index < len(question["options"]) else "",
             "correct_index": question["answer_index"],
-            "correct_text": question["options"][question["answer_index"]],
+            "correct_text": question["options"][question["answer_index"]] if isinstance(question.get("answer_index"), int) and 0 <= question["answer_index"] < len(question["options"]) else "",
             "correct": is_correct,
             "explanation": question.get("explanation", ""),
             "skill": question.get("skill", "general"),
