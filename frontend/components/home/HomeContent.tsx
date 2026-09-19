@@ -1,113 +1,230 @@
 "use client";
 
+import { useRef } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Outfit } from "next/font/google";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
 import {
   ArrowRight,
-  AudioLines,
+  ArrowUpRight,
   Building2,
   Camera,
-  Check,
-  CircleDollarSign,
   FileSearch,
   MessageSquareText,
+  Mic,
+  Play,
   ShieldCheck,
-  Sparkles,
-  Target,
 } from "lucide-react";
 
-const capabilities = [
+gsap.registerPlugin(ScrollTrigger);
+
+const display = Outfit({ subsets: ["latin"], weight: ["500", "600", "700"] });
+
+const SCRUB_LINE =
+  "Great interviews are rehearsed under pressure, not memorized from lists. Hustlrzz puts your evidence, the company's bar, and a live coach in one room.";
+
+const MARQUEE = ["Prepare", "Assess", "Rehearse", "Negotiate", "Remember", "Perform"];
+
+const MODES = [
   {
-    icon: FileSearch,
-    title: "Questions built around your experience",
-    copy: "Add a resume and job description. Hustlrzz finds the evidence worth practising and creates a focused interview pack.",
-    className: "md:col-span-7",
+    key: "prepare",
+    title: "Prepare",
+    copy: "Resume plus job description becomes a focused pack: questions, evidence map, company brief.",
+    href: "/prepare",
+    seed: "prepare-desk",
   },
   {
-    icon: Building2,
-    title: "Current company context",
-    copy: "Research runs when you need it, with source links and preparation cues for the role you selected.",
-    className: "md:col-span-5",
+    key: "assess",
+    title: "Assess",
+    copy: "Timed aptitude, technical, and judgment rounds. Scored blind, reported honestly.",
+    href: "/assessment",
+    seed: "assess-stage",
   },
   {
-    icon: MessageSquareText,
-    title: "A conversation, not a question list",
-    copy: "The interviewer listens to each answer, asks follow-ups, and keeps the discussion grounded in your preparation.",
-    className: "md:col-span-5",
+    key: "rehearse",
+    title: "Rehearse",
+    copy: "A live interviewer that follows up, paces the clock, and judges against your material.",
+    href: "/interview",
+    seed: "rehearse-mic",
   },
   {
-    icon: Camera,
-    title: "Content and presence in one review",
-    copy: "See answer quality alongside posture, gaze, and gesture signals. Camera processing remains on your device.",
-    className: "md:col-span-7",
+    key: "negotiate",
+    title: "Negotiate",
+    copy: "Salary scripts and coaching turns for the conversations after the interview.",
+    href: "/coaching",
+    seed: "negotiate-room",
   },
 ];
 
 export function HomeContent() {
-  return (
-    <main className="flex-1 overflow-hidden">
-      <section className="mx-auto grid min-h-[calc(100dvh-4rem)] max-w-7xl items-center gap-12 px-4 py-12 md:px-6 lg:grid-cols-[0.88fr_1.12fr] lg:py-16">
-        <div className="motion-enter max-w-xl">
-          <p className="mb-5 text-sm font-semibold text-primary">AI interview practice that uses your context</p>
-          <h1 className="text-5xl font-semibold leading-[1.02] tracking-[-0.045em] text-foreground md:text-6xl">
-            Walk into the interview prepared.
-          </h1>
-          <p className="mt-6 max-w-[50ch] text-lg leading-8 text-muted-foreground">
-            Paste your resume, get a focused question pack, and practice like it’s real — 3 steps, ~5 minutes.
-          </p>
-          <div className="mt-6 flex items-center gap-2 text-xs font-medium">
-            <span className="flex items-center gap-1.5"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">1</span> Prepare</span>
-            <span className="text-muted-foreground">→</span>
-            <span className="flex items-center gap-1.5"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">2</span> Practice</span>
-            <span className="text-muted-foreground">→</span>
-            <span className="flex items-center gap-1.5"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">3</span> Progress</span>
-          </div>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/prepare"><Button size="lg">Start preparing <ArrowRight className="h-4 w-4" /></Button></Link>
-            <Link href="/interview"><Button size="lg" variant="outline">Try sample interview</Button></Link>
-          </div>
-          <p className="mt-3 text-xs text-muted-foreground">No resume? Use sample data in Prepare — one click.</p>
-        </div>
+  const root = useRef<HTMLElement>(null);
 
-        <div className="motion-enter motion-enter-delay-1 relative lg:pl-8">
-          <div className="product-window overflow-hidden rounded-[1.5rem]">
-            <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
+  useGSAP(
+    () => {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduce) {
+        root.current?.classList.add("no-scrub");
+        return;
+      }
+      const words = gsap.utils.toArray<HTMLElement>(".scrub-word");
+      if (words.length) {
+        gsap.to(words, {
+          opacity: 1,
+          stagger: 0.06,
+          ease: "none",
+          scrollTrigger: { trigger: ".scrub-block", start: "top 78%", end: "bottom 42%", scrub: 0.6 },
+        });
+      }
+      gsap.utils.toArray<HTMLElement>(".rise-fade").forEach((img) => {
+        gsap.fromTo(
+          img,
+          { scale: 0.8, opacity: 0.35 },
+          {
+            scale: 1,
+            opacity: 1,
+            ease: "none",
+            scrollTrigger: { trigger: img, start: "top 92%", end: "top 45%", scrub: 0.7 },
+          }
+        );
+        gsap.to(img, {
+          opacity: 0.2,
+          filter: "brightness(0.45)",
+          ease: "none",
+          scrollTrigger: { trigger: img, start: "center 40%", end: "top -10%", scrub: 0.7 },
+        });
+      });
+      gsap.fromTo(
+        ".hero-frame",
+        { y: 44, opacity: 0, scale: 0.985 },
+        { y: 0, opacity: 1, scale: 1, duration: 1.1, ease: "power3.out", delay: 0.35 }
+      );
+    },
+    { scope: root }
+  );
+
+  return (
+    <main ref={root} className="w-full max-w-full overflow-x-hidden">
+      {/* Floating glass navigation */}
+      <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+        <nav
+          aria-label="Primary"
+          className="flex w-full max-w-3xl items-center justify-between gap-2 rounded-full border border-white/15 bg-[#0a0e18]/60 py-2 pl-5 pr-2 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur-[20px] backdrop-saturate-[180%]"
+        >
+          <Link href="/" className="pressable text-sm font-bold tracking-tight text-white">
+            Hustlrzz
+          </Link>
+          <div className="hidden items-center gap-6 text-[13px] font-medium text-white/70 sm:flex">
+            <Link className="pressable transition-colors hover:text-white" href="/prepare">Prepare</Link>
+            <Link className="pressable transition-colors hover:text-white" href="/assessment">Assess</Link>
+            <Link className="pressable transition-colors hover:text-white" href="/coaching">Coach</Link>
+          </div>
+          <Link
+            href="/prepare"
+            className="pressable rounded-full bg-white px-4 py-2 text-[13px] font-semibold text-[#05070d] transition-transform hover:scale-[1.03]"
+          >
+            Start preparing
+          </Link>
+        </nav>
+      </header>
+
+      {/* ATTENTION — cinematic center hero */}
+      <section className="campaign-ink grain relative flex min-h-[108svh] items-center justify-center overflow-hidden">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-cover bg-center opacity-90 grayscale contrast-125"
+          style={{ backgroundImage: "url(https://picsum.photos/seed/interview-stage/1920/1080)" }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(1100px 520px at 50% 42%, rgba(5,7,13,0.15), rgba(5,7,13,0.88) 78%), linear-gradient(to bottom, rgba(5,7,13,0.55), rgba(5,7,13,0.35) 40%, #05070d 96%)",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -left-32 top-1/4 h-96 w-96 rounded-full bg-[#2e5bff]/30 blur-[130px]"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -right-32 bottom-1/4 h-96 w-96 rounded-full bg-[#7c5cff]/25 blur-[130px]"
+        />
+
+        <div className="relative mx-auto w-full max-w-6xl px-5 pb-28 pt-40 text-center">
+          <h1
+            className={`${display.className} mx-auto w-full max-w-6xl font-semibold text-white`}
+            style={{ fontSize: "clamp(2.75rem, 5vw, 5rem)", lineHeight: 1.04, letterSpacing: "-0.03em" }}
+          >
+            Walk in rehearsed.{" "}
+            <span
+              aria-hidden="true"
+              className="mx-2 inline-block h-[0.72em] w-24 rounded-full bg-cover bg-center align-middle grayscale"
+              style={{ backgroundImage: "url(https://picsum.photos/seed/coach-mic/400/160)" }}
+            />
+            Leave unforgettable.
+          </h1>
+          <p className="mx-auto mt-7 max-w-[58ch] text-base leading-7 text-white/70 md:text-lg md:leading-8">
+            Paste your resume, get a focused question pack, and practice like it is real. Three steps, about five minutes.
+          </p>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/prepare"
+              className="pressable inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-semibold text-[#05070d] shadow-[0_10px_40px_rgba(255,255,255,0.25)] transition-transform hover:scale-[1.03]"
+            >
+              Start preparing <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/interview"
+              className="pressable inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-7 py-3.5 text-sm font-semibold text-white backdrop-blur-md transition-colors hover:bg-white/20"
+            >
+              <Play className="h-4 w-4" /> Try sample interview
+            </Link>
+          </div>
+
+          <div className="hero-frame relative mx-auto mt-16 max-w-4xl overflow-hidden rounded-[1.5rem] border border-white/15 bg-white/[0.06] shadow-[0_40px_120px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary"><Sparkles className="h-4 w-4" /></span>
-                <div><p className="text-sm font-semibold">Product interview</p><p className="text-xs text-muted-foreground">Senior frontend engineer</p></div>
-              <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Illustrative</span>
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2e5bff]/25 text-white">
+                  <Mic className="h-4 w-4" />
+                </span>
+                <p className="text-left text-sm font-semibold text-white">Product interview</p>
               </div>
-              <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">Live</span>
+              <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">Live</span>
             </div>
-            <div className="grid min-h-[440px] lg:grid-cols-[1fr_190px]">
-              <div className="flex flex-col p-5 md:p-7">
-                <div className="max-w-[90%] rounded-2xl rounded-tl-md bg-secondary p-4">
-                  <p className="text-sm leading-6">Tell me about a technical decision you changed after receiving new evidence.</p>
+            <div className="grid gap-4 p-5 text-left md:grid-cols-[1fr_190px] md:p-7">
+              <div className="flex flex-col gap-4">
+                <div className="max-w-[90%] rounded-2xl rounded-tl-md bg-white/10 p-4">
+                  <p className="text-sm leading-6 text-white/90">Tell me about a technical decision you changed after new evidence.</p>
                 </div>
-                <div className="mt-4 ml-auto max-w-[88%] rounded-2xl rounded-tr-md bg-primary px-4 py-3.5 text-primary-foreground">
-                  <p className="text-sm leading-6">I changed our client-side data strategy after profiling the slowest user journeys...</p>
+                <div className="ml-auto max-w-[88%] rounded-2xl rounded-tr-md bg-white px-4 py-3.5">
+                  <p className="text-sm leading-6 text-[#05070d]">I changed our client-side data strategy after profiling the slowest journeys…</p>
                 </div>
-                <div className="mt-auto rounded-2xl border bg-background/80 p-3.5">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground"><AudioLines className="h-4 w-4" /></span>
-                    <div className="live-wave flex flex-1 items-center gap-1" aria-hidden="true">
-                      {[5, 11, 17, 9, 22, 14, 7, 19, 12, 6, 15, 9, 20, 11, 5].map((height, index) => <span key={index} className="w-full rounded-full bg-primary/60" style={{ height }} />)}
-                    </div>
-                    <span className="text-xs font-medium text-muted-foreground">Listening</span>
+                <div className="mt-auto flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5">
+                  <div className="live-wave flex flex-1 items-center gap-1" aria-hidden="true">
+                    {[5, 11, 17, 9, 22, 14, 7, 19, 12, 6, 15, 9, 20, 11, 5].map((h, i) => (
+                      <span key={i} className="w-full rounded-full bg-white/60" style={{ height: h }} />
+                    ))}
                   </div>
+                  <span className="text-xs font-medium text-white/60">Listening</span>
                 </div>
               </div>
-              <aside className="hidden border-l border-border/70 bg-secondary/35 p-4 lg:block">
-                <p className="text-xs font-semibold text-muted-foreground">Session signals</p>
-                <div className="mt-5 space-y-5">
-                  <Signal label="Answer structure" value="Clear" />
-                  <Signal label="Eye contact" value="Steady" />
-                  <Signal label="Posture" value="Balanced" />
-                </div>
-                <div className="mt-7 rounded-xl bg-background p-3 shadow-sm">
-                  <Target className="h-4 w-4 text-primary" />
-                  <p className="mt-2 text-xs font-semibold">Current focus</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Explain the measurable outcome.</p>
+              <aside className="hidden rounded-xl border border-white/10 bg-white/[0.04] p-4 lg:block">
+                <p className="text-xs font-semibold text-white/50">Session signals</p>
+                <div className="mt-4 space-y-4">
+                  {[["Structure", "Clear"], ["Eye contact", "Steady"], ["Posture", "Balanced"]].map(([l, v]) => (
+                    <div key={l}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-white/55">{l}</span>
+                        <span className="text-xs font-semibold text-white">{v}</span>
+                      </div>
+                      <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
+                        <div className="h-full w-[76%] rounded-full bg-[#2e5bff]" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </aside>
             </div>
@@ -115,42 +232,213 @@ export function HomeContent() {
         </div>
       </section>
 
-      <section className="border-y bg-secondary/35">
-        <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 text-sm md:grid-cols-3 md:px-6">
-          <p className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" />Voice and typing</p>
-          <p className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" />Multi-provider AI with automatic failover</p>
-          <p className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" />Private camera processing</p>
+      {/* Marquee interlude */}
+      <div className="campaign-ink overflow-hidden border-t border-white/10 py-8" aria-hidden="true">
+        <div className="marquee-track flex w-max items-center gap-10 pr-10">
+          {[...MARQUEE, ...MARQUEE].map((word, i) => (
+            <span key={i} className={`${display.className} text-4xl font-semibold tracking-tight text-white/25 md:text-5xl`}>
+              {word} <span className="ml-10 text-[#2e5bff]">·</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* INTEREST — gapless bento */}
+      <section className="campaign-ink px-5 py-32 md:px-10 md:py-48">
+        <div className="mx-auto max-w-6xl">
+          <h2
+            className={`${display.className} max-w-3xl text-3xl font-semibold tracking-tight text-white md:text-5xl`}
+            style={{ letterSpacing: "-0.025em", lineHeight: 1.08 }}
+          >
+            One room for{" "}
+            <span
+              aria-hidden="true"
+              className="mx-1 inline-block h-[0.72em] w-20 rounded-full bg-cover bg-center align-middle opacity-90 grayscale"
+              style={{ backgroundImage: "url(https://picsum.photos/seed/focus-desk/320/140)" }}
+            />{" "}
+            every round.
+          </h2>
+          <p className="mt-5 max-w-xl text-base leading-7 text-white/60">
+            Each surface serves the same goal: a more specific, confident answer next time.
+          </p>
+
+          <div className="mt-12 grid grid-flow-dense grid-cols-1 gap-4 md:grid-cols-12">
+            <BentoCard
+              span="md:col-span-7"
+              icon={<FileSearch className="h-6 w-6 text-[#8fb0ff]" />}
+              title="Questions built around your experience"
+              copy="Add a resume and job description. Hustlrzz finds the evidence worth practising and creates a focused interview pack."
+              seed="evidence-wall"
+            />
+            <BentoCard
+              span="md:col-span-5"
+              icon={<Building2 className="h-6 w-6 text-[#8fb0ff]" />}
+              title="Current company context"
+              copy="Research runs when you need it, with source links and preparation cues for the role you selected."
+              seed="company-glass"
+            />
+            <BentoCard
+              span="md:col-span-5"
+              icon={<MessageSquareText className="h-6 w-6 text-[#8fb0ff]" />}
+              title="A conversation, not a question list"
+              copy="The interviewer listens to each answer, asks follow-ups, and keeps the discussion grounded in your preparation."
+              seed="dialogue-loop"
+            />
+            <BentoCard
+              span="md:col-span-7"
+              icon={<Camera className="h-6 w-6 text-[#8fb0ff]" />}
+              title="Content and presence in one review"
+              copy="Answer quality alongside posture, gaze, and gesture signals. Camera processing stays on your device."
+              seed="presence-studio"
+            />
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
+            {["Voice and typing", "Multi-provider AI with automatic failover", "Private on-device camera processing"].map((label) => (
+              <p key={label} className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-white/70">
+                <ShieldCheck className="h-4 w-4 text-emerald-300" /> {label}
+              </p>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-28">
-        <div className="max-w-2xl">
-          <h2 className="text-3xl font-semibold tracking-[-0.03em] md:text-4xl">One place to prepare and practise.</h2>
-          <p className="mt-4 text-base leading-7 text-muted-foreground">Every feature supports the same goal: a more specific, confident answer in your next interview.</p>
+      {/* INTEREST II — horizontal accordions */}
+      <section className="border-t border-white/10 bg-[#070b16] px-5 py-32 md:px-10 md:py-48">
+        <div className="mx-auto max-w-6xl">
+          <h2
+            className={`${display.className} max-w-2xl text-3xl font-semibold tracking-tight text-white md:text-5xl`}
+            style={{ letterSpacing: "-0.025em", lineHeight: 1.08 }}
+          >
+            Four modes. One momentum.
+          </h2>
+          <div className="acc-group mt-12 flex flex-col gap-3 md:h-[420px] md:flex-row">
+            {MODES.map((mode) => (
+              <Link
+                key={mode.key}
+                href={mode.href}
+                className="acc-slice pressable group relative min-h-[220px] flex-1 overflow-hidden rounded-3xl border border-white/10 hover:flex-[2.4] focus-visible:flex-[2.4] md:min-h-0"
+              >
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 bg-cover bg-center grayscale transition-transform duration-700 ease-out group-hover:scale-105"
+                  style={{ backgroundImage: `url(https://picsum.photos/seed/${mode.seed}/900/900)` }}
+                />
+                <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#05070d] via-[#05070d]/45 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-6">
+                  <p className={`${display.className} text-2xl font-semibold text-white`}>{mode.title}</p>
+                  <p className="mt-2 max-w-[36ch] text-sm leading-6 text-white/70 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-visible:opacity-100">
+                    {mode.copy}
+                  </p>
+                  <span className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-white">
+                    Open <ArrowUpRight className="h-4 w-4" />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
-        <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-12">
-          {capabilities.map(({ icon: Icon, title, copy, className }, index) => (
-            <article key={title} className={`feature-surface group min-h-56 rounded-2xl p-6 md:p-8 ${className} ${index === 0 || index === 3 ? "bg-primary/[0.055]" : ""}`}>
-              <Icon className="h-6 w-6 text-primary" />
-              <h3 className="mt-12 max-w-md text-xl font-semibold tracking-[-0.015em]">{title}</h3>
-              <p className="mt-3 max-w-lg text-sm leading-6 text-muted-foreground">{copy}</p>
-            </article>
+      </section>
+
+      {/* DESIRE — scrub reveal + scale gallery */}
+      <section className="scrub-block border-t border-white/10 bg-[#05070d] px-5 py-32 md:px-10 md:py-48">
+        <div className="mx-auto max-w-4xl text-center">
+          <p className={`${display.className} text-2xl font-medium leading-snug tracking-tight text-white md:text-4xl md:leading-snug`}>
+            {SCRUB_LINE.split(" ").map((word, i) => (
+              <span key={i} className="scrub-word">
+                {word}{" "}
+              </span>
+            ))}
+          </p>
+        </div>
+        <div className="mx-auto mt-20 grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-2">
+          {["stage-light", "quiet-booth"].map((seed) => (
+            <div key={seed} className="group overflow-hidden rounded-3xl border border-white/10">
+              {/* Plain img: GSAP scale/scrub transforms on the raw element; next/image wrappers break the effect. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://picsum.photos/seed/${seed}/1200/800`}
+                alt=""
+                loading="lazy"
+                className="rise-fade aspect-[3/2] w-full object-cover grayscale contrast-125 transition-transform duration-700 ease-out group-hover:scale-105"
+              />
+            </div>
           ))}
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pb-20 md:px-6 md:pb-28">
-        <div className="feature-surface rounded-[1.75rem] bg-primary/[0.055] px-6 py-10 text-foreground md:px-10 md:py-12">
-          <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div><h2 className="text-3xl font-semibold tracking-[-0.03em]">Practise the conversations around the interview too.</h2><p className="mt-3 max-w-2xl text-sm leading-6 opacity-70">Check role fit, understand company interview patterns, and rehearse salary negotiation with voice, camera, or typing.</p></div>
-            <Link href="/coaching"><Button size="lg">Open coaching <CircleDollarSign className="h-4 w-4" /></Button></Link>
+      {/* ACTION — massive CTA + footer */}
+      <section className="relative overflow-hidden border-t border-white/10 bg-[#2e5bff] px-5 py-32 md:py-48">
+        <div
+          aria-hidden="true"
+          className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/20 blur-[120px]"
+        />
+        <div className="relative mx-auto max-w-6xl">
+          <h2
+            className={`${display.className} w-full max-w-6xl text-center font-semibold text-white`}
+            style={{ fontSize: "clamp(2.5rem, 6vw, 5.5rem)", lineHeight: 1.02, letterSpacing: "-0.03em" }}
+          >
+            Your next interview starts tonight.
+          </h2>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/prepare"
+              className="pressable inline-flex items-center gap-2 rounded-full bg-[#05070d] px-8 py-4 text-sm font-semibold text-white transition-transform hover:scale-[1.03]"
+            >
+              Build my question pack <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/coaching"
+              className="pressable inline-flex items-center gap-2 rounded-full border border-white/40 px-8 py-4 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+            >
+              Open coaching
+            </Link>
           </div>
+          <footer className="mt-24 flex flex-col items-center justify-between gap-6 border-t border-white/25 pt-8 text-[13px] text-white/80 sm:flex-row">
+            <p className="font-bold text-white">Hustlrzz</p>
+            <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-6">
+              <Link className="pressable hover:text-white" href="/prepare">Prepare</Link>
+              <Link className="pressable hover:text-white" href="/assessment">Assessment</Link>
+              <Link className="pressable hover:text-white" href="/interview">Interview</Link>
+              <Link className="pressable hover:text-white" href="/coaching">Coaching</Link>
+              <Link className="pressable hover:text-white" href="/legal/privacy">Privacy</Link>
+            </nav>
+            <p>Private by design. Your camera never leaves the browser.</p>
+          </footer>
         </div>
       </section>
     </main>
   );
 }
 
-function Signal({ label, value }: { label: string; value: string }) {
-  return <div><div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{label}</span><span className="text-xs font-semibold">{value}</span></div><div className="mt-2 h-1 overflow-hidden rounded-full bg-border"><div className="h-full w-[76%] rounded-full bg-primary" /></div></div>;
+function BentoCard({
+  span,
+  icon,
+  title,
+  copy,
+  seed,
+}: {
+  span: string;
+  icon: React.ReactNode;
+  title: string;
+  copy: string;
+  seed: string;
+}) {
+  return (
+    <article
+      className={`group relative ${span} min-h-64 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-7 md:p-9`}
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-cover bg-center opacity-25 grayscale mix-blend-luminosity transition-transform duration-700 ease-out group-hover:scale-105"
+        style={{ backgroundImage: `url(https://picsum.photos/seed/${seed}/1000/700)` }}
+      />
+      <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#05070d] via-[#05070d]/55 to-transparent" />
+      <div className="relative">
+        {icon}
+        <h3 className="mt-16 max-w-md text-xl font-semibold tracking-tight text-white md:mt-20">{title}</h3>
+        <p className="mt-3 max-w-lg text-sm leading-6 text-white/65">{copy}</p>
+      </div>
+    </article>
+  );
 }

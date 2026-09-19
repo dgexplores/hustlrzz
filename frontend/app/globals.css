@@ -121,6 +121,23 @@
   .feature-surface:hover { transform: translateY(-3px); border-color: hsl(var(--primary) / .32); background-color: hsl(var(--card)); }
 }
 
+/* Landing campaign tokens: cinematic ink, cobalt, violet. Scoped utilities only. */
+.campaign-ink { background-color: #05070d; }
+.grain::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+}
+.pressable:active { transform: scale(.97); transition: transform 100ms ease-out; }
+@keyframes marquee-x { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee-track { animation: marquee-x 28s linear infinite; }
+.acc-slice { transition: flex-grow 500ms cubic-bezier(0.22, 1, 0.36, 1), filter 500ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .acc-group:hover .acc-slice { filter: saturate(.6) brightness(.75); }
+  .acc-group .acc-slice:hover { filter: none; }
+}
+.scrub-word { opacity: .12; }
+.no-scrub .scrub-word { opacity: 1; }
+
 @media (prefers-reduced-transparency: reduce) {
   .product-window { background: hsl(var(--card)); backdrop-filter: none; }
 }
@@ -128,5 +145,7 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; transform: none !important; }
   .live-wave > span { animation: none !important; }
+  .marquee-track { animation: none !important; }
+  .scrub-word { opacity: 1 !important; }
   .orb-speaking > span, .nudge-enter, .nudge-exit, .presence-aura-warn, .presence-aura-alert, .rec-dot { animation: none !important; }
 }
