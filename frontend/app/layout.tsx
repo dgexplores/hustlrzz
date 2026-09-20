@@ -3,7 +3,10 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -41,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta name="color-scheme" content="light dark" />
         <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#0b0f1a" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <script dangerouslySetInnerHTML={{ __html: swScript }} />
       </head>

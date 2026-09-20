@@ -1,23 +1,23 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type CSSProperties } from "react";
 import { useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { Outfit } from "next/font/google";
-import { motion } from "motion/react";
+import { motion, useMotionValue, useSpring, type MotionStyle } from "motion/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import {
   ArrowRight,
   ArrowUpRight,
-  Building2,
+  Buildings,
   Camera,
-  FileSearch,
-  MessageSquareText,
+  FileText,
+  ChatsCircle,
   Play,
   ShieldCheck,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import { usePressAndHover, useFlexSpring, useHoverSpring } from "@/hooks/useSprings";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -60,6 +60,31 @@ const MODES = [
   },
 ];
 
+function Magnetic({ children, strength = 0.25 }: { children: React.ReactNode; strength?: number }) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const sx = useSpring(x, { stiffness: 150, damping: 15 });
+  const sy = useSpring(y, { stiffness: 150, damping: 15 });
+  return (
+    <motion.div
+      className="inline-block"
+      style={{ x: sx, y: sy }}
+      onPointerMove={(e) => {
+        const el = e.currentTarget as HTMLDivElement;
+        const rect = el.getBoundingClientRect();
+        x.set((e.clientX - (rect.left + rect.width / 2)) * strength);
+        y.set((e.clientY - (rect.top + rect.height / 2)) * strength);
+      }}
+      onPointerLeave={() => {
+        x.set(0);
+        y.set(0);
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   const { scale, handlers } = useHoverSpring(1, 1);
   return (
@@ -81,18 +106,20 @@ function NavCTA({ href, children }: { href: string; children: React.ReactNode })
 function HeroCTA({ href, children, primary = true }: { href: string; children: React.ReactNode; primary?: boolean }) {
   const { scale, handlers } = usePressAndHover(0.97, 1.03);
   return (
-    <motion.span {...handlers} style={{ scale }} className="pressable inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-      <Link
-        href={href}
-        className={`block ${
-          primary
-            ? "bg-primary text-primary-foreground shadow-[0_10px_40px_rgba(0,0,0,0.15)]"
-            : "border border-border bg-secondary text-secondary-foreground hover:bg-accent"
-        }`}
-      >
-        {children}
-      </Link>
-    </motion.span>
+    <Magnetic>
+      <motion.span {...handlers} style={{ scale }} className="pressable inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+        <Link
+          href={href}
+          className={`block ${
+            primary
+              ? "bg-primary text-primary-foreground shadow-[0_12px_32px_-12px_hsl(var(--primary)/0.55)]"
+              : "border border-border bg-secondary text-secondary-foreground hover:bg-accent"
+          }`}
+        >
+          {children}
+        </Link>
+      </motion.span>
+    </Magnetic>
   );
 }
 
@@ -105,7 +132,7 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-function AccordionSlice({ mode }: { mode: typeof MODES[0] }) {
+function AccordionSlice({ mode, index }: { mode: typeof MODES[0]; index: number }) {
   const { flex, isExpanded, expand, collapse } = useFlexSpring(1, 2.4);
   const { scale: imgScale } = useHoverSpring(1, 1.05);
 
@@ -120,7 +147,7 @@ function AccordionSlice({ mode }: { mode: typeof MODES[0] }) {
     <motion.a
       href={mode.href}
       className="acc-slice pressable group relative min-h-[220px] flex-1 overflow-hidden rounded-3xl border border-border md:min-h-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      style={{ flexGrow: flex }}
+      style={{ flexGrow: flex, "--i": index } as MotionStyle}
       onMouseEnter={expand}
       onMouseLeave={collapse}
       onFocus={expand}
@@ -152,15 +179,15 @@ function AccordionSlice({ mode }: { mode: typeof MODES[0] }) {
   );
 }
 
-function BentoCard({ span, icon, title, copy, seed }: { span: string; icon: React.ReactNode; title: string; copy: string; seed: string }) {
+function BentoCard({ span, icon, title, copy, seed, index }: { span: string; icon: React.ReactNode; title: string; copy: string; seed: string; index: number }) {
   const { scale, handlers } = useHoverSpring(1, 1.02);
   const { scale: imgScale } = useHoverSpring(1, 1.05);
 
   return (
     <motion.article
       {...handlers}
-      style={{ scale }}
-      className={`group relative ${span} min-h-64 overflow-hidden rounded-3xl border border-border bg-card/50 p-7 md:p-9 transition-none spring-scale`}
+      style={{ scale, "--i": index } as MotionStyle}
+      className={`group relative ${span} min-h-64 overflow-hidden rounded-3xl border border-border bg-card/50 p-7 md:p-9 transition-none spring-scale shadow-[0_20px_40px_-24px_hsl(var(--foreground)/0.15)]`}
     >
       <motion.div
         {...handlers}
@@ -235,22 +262,18 @@ export function HomeContent() {
           scrollTrigger: { trigger: img, start: "center 40%", end: "top -10%", scrub: 0.7 },
         });
       });
-      gsap.fromTo(
-        ".hero-frame",
-        { y: 44, opacity: 0, scale: 0.985 },
-        { y: 0, opacity: 1, scale: 1, duration: 1.1, ease: "power3.out", delay: 0.35 }
-      );
     },
     { scope: root }
   );
 
   return (
     <main ref={root} className="w-full max-w-full overflow-x-hidden">
+      <div aria-hidden="true" className="grain-fixed" />
       {/* Floating glass navigation - spring-driven */}
       <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4">
         <nav
           aria-label="Primary"
-          className="flex w-full max-w-3xl items-center justify-between gap-2 rounded-full border border-border bg-card/80 py-2 pl-5 pr-2 shadow-[0_18px_60px_rgba(0,0,0,0.1)] backdrop-blur-[20px] backdrop-saturate-[180%]"
+          className="glass-panel flex w-full max-w-3xl items-center justify-between gap-2 rounded-full py-2 pl-5 pr-2"
         >
           <Link href="/" className="pressable text-sm font-bold tracking-tight text-foreground" aria-label="Hustlrzz home">
             Hustlrzz
@@ -264,34 +287,63 @@ export function HomeContent() {
         </nav>
       </header>
 
-      {/* ATTENTION — cinematic center hero */}
-      <section className="hero-bg grain relative flex min-h-[100svh] items-center justify-center overflow-hidden">
+      {/* Split hero: left content, right asset */}
+      <section className="hero-bg relative overflow-hidden">
         <div aria-hidden="true" className="absolute inset-0 hero-overlay" />
 
-        <div className="relative mx-auto w-full max-w-6xl px-5 pb-20 pt-32 text-center">
-          <h1
-            className={`${display.className} mx-auto w-full max-w-6xl font-semibold text-foreground text-balance`}
-            style={{ fontSize: "clamp(2.75rem, 5vw, 5rem)", lineHeight: 1.04, letterSpacing: "-0.03em" }}
-          >
-            Walk in rehearsed.{" "}
-            <span
-              aria-hidden="true"
-              className="mx-2 inline-block h-[0.72em] w-24 rounded-full bg-cover bg-center align-middle opacity-80 grayscale"
-              style={{ backgroundImage: "url(https://picsum.photos/seed/coach-mic/400/160)" }}
-            />
-            Leave unforgettable.
-          </h1>
-          <p className="mx-auto mt-7 max-w-[58ch] text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
-            Paste your resume, get a focused question pack, and practice like it is real. Three steps, about five minutes.
-          </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <HeroCTA href="/prepare" primary>
-              Start preparing <ArrowRight className="h-4 w-4" />
-            </HeroCTA>
-            <HeroCTA href="/interview" primary={false}>
-              <Play className="h-4 w-4" /> Try sample interview
-            </HeroCTA>
+        <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 px-4 pb-20 pt-32 md:px-6 lg:grid-cols-12 lg:pt-40">
+          <div className="text-left lg:col-span-6">
+            <h1
+              className={`${display.className} w-full font-semibold text-foreground text-4xl md:text-5xl tracking-tighter leading-none`}
+            >
+              Walk in rehearsed.{" "}
+              <span
+                aria-hidden="true"
+                className="mx-1 inline-block h-[0.72em] w-20 rounded-full bg-cover bg-center align-middle opacity-80 grayscale"
+                style={{ backgroundImage: "url(https://picsum.photos/seed/coach-mic/400/160)" }}
+              />
+              Leave unforgettable.
+            </h1>
+            <p className="mt-7 max-w-[58ch] text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
+              Paste your resume, get a focused question pack, and practice like it is real. Three steps, about five minutes.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center gap-3">
+              <HeroCTA href="/prepare" primary>
+                Start preparing <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </HeroCTA>
+              <HeroCTA href="/interview" primary={false}>
+                <Play className="h-4 w-4" aria-hidden="true" /> Try sample interview
+              </HeroCTA>
+            </div>
+            <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] font-medium text-muted-foreground">
+              <span className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">1</span> Prepare</span>
+              <span aria-hidden="true">→</span>
+              <span className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">2</span> Practice</span>
+              <span aria-hidden="true">→</span>
+              <span className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">3</span> Progress</span>
+            </div>
           </div>
+
+          <figure className="relative lg:col-span-5 lg:col-start-8">
+            <div className="overflow-hidden rounded-[2rem] border border-border shadow-[0_20px_40px_-24px_hsl(var(--foreground)/0.2)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="https://picsum.photos/seed/interview-room/1200/900"
+                alt="Candidate rehearsing an interview answer"
+                loading="eager"
+                width="1200"
+                height="900"
+                className="aspect-[4/3] w-full object-cover grayscale contrast-110 [mask-image:linear-gradient(to_left,black_78%,transparent)]"
+              />
+            </div>
+            <figcaption className="glass-panel absolute bottom-5 left-5 flex items-center gap-2.5 rounded-full px-4 py-2 text-xs font-semibold text-foreground">
+              <span className="relative flex h-2 w-2" aria-hidden="true">
+                <span className="absolute h-full w-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
+                <span className="h-2 w-2 rounded-full bg-primary" />
+              </span>
+              Live practice session
+            </figcaption>
+          </figure>
         </div>
       </section>
 
@@ -306,12 +358,11 @@ export function HomeContent() {
         </div>
       </div>
 
-      {/* INTEREST — gapless bento */}
+      {/* Bento grid */}
       <section className="bg-background px-5 py-24 md:px-10 md:py-40">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-7xl">
           <h2
-            className={`${display.className} max-w-3xl text-3xl font-semibold tracking-tight text-foreground md:text-5xl text-balance`}
-            style={{ letterSpacing: "-0.025em", lineHeight: 1.08 }}
+            className={`${display.className} max-w-3xl text-4xl font-semibold tracking-tighter leading-none text-foreground md:text-6xl`}
           >
             One room for{" "}
             <span
@@ -321,71 +372,74 @@ export function HomeContent() {
             />{" "}
             every round.
           </h2>
-          <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground">
+          <p className="mt-5 max-w-[65ch] text-base leading-7 text-muted-foreground">
             Each surface serves the same goal: a more specific, confident answer next time.
           </p>
 
-          <div className="mt-12 grid grid-flow-dense grid-cols-1 gap-4 md:grid-cols-12">
+          <div className="cascade mt-12 grid grid-flow-dense grid-cols-1 gap-6 md:grid-cols-12">
             <BentoCard
               span="md:col-span-7"
-              icon={<FileSearch className="h-6 w-6 text-primary" />}
+              icon={<FileText className="h-6 w-6 text-primary" aria-hidden="true" />}
               title="Questions built around your experience"
               copy="Add a resume and job description. Hustlrzz finds the evidence worth practising and creates a focused interview pack."
               seed="evidence-wall"
+              index={0}
             />
             <BentoCard
               span="md:col-span-5"
-              icon={<Building2 className="h-6 w-6 text-primary" />}
+              icon={<Buildings className="h-6 w-6 text-primary" aria-hidden="true" />}
               title="Current company context"
               copy="Research runs when you need it, with source links and preparation cues for the role you selected."
               seed="company-glass"
+              index={1}
             />
             <BentoCard
               span="md:col-span-5"
-              icon={<MessageSquareText className="h-6 w-6 text-primary" />}
+              icon={<ChatsCircle className="h-6 w-6 text-primary" aria-hidden="true" />}
               title="A conversation, not a question list"
               copy="The interviewer listens to each answer, asks follow-ups, and keeps the discussion grounded in your preparation."
               seed="dialogue-loop"
+              index={2}
             />
             <BentoCard
               span="md:col-span-7"
-              icon={<Camera className="h-6 w-6 text-primary" />}
+              icon={<Camera className="h-6 w-6 text-primary" aria-hidden="true" />}
               title="Content and presence in one review"
               copy="Answer quality alongside posture, gaze, and gesture signals. Camera processing stays on your device."
               seed="presence-studio"
+              index={3}
             />
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
-            {["Voice and typing", "Multi-provider AI with automatic failover", "Private on-device camera processing"].map((label) => (
-              <p key={label} className="flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-4 text-muted-foreground">
-                <ShieldCheck className="h-4 w-4 text-green-500" /> {label}
+          <div className="cascade mt-4 grid grid-cols-1 gap-6 text-sm md:grid-cols-12">
+            {["Voice and typing", "Multi-provider AI with automatic failover", "Private on-device camera processing"].map((label, i) => (
+              <p key={label} style={{ "--i": i + 4 } as CSSProperties} className={`flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-4 text-muted-foreground ${i === 0 ? "md:col-span-5" : i === 1 ? "md:col-span-4" : "md:col-span-3"}`}>
+                <ShieldCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> {label}
               </p>
             ))}
           </div>
         </div>
       </section>
 
-      {/* INTEREST II — horizontal accordions with spring expand/collapse */}
+      {/* Horizontal accordions */}
       <section className="border-t border-border bg-muted/50 px-5 py-24 md:px-10 md:py-40">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-7xl">
           <h2
-            className={`${display.className} max-w-2xl text-3xl font-semibold tracking-tight text-foreground md:text-5xl text-balance`}
-            style={{ letterSpacing: "-0.025em", lineHeight: 1.08 }}
+            className={`${display.className} max-w-2xl text-4xl font-semibold tracking-tighter leading-none text-foreground md:text-6xl`}
           >
             Four modes. One momentum.
           </h2>
-          <div className="acc-group mt-12 flex flex-col gap-3 md:h-[420px] md:flex-row">
-            {MODES.map((mode) => (
-              <AccordionSlice key={mode.key} mode={mode} />
+          <div className="cascade acc-group mt-12 flex flex-col gap-3 md:h-[420px] md:flex-row">
+            {MODES.map((mode, i) => (
+              <AccordionSlice key={mode.key} mode={mode} index={i} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* DESIRE — scrub reveal + scale gallery */}
+      {/* Scrub reveal + gallery */}
       <section className="scrub-block border-t border-border bg-background px-5 py-24 md:px-10 md:py-40">
-        <div className="mx-auto max-w-4xl text-center">
+        <div className="mx-auto max-w-4xl text-left md:text-center">
           <p className={`${display.className} text-2xl font-medium leading-snug tracking-tight text-foreground md:text-4xl md:leading-snug`}>
             {SCRUB_LINE.split(" ").map((word, i) => (
               <span key={i} className="scrub-word">
@@ -394,29 +448,28 @@ export function HomeContent() {
             ))}
           </p>
         </div>
-        <div className="mx-auto mt-20 grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="mx-auto mt-20 grid max-w-7xl grid-cols-1 gap-6 md:grid-cols-2">
           {["stage-light", "quiet-booth"].map((seed) => (
             <GalleryImage key={seed} seed={seed} />
           ))}
         </div>
       </section>
 
-      {/* ACTION — massive CTA + footer */}
+      {/* Closing CTA + footer */}
       <section className="relative overflow-hidden border-t border-border bg-primary/5 px-5 py-24 md:py-40">
         <div
           aria-hidden="true"
           className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary/10 blur-[120px]"
         />
-        <div className="relative mx-auto max-w-6xl">
+        <div className="relative mx-auto max-w-7xl">
           <h2
-            className={`${display.className} w-full max-w-6xl text-center font-semibold text-foreground text-balance`}
-            style={{ fontSize: "clamp(2.5rem, 6vw, 5.5rem)", lineHeight: 1.02, letterSpacing: "-0.03em" }}
+            className={`${display.className} w-full text-left font-semibold text-foreground text-4xl md:text-6xl tracking-tighter leading-none md:max-w-4xl`}
           >
             Your next interview starts tonight.
           </h2>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-10 flex flex-wrap items-center gap-3">
             <HeroCTA href="/prepare" primary>
-              Build my question pack <ArrowRight className="h-4 w-4" />
+              Build my question pack <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </HeroCTA>
             <HeroCTA href="/coaching" primary={false}>
               Open coaching
