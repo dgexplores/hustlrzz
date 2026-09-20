@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { motion, useMotionValue, useSpring, type MotionStyle } from "motion/react";
@@ -19,6 +19,7 @@ import {
 } from "@phosphor-icons/react";
 import { usePressAndHover, useFlexSpring, useHoverSpring } from "@/hooks/useSprings";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -105,10 +106,10 @@ function HeroCTA({ href, children, primary = true }: { href: string; children: R
   const { scale, handlers } = usePressAndHover(0.97, 1.03);
   return (
     <Magnetic>
-      <motion.span {...handlers} style={{ scale }} className="pressable inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+      <motion.span {...handlers} style={{ scale }} className="pressable inline-flex transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
         <Link
           href={href}
-          className={`block ${
+          className={`inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold ${
             primary
               ? "bg-primary text-primary-foreground shadow-[0_12px_32px_-12px_hsl(var(--primary)/0.55)]"
               : "border border-border bg-secondary text-secondary-foreground hover:bg-accent"
@@ -203,29 +204,32 @@ function BentoCard({ span, icon, title, copy, seed, index }: { span: string; ico
   );
 }
 
-function GalleryImage({ seed }: { seed: string }) {
-  const { scale, handlers } = useHoverSpring(1, 1.05);
-  return (
-    <div className="group overflow-hidden rounded-3xl border border-border">
-      <motion.div {...handlers} style={{ scale }} className="spring-scale aspect-[3/2] w-full overflow-hidden">
-        {/* Plain img: GSAP scale/scrub transforms on the raw element; next/image wrappers break the effect. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`https://picsum.photos/seed/${seed}/1200/800`}
-          alt=""
-          loading="lazy"
-          width="1200"
-          height="800"
-          className="rise-fade w-full h-full object-cover grayscale contrast-110 transition-none"
-        />
-      </motion.div>
-    </div>
-  );
-}
-
 export function HomeContent() {
   const root = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
+  const [hasSession, setHasSession] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let active = true;
+    try {
+      const supabase = getSupabase();
+      supabase.auth.getSession().then(({ data }) => {
+        if (active) setHasSession(!!data.session);
+      });
+      const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+        if (active) setHasSession(!!s);
+      });
+      return () => {
+        active = false;
+        sub.subscription.unsubscribe();
+      };
+    } catch {
+      return () => {
+        active = false;
+      };
+    }
+  }, []);
 
   useGSAP(
     () => {
@@ -242,24 +246,6 @@ export function HomeContent() {
           scrollTrigger: { trigger: ".scrub-block", start: "top 78%", end: "bottom 42%", scrub: 0.6 },
         });
       }
-      gsap.utils.toArray<HTMLElement>(".rise-fade").forEach((img) => {
-        gsap.fromTo(
-          img,
-          { scale: 0.8, opacity: 0.35 },
-          {
-            scale: 1,
-            opacity: 1,
-            ease: "none",
-            scrollTrigger: { trigger: img, start: "top 92%", end: "top 45%", scrub: 0.7 },
-          }
-        );
-        gsap.to(img, {
-          opacity: 0.2,
-          filter: "brightness(0.5)",
-          ease: "none",
-          scrollTrigger: { trigger: img, start: "center 40%", end: "top -10%", scrub: 0.7 },
-        });
-      });
     },
     { scope: root }
   );
@@ -270,7 +256,8 @@ export function HomeContent() {
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:text-primary-foreground">
         Skip to content
       </a>
-      {/* Floating glass navigation - spring-driven */}
+      {/* Floating glass navigation — visitors only; signed-in users get the app header */}
+      {!hasSession && (
       <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4">
         <nav
           aria-label="Primary"
@@ -290,6 +277,7 @@ export function HomeContent() {
           </div>
         </nav>
       </header>
+      )}
 
       {/* Split hero: left content, right asset */}
       <section className="hero-bg relative overflow-hidden">
@@ -443,19 +431,14 @@ export function HomeContent() {
 
       {/* Scrub reveal + gallery */}
       <section className="scrub-block border-t border-border bg-background px-5 py-24 md:px-10 md:py-40">
-        <div className="mx-auto max-w-4xl text-start md:text-center">
-          <p className={`display-type text-2xl font-medium leading-snug tracking-tight text-foreground md:text-4xl md:leading-snug`}>
+      <div className="mx-auto max-w-4xl text-start md:text-center">
+          <p className="display-type text-2xl font-medium leading-snug tracking-tight text-foreground md:text-4xl md:leading-snug">
             {SCRUB_LINE.split(" ").map((word, i) => (
               <span key={i} className="scrub-word">
                 {word}{" "}
               </span>
             ))}
           </p>
-        </div>
-        <div className="mx-auto mt-20 grid max-w-7xl grid-cols-1 gap-6 md:grid-cols-2">
-          {["stage-light", "quiet-booth"].map((seed) => (
-            <GalleryImage key={seed} seed={seed} />
-          ))}
         </div>
       </section>
 
