@@ -1,6 +1,6 @@
 "use client";
 
-import { Laptop, Moon, Sun } from "lucide-react";
+import { Laptop, Moon, Sun } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { useTheme, type ThemePreference } from "@/components/theme/ThemeProvider";
 
@@ -28,7 +28,7 @@ export function ThemeToggle() {
       onClick={cycleTheme}
       aria-label={`Theme: ${active.label}. Activate to change theme.`}
       title={`Theme: ${active.label}`}
-      className="min-w-9 px-2 sm:min-w-[92px] sm:px-3"
+      className="min-h-[44px] min-w-[44px] px-2 sm:px-3"
     >
       <ActiveIcon className="h-4 w-4" aria-hidden="true" />
       <span className="hidden sm:inline">{active.label}</span>
