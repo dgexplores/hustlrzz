@@ -52,6 +52,9 @@
   * {
     @apply border-border;
   }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -81,6 +84,14 @@
   .spring-scale { will-change: transform; }
   .spring-opacity { will-change: opacity; }
   .spring-flex { will-change: flex-grow; }
+
+  /* Display type: platform-native stack, optical sizing, size-tightened tracking.
+     Per Apple HIG §15 — default to the system face before a custom one. */
+  .display-type {
+    font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-optical-sizing: auto;
+    font-feature-settings: "ss01", "cv11";
+  }
 
   /* Pressable: instant pointer-down response, spring return */
   .pressable { touch-action: manipulation; }

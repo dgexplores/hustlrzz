@@ -3,7 +3,6 @@
 import { useRef, type CSSProperties } from "react";
 import { useReducedMotion } from "motion/react";
 import Link from "next/link";
-import { Outfit } from "next/font/google";
 import { motion, useMotionValue, useSpring, type MotionStyle } from "motion/react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -19,10 +18,9 @@ import {
   ShieldCheck,
 } from "@phosphor-icons/react";
 import { usePressAndHover, useFlexSpring, useHoverSpring } from "@/hooks/useSprings";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 gsap.registerPlugin(ScrollTrigger);
-
-const display = Outfit({ subsets: ["latin"], weight: ["500", "600", "700"] });
 
 const SCRUB_LINE =
   "Great interviews are rehearsed under pressure, not memorized from lists. Hustlrzz puts your evidence, the company's bar, and a live coach in one room.";
@@ -89,7 +87,7 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   const { scale, handlers } = useHoverSpring(1, 1);
   return (
     <motion.span {...handlers} style={{ scale }} className="pressable text-[13px] font-medium text-foreground/70 transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-      <Link href={href} className="block hover:text-foreground">{children}</Link>
+      <Link href={href} className="flex min-h-[44px] items-center hover:text-foreground">{children}</Link>
     </motion.span>
   );
 }
@@ -98,7 +96,7 @@ function NavCTA({ href, children }: { href: string; children: React.ReactNode })
   const { scale, handlers } = usePressAndHover(0.97, 1.03);
   return (
     <motion.span {...handlers} style={{ scale }} className="pressable rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-      <Link href={href} className="block">{children}</Link>
+      <Link href={href} className="flex min-h-[32px] items-center">{children}</Link>
     </motion.span>
   );
 }
@@ -127,7 +125,7 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
   const { scale, handlers } = useHoverSpring(1, 1);
   return (
     <motion.span {...handlers} style={{ scale }} className="pressable transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-      <Link href={href} className="hover:text-foreground">{children}</Link>
+      <Link href={href} className="inline-flex min-h-[44px] items-center hover:text-foreground">{children}</Link>
     </motion.span>
   );
 }
@@ -164,7 +162,7 @@ function AccordionSlice({ mode, index }: { mode: typeof MODES[0]; index: number 
         className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/50 to-transparent"
       />
       <div className="absolute inset-x-0 bottom-0 p-6">
-        <p className={`${display.className} text-2xl font-semibold text-foreground`}>{mode.title}</p>
+        <p className={`display-type text-2xl font-semibold text-foreground`}>{mode.title}</p>
         <motion.p
           style={{ opacity: isExpanded ? 1 : 0, y: isExpanded ? 0 : 10 }}
           className="mt-2 max-w-[36ch] text-sm leading-6 text-muted-foreground transition-none"
@@ -267,13 +265,16 @@ export function HomeContent() {
   );
 
   return (
-    <main ref={root} className="w-full max-w-full overflow-x-hidden">
+    <main ref={root} id="main-content" className="w-full max-w-full overflow-x-hidden">
       <div aria-hidden="true" className="grain-fixed" />
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:text-primary-foreground">
+        Skip to content
+      </a>
       {/* Floating glass navigation - spring-driven */}
       <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4">
         <nav
           aria-label="Primary"
-          className="glass-panel flex w-full max-w-3xl items-center justify-between gap-2 rounded-full py-2 pl-5 pr-2"
+          className="glass-panel flex w-full max-w-3xl items-center justify-between gap-2 rounded-full py-2 pe-2 ps-5"
         >
           <Link href="/" className="pressable text-sm font-bold tracking-tight text-foreground" aria-label="Hustlrzz home">
             Hustlrzz
@@ -283,7 +284,10 @@ export function HomeContent() {
             <NavLink href="/assessment">Assess</NavLink>
             <NavLink href="/coaching">Coach</NavLink>
           </div>
-          <NavCTA href="/prepare">Start preparing</NavCTA>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <NavCTA href="/prepare">Start preparing</NavCTA>
+          </div>
         </nav>
       </header>
 
@@ -291,10 +295,10 @@ export function HomeContent() {
       <section className="hero-bg relative overflow-hidden">
         <div aria-hidden="true" className="absolute inset-0 hero-overlay" />
 
-        <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 px-4 pb-20 pt-32 md:px-6 lg:grid-cols-12 lg:pt-40">
-          <div className="text-left lg:col-span-6">
+        <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 px-4 pb-20 pt-32 md:px-6 lg:min-h-[100dvh] lg:grid-cols-12 lg:pt-40">
+          <div className="text-start lg:col-span-6">
             <h1
-              className={`${display.className} w-full font-semibold text-foreground text-4xl md:text-5xl tracking-tighter leading-none`}
+              className={`display-type w-full font-semibold text-foreground text-4xl md:text-5xl tracking-tighter leading-none`}
             >
               Walk in rehearsed.{" "}
               <span
@@ -305,7 +309,7 @@ export function HomeContent() {
               Leave unforgettable.
             </h1>
             <p className="mt-7 max-w-[58ch] text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
-              Paste your resume, get a focused question pack, and practice like it is real. Three steps, about five minutes.
+              Paste your resume, get a focused question pack, and practice like it is real. 3 steps, about 5 minutes.
             </p>
             <div className="mt-10 flex flex-wrap items-center gap-3">
               <HeroCTA href="/prepare" primary>
@@ -336,7 +340,7 @@ export function HomeContent() {
                 className="aspect-[4/3] w-full object-cover grayscale contrast-110 [mask-image:linear-gradient(to_left,black_78%,transparent)]"
               />
             </div>
-            <figcaption className="glass-panel absolute bottom-5 left-5 flex items-center gap-2.5 rounded-full px-4 py-2 text-xs font-semibold text-foreground">
+            <figcaption className="glass-panel absolute bottom-5 start-5 flex items-center gap-2.5 rounded-full px-4 py-2 text-xs font-semibold text-foreground">
               <span className="relative flex h-2 w-2" aria-hidden="true">
                 <span className="absolute h-full w-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
                 <span className="h-2 w-2 rounded-full bg-primary" />
@@ -349,10 +353,10 @@ export function HomeContent() {
 
       {/* Marquee interlude */}
       <div className="bg-background overflow-hidden border-t border-border py-8" aria-hidden="true">
-        <div className="marquee-track flex w-max items-center gap-10 pr-10">
+        <div className="marquee-track flex w-max items-center gap-10 pe-10">
           {[...MARQUEE, ...MARQUEE].map((word, i) => (
-            <span key={i} className={`${display.className} text-4xl font-semibold tracking-tight text-muted-foreground/40 md:text-5xl`}>
-              {word} <span className="ml-10 text-primary">·</span>
+            <span key={i} className="display-type text-4xl font-semibold tracking-tight text-muted-foreground/40 md:text-5xl">
+              {word} <span className="ms-10 text-primary">·</span>
             </span>
           ))}
         </div>
@@ -362,7 +366,7 @@ export function HomeContent() {
       <section className="bg-background px-5 py-24 md:px-10 md:py-40">
         <div className="mx-auto max-w-7xl">
           <h2
-            className={`${display.className} max-w-3xl text-4xl font-semibold tracking-tighter leading-none text-foreground md:text-6xl`}
+            className={`display-type max-w-3xl text-4xl font-semibold tracking-tighter leading-none text-foreground md:text-6xl`}
           >
             One room for{" "}
             <span
@@ -425,7 +429,7 @@ export function HomeContent() {
       <section className="border-t border-border bg-muted/50 px-5 py-24 md:px-10 md:py-40">
         <div className="mx-auto max-w-7xl">
           <h2
-            className={`${display.className} max-w-2xl text-4xl font-semibold tracking-tighter leading-none text-foreground md:text-6xl`}
+            className={`display-type max-w-2xl text-4xl font-semibold tracking-tighter leading-none text-foreground md:text-6xl`}
           >
             Four modes. One momentum.
           </h2>
@@ -439,8 +443,8 @@ export function HomeContent() {
 
       {/* Scrub reveal + gallery */}
       <section className="scrub-block border-t border-border bg-background px-5 py-24 md:px-10 md:py-40">
-        <div className="mx-auto max-w-4xl text-left md:text-center">
-          <p className={`${display.className} text-2xl font-medium leading-snug tracking-tight text-foreground md:text-4xl md:leading-snug`}>
+        <div className="mx-auto max-w-4xl text-start md:text-center">
+          <p className={`display-type text-2xl font-medium leading-snug tracking-tight text-foreground md:text-4xl md:leading-snug`}>
             {SCRUB_LINE.split(" ").map((word, i) => (
               <span key={i} className="scrub-word">
                 {word}{" "}
@@ -459,11 +463,11 @@ export function HomeContent() {
       <section className="relative overflow-hidden border-t border-border bg-primary/5 px-5 py-24 md:py-40">
         <div
           aria-hidden="true"
-          className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary/10 blur-[120px]"
+          className="absolute -end-24 -top-24 h-96 w-96 rounded-full bg-primary/10 blur-[120px]"
         />
         <div className="relative mx-auto max-w-7xl">
           <h2
-            className={`${display.className} w-full text-left font-semibold text-foreground text-4xl md:text-6xl tracking-tighter leading-none md:max-w-4xl`}
+            className={`display-type w-full text-start font-semibold text-foreground text-4xl md:text-6xl tracking-tighter leading-none md:max-w-4xl`}
           >
             Your next interview starts tonight.
           </h2>
