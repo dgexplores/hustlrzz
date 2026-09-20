@@ -63,7 +63,7 @@ const MODES = [
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   const { scale, handlers } = useHoverSpring(1, 1);
   return (
-    <motion.span {...handlers} style={{ scale }} className="pressable text-[13px] font-medium text-foreground/70 transition-none">
+    <motion.span {...handlers} style={{ scale }} className="pressable text-[13px] font-medium text-foreground/70 transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
       <Link href={href} className="block hover:text-foreground">{children}</Link>
     </motion.span>
   );
@@ -72,7 +72,7 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
 function NavCTA({ href, children }: { href: string; children: React.ReactNode }) {
   const { scale, handlers } = usePressAndHover(0.97, 1.03);
   return (
-    <motion.span {...handlers} style={{ scale }} className="pressable rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-none">
+    <motion.span {...handlers} style={{ scale }} className="pressable rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
       <Link href={href} className="block">{children}</Link>
     </motion.span>
   );
@@ -81,7 +81,7 @@ function NavCTA({ href, children }: { href: string; children: React.ReactNode })
 function HeroCTA({ href, children, primary = true }: { href: string; children: React.ReactNode; primary?: boolean }) {
   const { scale, handlers } = usePressAndHover(0.97, 1.03);
   return (
-    <motion.span {...handlers} style={{ scale }} className="pressable inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold transition-none">
+    <motion.span {...handlers} style={{ scale }} className="pressable inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
       <Link
         href={href}
         className={`block ${
@@ -99,7 +99,7 @@ function HeroCTA({ href, children, primary = true }: { href: string; children: R
 function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
   const { scale, handlers } = useHoverSpring(1, 1);
   return (
-    <motion.span {...handlers} style={{ scale }} className="pressable transition-none">
+    <motion.span {...handlers} style={{ scale }} className="pressable transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
       <Link href={href} className="hover:text-foreground">{children}</Link>
     </motion.span>
   );
@@ -109,15 +109,23 @@ function AccordionSlice({ mode }: { mode: typeof MODES[0] }) {
   const { flex, isExpanded, expand, collapse } = useFlexSpring(1, 2.4);
   const { scale: imgScale } = useHoverSpring(1, 1.05);
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLAnchorElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      expand();
+    }
+  };
+
   return (
     <motion.a
       href={mode.href}
-      className="acc-slice pressable group relative min-h-[220px] flex-1 overflow-hidden rounded-3xl border border-border md:min-h-0"
+      className="acc-slice pressable group relative min-h-[220px] flex-1 overflow-hidden rounded-3xl border border-border md:min-h-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       style={{ flexGrow: flex }}
       onMouseEnter={expand}
       onMouseLeave={collapse}
       onFocus={expand}
       onBlur={collapse}
+      onKeyDown={handleKeyDown}
     >
       <motion.div
         style={{ scale: imgScale, backgroundImage: `url(https://picsum.photos/seed/${mode.seed}/900/900)` }}
@@ -137,7 +145,7 @@ function AccordionSlice({ mode }: { mode: typeof MODES[0] }) {
           {mode.copy}
         </motion.p>
         <span className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-foreground">
-          Open <ArrowUpRight className="h-4 w-4" />
+          Open <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
         </span>
       </div>
     </motion.a>
@@ -162,7 +170,7 @@ function BentoCard({ span, icon, title, copy, seed }: { span: string; icon: Reac
       />
       <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/40 to-transparent" />
       <div className="relative">
-        <div className="text-primary">{icon}</div>
+        <div className="text-primary" aria-hidden="true">{icon}</div>
         <h3 className="mt-16 max-w-md text-xl font-semibold tracking-tight text-foreground md:mt-20">{title}</h3>
         <p className="mt-3 max-w-lg text-sm leading-6 text-muted-foreground">{copy}</p>
       </div>
@@ -173,16 +181,20 @@ function BentoCard({ span, icon, title, copy, seed }: { span: string; icon: Reac
 function GalleryImage({ seed }: { seed: string }) {
   const { scale, handlers } = useHoverSpring(1, 1.05);
   return (
-    <motion.div {...handlers} style={{ scale }} className="group overflow-hidden rounded-3xl border border-border spring-scale">
-      {/* Plain img: GSAP scale/scrub transforms on the raw element; next/image wrappers break the effect. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`https://picsum.photos/seed/${seed}/1200/800`}
-        alt=""
-        loading="lazy"
-        className="rise-fade aspect-[3/2] w-full object-cover grayscale contrast-110 transition-none"
-      />
-    </motion.div>
+    <div className="group overflow-hidden rounded-3xl border border-border">
+      <motion.div {...handlers} style={{ scale }} className="spring-scale aspect-[3/2] w-full overflow-hidden">
+        {/* Plain img: GSAP scale/scrub transforms on the raw element; next/image wrappers break the effect. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`https://picsum.photos/seed/${seed}/1200/800`}
+          alt=""
+          loading="lazy"
+          width="1200"
+          height="800"
+          className="rise-fade w-full h-full object-cover grayscale contrast-110 transition-none"
+        />
+      </motion.div>
+    </div>
   );
 }
 
@@ -240,7 +252,7 @@ export function HomeContent() {
           aria-label="Primary"
           className="flex w-full max-w-3xl items-center justify-between gap-2 rounded-full border border-border bg-card/80 py-2 pl-5 pr-2 shadow-[0_18px_60px_rgba(0,0,0,0.1)] backdrop-blur-[20px] backdrop-saturate-[180%]"
         >
-          <Link href="/" className="pressable text-sm font-bold tracking-tight text-foreground">
+          <Link href="/" className="pressable text-sm font-bold tracking-tight text-foreground" aria-label="Hustlrzz home">
             Hustlrzz
           </Link>
           <div className="hidden items-center gap-6 sm:flex">
@@ -258,7 +270,7 @@ export function HomeContent() {
 
         <div className="relative mx-auto w-full max-w-6xl px-5 pb-20 pt-32 text-center">
           <h1
-            className={`${display.className} mx-auto w-full max-w-6xl font-semibold text-foreground`}
+            className={`${display.className} mx-auto w-full max-w-6xl font-semibold text-foreground text-balance`}
             style={{ fontSize: "clamp(2.75rem, 5vw, 5rem)", lineHeight: 1.04, letterSpacing: "-0.03em" }}
           >
             Walk in rehearsed.{" "}
@@ -298,7 +310,7 @@ export function HomeContent() {
       <section className="bg-background px-5 py-24 md:px-10 md:py-40">
         <div className="mx-auto max-w-6xl">
           <h2
-            className={`${display.className} max-w-3xl text-3xl font-semibold tracking-tight text-foreground md:text-5xl`}
+            className={`${display.className} max-w-3xl text-3xl font-semibold tracking-tight text-foreground md:text-5xl text-balance`}
             style={{ letterSpacing: "-0.025em", lineHeight: 1.08 }}
           >
             One room for{" "}
@@ -358,7 +370,7 @@ export function HomeContent() {
       <section className="border-t border-border bg-muted/50 px-5 py-24 md:px-10 md:py-40">
         <div className="mx-auto max-w-6xl">
           <h2
-            className={`${display.className} max-w-2xl text-3xl font-semibold tracking-tight text-foreground md:text-5xl`}
+            className={`${display.className} max-w-2xl text-3xl font-semibold tracking-tight text-foreground md:text-5xl text-balance`}
             style={{ letterSpacing: "-0.025em", lineHeight: 1.08 }}
           >
             Four modes. One momentum.
@@ -397,7 +409,7 @@ export function HomeContent() {
         />
         <div className="relative mx-auto max-w-6xl">
           <h2
-            className={`${display.className} w-full max-w-6xl text-center font-semibold text-foreground`}
+            className={`${display.className} w-full max-w-6xl text-center font-semibold text-foreground text-balance`}
             style={{ fontSize: "clamp(2.5rem, 6vw, 5.5rem)", lineHeight: 1.02, letterSpacing: "-0.03em" }}
           >
             Your next interview starts tonight.
