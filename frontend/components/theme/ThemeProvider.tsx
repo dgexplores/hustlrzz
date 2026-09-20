@@ -12,8 +12,12 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
+let systemThemeCache: "light" | "dark" | null = null;
+
 function systemTheme(): "light" | "dark" {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  if (systemThemeCache) return systemThemeCache;
+  systemThemeCache = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return systemThemeCache;
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -30,11 +34,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const apply = () => {
       const next = theme === "system" ? systemTheme() : theme;
       document.documentElement.classList.toggle("dark", next === "dark");
-      document.documentElement.style.colorScheme = next;
       setResolvedTheme(next);
     };
     apply();
-    media.addEventListener("change", apply);
+    media.addEventListener("change", () => {
+      systemThemeCache = null;
+      apply();
+    });
     return () => media.removeEventListener("change", apply);
   }, [theme]);
 
