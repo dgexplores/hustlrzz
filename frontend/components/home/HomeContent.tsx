@@ -258,7 +258,7 @@ export function HomeContent() {
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:text-primary-foreground">
         Skip to content
       </a>
-      {/* Floating glass navigation — visitors only; signed-in users get the app header */}
+      {/* Floating glass navigation - visitors only; signed-in users get the app header */}
       {!hasSession && (
       <header className="fixed inset-x-0 top-4 z-50 flex justify-center px-4">
         <nav
@@ -285,8 +285,8 @@ export function HomeContent() {
       <section className="hero-bg relative overflow-hidden">
         <div aria-hidden="true" className="absolute inset-0 hero-overlay" />
 
-        <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 px-4 pb-20 pt-32 md:px-6 lg:min-h-[100dvh] lg:grid-cols-12 lg:pt-40">
-          <div className="text-start lg:col-span-6">
+        <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 px-4 pb-20 pt-28 md:px-6 lg:min-h-[100dvh] lg:grid-cols-12 lg:pt-24">
+          <div className="text-start lg:col-span-7">
             <h1
               className={`display-type w-full font-semibold text-foreground text-4xl md:text-5xl tracking-tighter leading-none`}
             >
@@ -309,16 +309,9 @@ export function HomeContent() {
                 <Play className="h-4 w-4" aria-hidden="true" /> Try sample interview
               </HeroCTA>
             </div>
-            <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] font-medium tabular-nums text-muted-foreground">
-              <span className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">1</span> Prepare</span>
-              <span aria-hidden="true">→</span>
-              <span className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">2</span> Practice</span>
-              <span aria-hidden="true">→</span>
-              <span className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">3</span> Progress</span>
-            </div>
           </div>
 
-          <figure className="relative lg:col-span-5 lg:col-start-8">
+          <figure className="relative lg:col-span-4 lg:col-start-9">
             <div className="overflow-hidden rounded-[2rem] border border-border shadow-[0_20px_40px_-24px_hsl(var(--foreground)/0.2)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -330,7 +323,7 @@ export function HomeContent() {
                 className="aspect-[4/3] w-full object-cover grayscale contrast-110 [mask-image:linear-gradient(to_left,black_78%,transparent)]"
               />
             </div>
-            <figcaption className="glass-panel absolute bottom-5 start-5 flex items-center gap-2.5 rounded-full px-4 py-2 text-xs font-semibold text-foreground">
+            <figcaption className="mt-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <span className="relative flex h-2 w-2" aria-hidden="true">
                 <span className="absolute h-full w-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
                 <span className="h-2 w-2 rounded-full bg-primary" />
@@ -462,7 +455,7 @@ export function HomeContent() {
           </h2>
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <HeroCTA href="/prepare" primary>
-              Build my question pack <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              Start preparing <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </HeroCTA>
             <HeroCTA href="/coaching" primary={false}>
               Open coaching
