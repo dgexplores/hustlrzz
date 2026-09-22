@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 
-from backend.ai import provider
+from backend.ai import grounding, provider
 
 INTERVIEWER_PERSONA = (
     "You are {name}, a senior {role} interviewer at {company}. You are on a "
@@ -163,7 +163,7 @@ def interviewer_turn(
             + "\nUse this only when it is relevant. Do not invent facts beyond it."
         )
     context = _transcript_budget(transcript) + f"\nCandidate: {candidate_message}"
-    raw = provider.chat(
+    raw, sources = grounding.grounded_chat(
         "Follow the interviewer system below, sound human, and output only the JSON response format.\n\n"
         + grounded_system,
         context + "\n\n(Reply as the interviewer in the JSON format.)",
@@ -173,7 +173,10 @@ def interviewer_turn(
         return {"message": "Sorry, could you walk me through that again?", "reflection": False}
     message = str(data.get("message") or "").strip()[:2000]
     question = str(data.get("question") or "").strip()[:1000]
-    return {"message": message, "question": question, "done": bool(data.get("done", False))}
+    reply = {"message": message, "question": question, "done": bool(data.get("done", False))}
+    if sources:
+        reply["sources"] = sources
+    return reply
 
 
 def judge_report(

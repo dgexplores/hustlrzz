@@ -457,6 +457,19 @@ function ExplainButton({ question, answer }: { question: string; answer: string 
               ))}
               {(data.upgrades || []).slice(0, 2).map((u: string, j: number) => <p key={j} className="text-amber-700 dark:text-amber-300">↗ {u}</p>)}
               {data.reuse_rule && <p className="rounded bg-secondary/60 p-2"><span className="font-semibold">Reuse:</span> {data.reuse_rule}</p>}
+              {Array.isArray(data.sources) && data.sources.length > 0 && (
+                <p className="text-muted-foreground">
+                  Sources:{" "}
+                  {data.sources.map((s: any, i: number) => (
+                    <span key={s.id}>
+                      {i > 0 && " · "}
+                      <a href={s.url} target="_blank" rel="noreferrer" className="font-medium text-primary underline-offset-2 hover:underline">
+                        {s.id} {s.domain}
+                      </a>
+                    </span>
+                  ))}
+                </p>
+              )}
             </div>
           )}
         </div>

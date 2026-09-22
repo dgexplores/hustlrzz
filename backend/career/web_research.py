@@ -131,5 +131,28 @@ def search_industry_questions(job_title: str, max_results: int = 5) -> list[dict
     return results
 
 
+def search_web(query: str, max_results: int = 6) -> list[dict]:
+    """Single-query DuckDuckGo search for the agent web_search tool.
+
+    Best-effort: every failure path returns an empty list so the LLM loop
+    continues without grounding rather than failing the request.
+    """
+    query = str(query or "").strip()[:300]
+    if not query or not search_enabled():
+        return []
+    try:
+        from ddgs import DDGS
+
+        with DDGS() as ddgs:
+            items = list(ddgs.text(query, max_results=max_results))
+    except Exception as exc:
+        log.warning("web_search tool failed: %s", exc)
+        return []
+    return clean_web_results(
+        [{**item, "query": query, "category": "live_search"} for item in items],
+        limit=max_results,
+    )
+
+
 def search_enabled() -> bool:
     return config.ENABLE_WEB_SEARCH

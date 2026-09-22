@@ -91,6 +91,21 @@ def client(monkeypatch):
 
     monkeypatch.setattr(prov, "chat_json_strict", fake_strict)
 
+    # Grounded chat must stay deterministic in integration tests: route it
+    # back to the fakes above instead of the tool-calling loop.
+    from backend.ai import grounding as ground
+
+    monkeypatch.setattr(
+        ground,
+        "grounded_chat",
+        lambda system, user, temperature=0.4: (prov.chat(system, user, temperature), []),
+    )
+    monkeypatch.setattr(
+        ground,
+        "grounded_chat_json",
+        lambda system, user, temperature=0.2: (prov.chat_json_strict(system, user), []),
+    )
+
     # ---- Fake preparation workflow + intelligence + RAG ----------------- #
     async def fake_prep(**kwargs):
         return {

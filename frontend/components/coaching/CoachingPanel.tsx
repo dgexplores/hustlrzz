@@ -127,7 +127,37 @@ function SalaryWorkspace({ form, setForm, script, loading, onSubmit }: { form: a
 }
 
 function SalaryScript({ script }: { script: any }) {
-  return <div className="space-y-6">{script.situation && <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Strongest leverage</p><p className="mt-2 text-sm leading-6">{script.situation.strongest_leverage}</p></div><div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Watch this risk</p><p className="mt-2 text-sm leading-6">{script.situation.biggest_risk}</p></div></div>}{script.strategy?.length ? <section><h3 className="text-sm font-semibold">Your strategy</h3><ol className="mt-3 grid gap-2 sm:grid-cols-2">{script.strategy.map((item: string, index: number) => <li key={`${item}-${index}`} className="flex gap-3 rounded-lg bg-secondary/50 p-3 text-sm leading-6"><span className="font-mono text-xs font-semibold text-primary">0{index + 1}</span>{item}</li>)}</ol></section> : null}<section><h3 className="text-sm font-semibold">Conversation scenarios</h3><div className="mt-3 space-y-3">{(script.scenarios || []).map((scenario: any, index: number) => <details key={`${scenario.name}-${index}`} open={index === 0} className="rounded-xl border bg-card p-4"><summary className="cursor-pointer font-semibold">{scenario.name}</summary><div className="mt-4 space-y-3"><div className="rounded-lg bg-primary/5 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-primary">Say this</p><p className="mt-1 text-sm leading-6">“{scenario.say_this}”</p></div>{scenario.why && <p className="text-sm leading-6 text-muted-foreground"><span className="font-semibold text-foreground">Why it works:</span> {scenario.why}</p>}{scenario.avoid && <p className="flex gap-2 text-sm leading-6 text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-1 h-4 w-4 shrink-0" /><span><span className="font-semibold">Avoid:</span> {scenario.avoid}</span></p>}</div></details>)}</div></section>{script.closing && <section className="rounded-xl border bg-secondary/25 p-4"><h3 className="text-sm font-semibold">Decision guardrails</h3><div className="mt-3 space-y-2 text-sm leading-6"><p><span className="font-semibold">Keep negotiating:</span> {script.closing.keep_negotiating}</p><p><span className="font-semibold">Accept when:</span> {script.closing.acceptable_to_accept}</p><p><span className="font-semibold">Exit politely:</span> {script.closing.polite_exit}</p></div></section>}</div>;
+  return <div className="space-y-6">{script.situation && <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Strongest leverage</p><p className="mt-2 text-sm leading-6">{script.situation.strongest_leverage}</p></div><div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Watch this risk</p><p className="mt-2 text-sm leading-6">{script.situation.biggest_risk}</p></div></div>}{script.strategy?.length ? <section><h3 className="text-sm font-semibold">Your strategy</h3><ol className="mt-3 grid gap-2 sm:grid-cols-2">{script.strategy.map((item: string, index: number) => <li key={`${item}-${index}`} className="flex gap-3 rounded-lg bg-secondary/50 p-3 text-sm leading-6"><span className="font-mono text-xs font-semibold text-primary">0{index + 1}</span>{item}</li>)}</ol></section> : null}<section><h3 className="text-sm font-semibold">Conversation scenarios</h3><div className="mt-3 space-y-3">{(script.scenarios || []).map((scenario: any, index: number) => <details key={`${scenario.name}-${index}`} open={index === 0} className="rounded-xl border bg-card p-4"><summary className="cursor-pointer font-semibold">{scenario.name}</summary><div className="mt-4 space-y-3"><div className="rounded-lg bg-primary/5 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-primary">Say this</p><p className="mt-1 text-sm leading-6">“{scenario.say_this}”</p></div>{scenario.why && <p className="text-sm leading-6 text-muted-foreground"><span className="font-semibold text-foreground">Why it works:</span> {scenario.why}</p>}{scenario.avoid && <p className="flex gap-2 text-sm leading-6 text-amber-700 dark:text-amber-300"><TriangleAlert className="mt-1 h-4 w-4 shrink-0" /><span><span className="font-semibold">Avoid:</span> {scenario.avoid}</span></p>}</div></details>)}</div></section>{script.closing && <section className="rounded-xl border bg-secondary/25 p-4"><h3 className="text-sm font-semibold">Decision guardrails</h3><div className="mt-3 space-y-2 text-sm leading-6"><p><span className="font-semibold">Keep negotiating:</span> {script.closing.keep_negotiating}</p><p><span className="font-semibold">Accept when:</span> {script.closing.acceptable_to_accept}</p><p><span className="font-semibold">Exit politely:</span> {script.closing.polite_exit}</p></div></section>}{script.sources?.length > 0 && <ResearchSources sources={script.sources} />}</div>;
+}
+
+function ResearchSources({ sources }: { sources: any[] }) {
+  if (!sources?.length) return null;
+  return (
+    <details className="rounded-xl border bg-card p-4">
+      <summary className="cursor-pointer text-sm font-semibold">
+        Live research sources ({sources.length})
+      </summary>
+      <div className="mt-3 space-y-2">
+        {sources.map((source: any) => (
+          <a
+            key={source.id}
+            href={source.url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-start justify-between gap-3 rounded-md border bg-secondary/40 p-2.5 text-sm hover:bg-accent"
+          >
+            <span>
+              <span className="font-semibold text-primary">{source.id}</span> · {source.title}
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {source.domain}{source.published_at ? ` · ${source.published_at}` : ""}
+              </span>
+            </span>
+            <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          </a>
+        ))}
+      </div>
+    </details>
+  );
 }
 
 function EmptyResult({ icon, title, copy }: { icon: React.ReactNode; title: string; copy: string }) {

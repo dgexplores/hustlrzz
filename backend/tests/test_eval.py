@@ -73,7 +73,7 @@ def test_explain_answer_teaches_technique(monkeypatch):
 
     seen = {}
 
-    def fake_strict(system, user):
+    def fake_grounded(system, user, temperature=0.2):
         seen["system"] = system
         seen["user"] = user
         return {
@@ -82,9 +82,9 @@ def test_explain_answer_teaches_technique(monkeypatch):
             "strong_phrases": [{"quote": "p95 fell", "why": "numbers signal rigor"}],
             "upgrades": ["Add your personal decision."],
             "reuse_rule": "Always attach a number to a claim.",
-        }
+        }, []
 
-    monkeypatch.setattr(analysis.provider, "chat_json_strict", fake_strict)
+    monkeypatch.setattr(analysis.grounding, "grounded_chat_json", fake_grounded)
     out = analysis.explain_answer("Tell me about scale?", "We cut p95 from 900ms to 540ms with Redis.")
     assert out["reuse_rule"].startswith("Always")
     assert "untrusted" in seen["system"]
@@ -95,26 +95,24 @@ def test_explain_answer_eli5_level(monkeypatch):
 
     seen = {}
 
-    def fake_strict(system, user):
+    def fake_grounded(system, user, temperature=0.2):
         seen["user"] = user
-        return {"why_it_works": ["x"], "structure": "s", "strong_phrases": [], "upgrades": [], "reuse_rule": "r"}
+        return {"why_it_works": ["x"], "structure": "s", "strong_phrases": [], "upgrades": [], "reuse_rule": "r"}, []
 
-    monkeypatch.setattr(analysis.provider, "chat_json_strict", fake_strict)
+    monkeypatch.setattr(analysis.grounding, "grounded_chat_json", fake_grounded)
     analysis.explain_answer("Q is long enough here?", "This answer is definitely long enough to pass validation.", level="eli5")
     assert "15" in seen["user"]
 
 
-def test_explain_answer_parse_failure():
+def test_explain_answer_parse_failure(monkeypatch):
     from backend.career import analysis
 
-    import backend.ai.provider as provider
-
-    orig = provider.chat_json_strict
-    provider.chat_json_strict = lambda s, u: {"unexpected": True}
-    try:
-        assert "error" in analysis.explain_answer("Tell me about scale?", "We cut p95 from 900ms to 540ms with Redis caching.")
-    finally:
-        provider.chat_json_strict = orig
+    monkeypatch.setattr(
+        analysis.grounding,
+        "grounded_chat_json",
+        lambda system, user, temperature=0.2: ({"unexpected": True}, []),
+    )
+    assert "error" in analysis.explain_answer("Tell me about scale?", "We cut p95 from 900ms to 540ms with Redis caching.")
 
 
 # --------------------------------------------------------------------------- #

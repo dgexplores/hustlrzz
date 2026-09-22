@@ -159,7 +159,11 @@ def test_chat_raises_when_all_fail(monkeypatch):
 def test_interviewer_turn_adds_retrieval_context(monkeypatch):
     from backend.agents import interviewer
     seen = {}
-    monkeypatch.setattr(interviewer.provider, "chat", lambda system, user: seen.update({"system": system}) or '{"message":"Next question"}')
+    monkeypatch.setattr(
+        interviewer.grounding,
+        "grounded_chat",
+        lambda system, user, temperature=0.4: seen.update({"system": system}) or ('{"message":"Next question"}', []),
+    )
     reply = interviewer.interviewer_turn(
         "base system", [], "My answer", retrieval_context="[Source: Resume]\nBuilt FastAPI services"
     )
@@ -234,11 +238,11 @@ def test_coaching_turn_limits_history_and_keeps_candidate_content_untrusted(monk
     from backend.career import analysis
     seen = {}
     monkeypatch.setattr(
-        analysis.provider,
-        "chat_json_strict",
-        lambda system, user: seen.update({"system": system, "user": user}) or {
+        analysis.grounding,
+        "grounded_chat_json",
+        lambda system, user, temperature=0.2: seen.update({"system": system, "user": user}) or ({
             "message": "What measurable result followed?", "intent": "probe-depth", "done": False
-        },
+        }, []),
     )
     history = [{"role": "candidate", "text": f"answer {index}"} for index in range(14)]
     result = analysis.coaching_practice_turn(
