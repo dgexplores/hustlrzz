@@ -37,28 +37,28 @@ const MODES = [
     title: "Prepare",
     copy: "Resume plus job description becomes a focused pack: questions, evidence map, company brief.",
     href: "/prepare",
-    seed: "prepare-desk",
+    image: "/images/bg-prepare.svg",
   },
   {
     key: "assess",
     title: "Assess",
     copy: "Timed aptitude, technical, and judgment rounds. Scored blind, reported honestly.",
     href: "/assessment",
-    seed: "assess-stage",
+    image: "/images/bg-assess.svg",
   },
   {
     key: "rehearse",
     title: "Rehearse",
     copy: "A live interviewer that follows up, paces the clock, and judges against your material.",
     href: "/interview",
-    seed: "rehearse-mic",
+    image: "/images/bg-rehearse.svg",
   },
   {
     key: "negotiate",
     title: "Negotiate",
     copy: "Salary scripts and coaching turns for the conversations after the interview.",
     href: "/coaching",
-    seed: "negotiate-room",
+    image: "/images/bg-negotiate.svg",
   },
 ];
 
@@ -157,7 +157,7 @@ function AccordionSlice({ mode, index }: { mode: typeof MODES[0]; index: number 
       onKeyDown={handleKeyDown}
     >
       <motion.div
-        style={{ scale: imgScale, backgroundImage: `url(https://picsum.photos/seed/${mode.seed}/900/900)` }}
+        style={{ scale: imgScale, backgroundImage: `url(${mode.image})` }}
         className="acc-img absolute inset-0 bg-cover bg-center grayscale transition-none"
         aria-hidden="true"
       />
@@ -181,7 +181,7 @@ function AccordionSlice({ mode, index }: { mode: typeof MODES[0]; index: number 
   );
 }
 
-function BentoCard({ span, icon, title, copy, seed, index }: { span: string; icon: React.ReactNode; title: string; copy: string; seed: string; index: number }) {
+function BentoCard({ span, icon, title, copy, index }: { span: string; icon: React.ReactNode; title: string; copy: string; index: number }) {
   const { scale, handlers } = useHoverSpring(1, 1.02);
   const { scale: imgScale } = useHoverSpring(1, 1.05);
 
@@ -193,7 +193,7 @@ function BentoCard({ span, icon, title, copy, seed, index }: { span: string; ico
     >
       <motion.div
         {...handlers}
-        style={{ scale: imgScale, opacity: 0.15, backgroundImage: `url(https://picsum.photos/seed/${seed}/1000/700)` }}
+        style={{ scale: imgScale, opacity: 0.15, backgroundImage: "url(/images/bg-bento.svg)" }}
         className="absolute inset-0 bg-cover bg-center grayscale mix-blend-overlay transition-none"
         aria-hidden="true"
       />
@@ -295,7 +295,7 @@ export function HomeContent() {
               <span
                 aria-hidden="true"
                 className="mx-1 inline-block h-[0.72em] w-20 rounded-full bg-cover bg-center align-middle opacity-80 grayscale"
-                style={{ backgroundImage: "url(https://picsum.photos/seed/coach-mic/400/160)" }}
+                style={{ backgroundImage: "url(/images/pill-accent.svg)" }}
               />
               Leave unforgettable.
             </h1>
@@ -339,7 +339,7 @@ export function HomeContent() {
             <span
               aria-hidden="true"
               className="mx-1 inline-block h-[0.72em] w-20 rounded-full bg-cover bg-center align-middle opacity-80 grayscale"
-              style={{ backgroundImage: "url(https://picsum.photos/seed/focus-desk/320/140)" }}
+              style={{ backgroundImage: "url(/images/pill-accent.svg)" }}
             />{" "}
             every round.
           </h2>
@@ -353,7 +353,6 @@ export function HomeContent() {
               icon={<FileText className="h-6 w-6 text-primary" aria-hidden="true" />}
               title="Questions built around your experience"
               copy="Add a resume and job description. Hustlrzz finds the evidence worth practising and creates a focused interview pack."
-              seed="evidence-wall"
               index={0}
             />
             <BentoCard
@@ -361,7 +360,6 @@ export function HomeContent() {
               icon={<Buildings className="h-6 w-6 text-primary" aria-hidden="true" />}
               title="Current company context"
               copy="Research runs when you need it, with source links and preparation cues for the role you selected."
-              seed="company-glass"
               index={1}
             />
             <BentoCard
@@ -369,7 +367,6 @@ export function HomeContent() {
               icon={<ChatsCircle className="h-6 w-6 text-primary" aria-hidden="true" />}
               title="A conversation, not a question list"
               copy="The interviewer listens to each answer, asks follow-ups, and keeps the discussion grounded in your preparation."
-              seed="dialogue-loop"
               index={2}
             />
             <BentoCard
@@ -377,7 +374,6 @@ export function HomeContent() {
               icon={<Camera className="h-6 w-6 text-primary" aria-hidden="true" />}
               title="Content and presence in one review"
               copy="Answer quality alongside posture, gaze, and gesture signals. Camera processing stays on your device."
-              seed="presence-studio"
               index={3}
             />
           </div>

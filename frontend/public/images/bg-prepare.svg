@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="900" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0"/>
+    </filter>
+  </defs>
+  <rect width="900" height="900" fill="url(#bg)"/>
+  <!-- evidence grid -->
+  <g stroke="#27272a" stroke-width="1">
+    <path d="M0 150h900M0 300h900M0 450h900M0 600h900M0 750h900"/>
+    <path d="M150 0v900M300 0v900M450 0v900M600 0v900M750 0v900"/>
+  </g>
+  <!-- document stack -->
+  <rect x="180" y="220" width="360" height="460" rx="16" fill="#18181b" stroke="#3f3f46" stroke-width="2"/>
+  <rect x="220" y="180" width="360" height="460" rx="16" fill="#27272a" stroke="#52525b" stroke-width="2"/>
+  <rect x="260" y="260" width="360" height="460" rx="16" fill="#18181b" stroke="#71717a" stroke-width="2"/>
+  <g stroke="#3f3f46" stroke-width="10" stroke-linecap="round">
+    <path d="M310 350h260"/>
+    <path d="M310 400h260"/>
+    <path d="M310 450h180"/>
+    <path d="M310 500h260"/>
+    <path d="M310 550h220"/>
+  </g>
+  <!-- ready-mark frame + check -->
+  <rect x="540" y="560" width="200" height="200" rx="24" stroke="url(#accent)" stroke-width="8" fill="#09090b" fill-opacity="0.7"/>
+  <path d="M585 665l40 40 70-90" stroke="url(#accent)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="900" height="900" filter="url(#grain)"/>
+</svg>
