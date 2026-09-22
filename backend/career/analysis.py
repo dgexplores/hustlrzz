@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from backend.ai import provider
+from backend.ai import grounding, provider
 
 JD_MATCH_SYSTEM = (
     "You are a senior technical recruiter and interview coach. Analyze the "
@@ -222,23 +222,27 @@ EXPLAIN_LEVELS = {
 def explain_answer(question: str, answer: str, level: str = "standard") -> dict:
     """Teach the technique behind a model answer (Learn mode).
 
-    Pure function over the provider layer: mocked in tests, no DB access.
+    Grounded via optional web search for current role/market context; pure
+    function over the provider layer: mocked in tests, no DB access.
     """
     tone = EXPLAIN_LEVELS.get(level, EXPLAIN_LEVELS["standard"])
     user = (
         f"Interview question:\n{question}\n\nModel answer:\n{answer}\n\n"
         f"Level: {tone}\n\n" + EXPLAIN_SCHEMA
     )
-    data = provider.chat_json_strict(EXPLAIN_SYSTEM, user)
+    data, sources = grounding.grounded_chat_json(EXPLAIN_SYSTEM, user)
     if not isinstance(data, dict) or not data.get("why_it_works"):
         return {"error": "answer explanation parse failed"}
-    return {
+    result = {
         "why_it_works": data.get("why_it_works", []) or [],
         "structure": data.get("structure", "") or "",
         "strong_phrases": data.get("strong_phrases", []) or [],
         "upgrades": data.get("upgrades", []) or [],
         "reuse_rule": data.get("reuse_rule", "") or "",
     }
+    if sources:
+        result["sources"] = sources
+    return result
 
 
 def salary_script(
@@ -253,10 +257,16 @@ def salary_script(
         f"Current salary: {current_salary or 'not provided'}.\n"
         f"Target range: {target_range or 'not provided'}.\n"
         f"Existing offer: {has_offer or 'not provided'}.\n\n"
+        "If market rates, leveling, or company-specific compensation data would "
+        "strengthen the script, search the web for current figures before answering.\n\n"
         + SALARY_SCHEMA
     )
-    data = provider.chat_json_strict(SALARY_SYSTEM, user)
-    return data if isinstance(data, dict) else {"error": "salary script parse failed"}
+    data, sources = grounding.grounded_chat_json(SALARY_SYSTEM, user)
+    if not isinstance(data, dict):
+        return {"error": "salary script parse failed"}
+    if sources:
+        data["sources"] = sources
+    return data
 
 
 def evaluate_coaching_practice(
@@ -316,11 +326,14 @@ def coaching_practice_turn(
         "natural conclusion or at least four candidate answers have been completed.\n"
         + COACHING_TURN_SCHEMA
     )
-    data = provider.chat_json_strict(COACHING_TURN_SYSTEM, user)
+    data, sources = grounding.grounded_chat_json(COACHING_TURN_SYSTEM, user)
     if not isinstance(data, dict) or not str(data.get("message", "")).strip():
         return {"error": "coaching turn parse failed"}
-    return {
+    result = {
         "message": str(data["message"]).strip()[:2000],
         "intent": str(data.get("intent", "probe-depth"))[:60],
         "done": bool(data.get("done", False)),
     }
+    if sources:
+        result["sources"] = sources
+    return result

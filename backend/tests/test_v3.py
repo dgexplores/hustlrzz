@@ -265,11 +265,11 @@ def test_interviewer_turn_trims_transcript_budget(monkeypatch):
 
     seen = {}
 
-    def fake_chat(system, user, temperature=0.4):
+    def fake_grounded(system, user, temperature=0.4):
         seen["user"] = user
-        return '{"message":"Got it - next up.","question":"Next?","done":false}'
+        return '{"message":"Got it - next up.","question":"Next?","done":false}', []
 
-    monkeypatch.setattr(interviewer.provider, "chat", fake_chat)
+    monkeypatch.setattr(interviewer.grounding, "grounded_chat", fake_grounded)
     big_transcript = [
         {"from": "candidate" if i % 2 else "interviewer", "text": "x" * 500}
         for i in range(200)
