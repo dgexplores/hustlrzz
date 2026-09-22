@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="900" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0"/>
+    </filter>
+  </defs>
+  <rect width="900" height="900" fill="url(#bg)"/>
+  <!-- stepped negotiation path -->
+  <path d="M120 700h140V560h140V440h140V320h140V200h140"
+    stroke="url(#accent)" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#27272a" stroke="#71717a" stroke-width="4">
+    <rect x="96" y="676" width="48" height="48" rx="12"/>
+    <rect x="236" y="536" width="48" height="48" rx="12"/>
+    <rect x="376" y="416" width="48" height="48" rx="12"/>
+    <rect x="516" y="296" width="48" height="48" rx="12"/>
+  </g>
+  <rect x="656" y="176" width="48" height="48" rx="12" fill="url(#accent)"/>
+  <!-- balance scale hint -->
+  <path d="M200 300h300" stroke="#3f3f46" stroke-width="8" stroke-linecap="round"/>
+  <path d="M350 300v120" stroke="#3f3f46" stroke-width="8" stroke-linecap="round"/>
+  <path d="M250 300l-50 90h100l-50-90z" fill="#18181b" stroke="#52525b" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M450 300l-40 70h80l-40-70z" fill="#18181b" stroke="url(#accent)" stroke-width="4" stroke-linejoin="round"/>
+  <!-- ready-mark frame -->
+  <rect x="600" y="560" width="180" height="180" rx="24" stroke="url(#accent)" stroke-width="8" fill="#09090b" fill-opacity="0.7"/>
+  <path d="M642 655l36 36 62-82" stroke="url(#accent)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="900" height="900" filter="url(#grain)"/>
+</svg>

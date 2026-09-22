@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="900" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0"/>
+    </filter>
+  </defs>
+  <rect width="900" height="900" fill="url(#bg)"/>
+  <!-- waveform -->
+  <path d="M60 450
+    q30-160 60 0 t60 0 t60-220 t60 220 t60-120 t60 120
+    t60-260 t60 260 t60-90 t60 90 t60-180 t60 180 t60-60 t60 60"
+    stroke="url(#accent)" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <path d="M60 520
+    q40-90 80 0 t80 0 t80-130 t80 130 t80-70 t80 70 t80-150 t80 150 t80-50 t80 50"
+    stroke="#3f3f46" stroke-width="6" stroke-linecap="round" fill="none"/>
+  <!-- mic body -->
+  <rect x="390" y="140" width="120" height="200" rx="60" fill="#27272a" stroke="#71717a" stroke-width="4"/>
+  <path d="M350 300a90 90 0 0 0 180 0" stroke="#71717a" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <path d="M450 390v60" stroke="#71717a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M410 450h80" stroke="#71717a" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="450" cy="240" r="18" fill="url(#accent)"/>
+  <!-- timer arc -->
+  <circle cx="700" cy="700" r="100" stroke="#3f3f46" stroke-width="10" fill="none"/>
+  <path d="M700 600a100 100 0 0 1 87 150" stroke="url(#accent)" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <!-- ready-mark frame -->
+  <rect x="100" y="620" width="180" height="180" rx="24" stroke="url(#accent)" stroke-width="8" fill="#09090b" fill-opacity="0.7"/>
+  <path d="M142 715l36 36 62-82" stroke="url(#accent)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="900" height="900" filter="url(#grain)"/>
+</svg>
