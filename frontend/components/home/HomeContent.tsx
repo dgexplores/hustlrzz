@@ -21,6 +21,7 @@ import {
 } from "@phosphor-icons/react";
 import { usePressAndHover, useFlexSpring, useHoverSpring } from "@/hooks/useSprings";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { ProductPreview } from "@/components/home/ProductPreview";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -311,26 +312,9 @@ export function HomeContent() {
             </div>
           </div>
 
-          <figure className="relative lg:col-span-4 lg:col-start-9">
-            <div className="overflow-hidden rounded-[2rem] border border-border shadow-[0_20px_40px_-24px_hsl(var(--foreground)/0.2)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://picsum.photos/seed/interview-room/1200/900"
-                alt="Candidate rehearsing an interview answer"
-                loading="eager"
-                width="1200"
-                height="900"
-                className="aspect-[4/3] w-full object-cover grayscale contrast-110 [mask-image:linear-gradient(to_left,black_78%,transparent)]"
-              />
-            </div>
-            <figcaption className="mt-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <span className="relative flex h-2 w-2" aria-hidden="true">
-                <span className="absolute h-full w-full rounded-full bg-primary opacity-60 motion-safe:animate-ping" />
-                <span className="h-2 w-2 rounded-full bg-primary" />
-              </span>
-              Live practice session
-            </figcaption>
-          </figure>
+          <div className="lg:col-span-4 lg:col-start-9">
+            <ProductPreview />
+          </div>
         </div>
       </section>
 
