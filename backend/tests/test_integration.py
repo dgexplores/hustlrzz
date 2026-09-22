@@ -56,6 +56,8 @@ def client(monkeypatch):
     from backend import db as dbc
 
     monkeypatch.setattr(dbc, "is_ready", lambda: True)
+    # Rate limiter's shared path needs a client too; keep it memory-backed in tests.
+    monkeypatch.setattr(dbc, "get_client", lambda: None)
     monkeypatch.setattr(dbc, "insert", fake_insert)
     monkeypatch.setattr(dbc, "update", fake_update)
     monkeypatch.setattr(dbc, "select_where", fake_select)
@@ -257,6 +259,8 @@ def test_live_interview_uses_prepared_questions(client, monkeypatch):
     assert started.status_code == 200, started.text
     data = started.json()["data"]
     qs = data["websocket_parameter"]
+    assert "token=" not in qs  # handshake token never rides the URL
+    assert data["ws_token"]
 
     from backend.agents import interviewer as iv
 
@@ -272,6 +276,7 @@ def test_live_interview_uses_prepared_questions(client, monkeypatch):
     monkeypatch.setattr(iv.provider, "chat", spy_chat)
 
     with c.websocket_connect(f"/ws/{data['session_id']}{qs}") as ws:
+        ws.send_json({"type": "auth", "token": data["ws_token"]})
         opener = ws.receive_json()
         assert opener["type"] == "question"
         # THE FIX VERIFIED: opener comes from the prepared pack, not the default.
@@ -306,9 +311,21 @@ def test_websocket_rejects_bad_token(client):
     })
     started = c.post("/interviews/start", json={"workflow_id": "wf-x", "duration": 10})
     data = started.json()["data"]
-    bad_qs = data["websocket_parameter"].replace("token=", "token=wrongtoken")
     with pytest.raises(Exception):
-        with c.websocket_connect(f"/ws/{data['session_id']}{bad_qs}") as ws:
+        with c.websocket_connect(f"/ws/{data['session_id']}{data['websocket_parameter']}") as ws:
+            ws.send_json({"type": "auth", "token": "wrongtoken"})
+            ws.receive_json()
+
+
+def test_websocket_rejects_missing_auth(client):
+    c, store, _ = client
+    store["workflows"].append({
+        "workflow_id": "wf-na", "user_id": USER["uid"], "questions": [], "match": {},
+    })
+    data = c.post("/interviews/start", json={"workflow_id": "wf-na"}).json()["data"]
+    with pytest.raises(Exception):
+        with c.websocket_connect(f"/ws/{data['session_id']}{data['websocket_parameter']}") as ws:
+            # Never send auth — server must close on timeout/rejection.
             ws.receive_json()
 
 
@@ -317,8 +334,11 @@ def test_websocket_rejects_double_connection(client):
     store["workflows"].append({"workflow_id": "wf-y", "user_id": USER["uid"], "questions": [], "match": {}})
     data = c.post("/interviews/start", json={"workflow_id": "wf-y"}).json()["data"]
     ws_path = f"/ws/{data['session_id']}{data['websocket_parameter']}"
+    token = data["ws_token"]
     with c.websocket_connect(ws_path) as first:
+        first.send_json({"type": "auth", "token": token})
         first.receive_json()  # consume opener; connection now marked active
         with pytest.raises(Exception):
             with c.websocket_connect(ws_path) as second:
+                second.send_json({"type": "auth", "token": token})
                 second.receive_json(timeout=2)

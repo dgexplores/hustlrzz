@@ -181,35 +181,73 @@ class FetchBlocked(Exception):
     """URL failed SSRF / policy validation."""
 
 
-def _assert_safe_url(url: str) -> str:
-    parsed = urlparse(url)
-    if parsed.scheme not in _SAFE_SCHEMES or not parsed.hostname:
-        raise FetchBlocked("only absolute http(s) URLs are allowed")
-    hostname = parsed.hostname.lower()
+def _is_public_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return not (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
+def _resolve_public_ips(hostname: str, port: int) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    """Resolve hostname once; every record must be a public address.
+
+    Fails closed: a single private/reserved answer (e.g. rebinding attempt)
+    rejects the whole hostname.
+    """
     if hostname in {"localhost", "localhost.localdomain"} or hostname.endswith(".local"):
         raise FetchBlocked("local hostnames are blocked")
     try:
-        infos = socket.getaddrinfo(hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
+        infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
     except OSError as exc:
         raise FetchBlocked(f"could not resolve host: {exc}") from exc
     if not infos:
         raise FetchBlocked("could not resolve host")
+    addresses: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
     for info in infos:
-        address = info[4][0]
         try:
-            ip = ipaddress.ip_address(address)
-        except ValueError:
-            raise FetchBlocked("unparsable resolved address")
-        if (
-            ip.is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_multicast
-            or ip.is_reserved
-            or ip.is_unspecified
-        ):
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError as exc:
+            raise FetchBlocked("unparsable resolved address") from exc
+        if not _is_public_ip(ip):
             raise FetchBlocked("resolved to a non-public address")
+        if ip not in addresses:
+            addresses.append(ip)
+    return addresses
+
+
+def _assert_safe_url(url: str) -> str:
+    """Validate scheme + resolution policy (kept for direct callers/tests)."""
+    _pin_url(url)
     return url
+
+
+def _pin_url(url: str) -> tuple[str, str, str]:
+    """Validate URL once and pin the connection to a single resolved IP.
+
+    Returns (pinned_url, host_header, sni_hostname). DNS is resolved exactly
+    once here; the subsequent request connects to that literal IP, so a
+    short-TTL rebinding between check and connect cannot redirect the socket
+    to an internal address (TOCTOU gap closed).
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in _SAFE_SCHEMES or not parsed.hostname:
+        raise FetchBlocked("only absolute http(s) URLs are allowed")
+    hostname = parsed.hostname.lower()
+    default_port = 443 if parsed.scheme == "https" else 80
+    port = parsed.port or default_port
+    addresses = _resolve_public_ips(hostname, port)
+    pinned = addresses[0]
+    host_in_url = f"[{pinned}]" if pinned.version == 6 else str(pinned)
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    pinned_url = f"{parsed.scheme}://{host_in_url}:{port}{path}"
+    host_header = hostname if port == default_port else f"{hostname}:{port}"
+    return pinned_url, host_header, hostname
 
 
 def _html_to_text(raw: bytes) -> tuple[str, str]:
@@ -245,8 +283,13 @@ def fetch_page_text(url: str) -> dict:
             },
         ) as client:
             for _hop in range(_MAX_REDIRECTS + 1):
-                current = _assert_safe_url(current)
-                with client.stream("GET", current) as response:
+                pinned_url, host_header, sni = _pin_url(current)
+                with client.stream(
+                    "GET",
+                    pinned_url,
+                    headers={"Host": host_header},
+                    extensions={"sni_hostname": sni},
+                ) as response:
                     if response.status_code in {301, 302, 303, 307, 308}:
                         location = response.headers.get("location")
                         if not location:

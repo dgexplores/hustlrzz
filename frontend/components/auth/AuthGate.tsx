@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import { getSupabase, isSupabaseConfigured, restoreSessionFromCookie } from "@/lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -41,17 +41,23 @@ export function AuthGate({ children }: { children: ReactNode }) {
     let active = true;
     try {
       const supabase = getSupabase();
-      supabase.auth
-        .getSession()
-        .then(({ data }) => {
+      // Full page load: tokens are memory-only now; rehydrate from httpOnly cookie first.
+      restoreSessionFromCookie()
+        .catch(() => undefined)
+        .finally(() => {
           if (!active) return;
-          setSession(data.session);
-          setLoading(false);
-        })
-        .catch(() => {
-          if (!active) return;
-          setSession(null);
-          setLoading(false);
+          supabase.auth
+            .getSession()
+            .then(({ data }) => {
+              if (!active) return;
+              setSession(data.session);
+              setLoading(false);
+            })
+            .catch(() => {
+              if (!active) return;
+              setSession(null);
+              setLoading(false);
+            });
         });
       const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
       return () => {
