@@ -1,13 +1,20 @@
 """Shared DuckDuckGo retrieval used by preparation and company intelligence.
 
 Search is best-effort by design: every failure path returns an empty list and
-callers fall back to built-in knowledge.
+callers fall back to built-in knowledge. ``fetch_page_text`` is the SSRF-safe
+page reader used by the grounding fetch_page tool.
 """
 
 from __future__ import annotations
 
+import html
+import ipaddress
+import re
+import socket
 from datetime import datetime, timezone
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
+
+import httpx
 
 from backend import config
 from backend.obs import log
@@ -156,3 +163,124 @@ def search_web(query: str, max_results: int = 6) -> list[dict]:
 
 def search_enabled() -> bool:
     return config.ENABLE_WEB_SEARCH
+
+
+# --------------------------------------------------------------------------- #
+# fetch_page tool (SSRF-hardened)
+# --------------------------------------------------------------------------- #
+_SAFE_SCHEMES = {"http", "https"}
+_CONTENT_TYPES = ("text/html", "text/plain", "application/xhtml", "application/xml")
+_MAX_REDIRECTS = 3
+_TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
+_TAG_RE = re.compile(r"<(script|style|noscript)[^>]*>.*?</\1>", re.I | re.S)
+_ANY_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+
+
+class FetchBlocked(Exception):
+    """URL failed SSRF / policy validation."""
+
+
+def _assert_safe_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in _SAFE_SCHEMES or not parsed.hostname:
+        raise FetchBlocked("only absolute http(s) URLs are allowed")
+    hostname = parsed.hostname.lower()
+    if hostname in {"localhost", "localhost.localdomain"} or hostname.endswith(".local"):
+        raise FetchBlocked("local hostnames are blocked")
+    try:
+        infos = socket.getaddrinfo(hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
+    except OSError as exc:
+        raise FetchBlocked(f"could not resolve host: {exc}") from exc
+    if not infos:
+        raise FetchBlocked("could not resolve host")
+    for info in infos:
+        address = info[4][0]
+        try:
+            ip = ipaddress.ip_address(address)
+        except ValueError:
+            raise FetchBlocked("unparsable resolved address")
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_reserved
+            or ip.is_unspecified
+        ):
+            raise FetchBlocked("resolved to a non-public address")
+    return url
+
+
+def _html_to_text(raw: bytes) -> tuple[str, str]:
+    document = raw.decode("utf-8", errors="replace")
+    title_match = _TITLE_RE.search(document)
+    title = _WS_RE.sub(" ", html.unescape(title_match.group(1))).strip()[:240] if title_match else ""
+    body = _TAG_RE.sub(" ", document)
+    body = _ANY_TAG_RE.sub(" ", body)
+    text = _WS_RE.sub(" ", html.unescape(body)).strip()
+    return title, text[: config.PAGE_FETCH_MAX_CHARS]
+
+
+def fetch_page_text(url: str) -> dict:
+    """Fetch one public page and return readable text. Never raises.
+
+    Policy: http(s) only, public IPs only (validated on every redirect hop),
+    no cookies/JS, size- and time-capped, HTML stripped to plain text.
+    """
+    url = str(url or "").strip()
+    if not url:
+        return {"error": "empty url"}
+    if not search_enabled():
+        return {"error": "web tools disabled"}
+    current = url
+    raw = b""
+    try:
+        with httpx.Client(
+            follow_redirects=False,
+            timeout=config.PAGE_FETCH_TIMEOUT_SECONDS,
+            headers={
+                "User-Agent": "hustlrzz-research/1.0 (+https://hustlrzz.vercel.app)",
+                "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
+            },
+        ) as client:
+            for _hop in range(_MAX_REDIRECTS + 1):
+                current = _assert_safe_url(current)
+                with client.stream("GET", current) as response:
+                    if response.status_code in {301, 302, 303, 307, 308}:
+                        location = response.headers.get("location")
+                        if not location:
+                            return {"error": "redirect without location"}
+                        current = urljoin(current, location)
+                        continue
+                    if response.status_code >= 400:
+                        return {"error": f"http {response.status_code}", "url": current}
+                    content_type = (response.headers.get("content-type") or "").lower()
+                    if not any(allowed in content_type for allowed in _CONTENT_TYPES):
+                        return {"error": f"unsupported content-type: {content_type[:80]}", "url": current}
+                    chunks: list[bytes] = []
+                    total = 0
+                    for chunk in response.iter_bytes():
+                        total += len(chunk)
+                        if total > config.PAGE_FETCH_MAX_BYTES:
+                            break
+                        chunks.append(chunk)
+                    raw = b"".join(chunks)[: config.PAGE_FETCH_MAX_BYTES]
+                    break
+            else:
+                return {"error": "too many redirects", "url": url}
+            title, text = _html_to_text(raw)
+            if not text:
+                return {"error": "no readable text", "url": current}
+            return {
+                "url": current,
+                "title": title,
+                "text": text,
+                "bytes": len(raw),
+            }
+    except FetchBlocked as exc:
+        log.warning("fetch_page blocked %s: %s", url, exc)
+        return {"error": f"blocked: {exc}", "url": url}
+    except Exception as exc:
+        log.warning("fetch_page failed %s: %s", url, exc)
+        return {"error": f"fetch failed: {exc}", "url": url}

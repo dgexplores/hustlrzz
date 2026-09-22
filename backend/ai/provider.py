@@ -3,6 +3,8 @@
 Preferred provider is runtime-switchable via config.AI_PROVIDER:
   - "groq": fast, free tier (no credit card), good daily quota
   - "gemini": google gemini flash (adds vision + long context)
+  - "openai": OpenAI API (or any OpenAI-compatible via OPENAI_BASE_URL)
+  - "openrouter": one key, many models via OpenRouter
 
 Every downstream agent talks to ``chat`` / ``chat_json`` only, so the
 interviewer, judge, summarizer and analysis modules stay provider-agnostic.
@@ -31,6 +33,15 @@ def is_rate_limit_error(exc: BaseException) -> bool:
 
 def is_configured() -> bool:
     return bool(_providers())
+
+
+def _keyed_providers() -> dict[str, str]:
+    return {
+        "groq": config.GROQ_API_KEY,
+        "gemini": config.GEMINI_API_KEY,
+        "openai": config.OPENAI_API_KEY,
+        "openrouter": config.OPENROUTER_API_KEY,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -65,16 +76,69 @@ def _gemini_chat(system: str, user: str, temperature: float = 0.4) -> str:
     return (resp.text or "").strip()
 
 
+def _openai_compat_settings(name: str) -> tuple[str, str, str]:
+    """(base_url, api_key, model) for OpenAI-compatible HTTP providers."""
+    if name == "openrouter":
+        return config.OPENROUTER_BASE_URL, config.OPENROUTER_API_KEY, config.OPENROUTER_MODEL
+    if name == "openai":
+        return config.OPENAI_BASE_URL, config.OPENAI_API_KEY, config.OPENAI_MODEL
+    raise ProviderError(f"not an openai-compatible provider: {name}")
+
+
+def _openai_compat_chat_messages(
+    name: str,
+    messages: list[dict],
+    temperature: float = 0.4,
+    tools: list[dict] | None = None,
+) -> dict:
+    import httpx
+
+    base_url, api_key, model = _openai_compat_settings(name)
+    payload: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+    }
+    if tools:
+        payload["tools"] = tools
+        payload["tool_choice"] = "auto"
+    response = httpx.post(
+        f"{base_url}/chat/completions",
+        json=payload,
+        headers={"Authorization": f"Bearer {api_key}"},
+        timeout=config.AI_REQUEST_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    message = (response.json().get("choices") or [{}])[0].get("message") or {}
+    tool_calls = []
+    for call in message.get("tool_calls") or []:
+        function = call.get("function") or {}
+        tool_calls.append({
+            "id": call.get("id") or "",
+            "name": function.get("name") or "",
+            "arguments": function.get("arguments") or "{}",
+        })
+    return {"content": (message.get("content") or "").strip(), "tool_calls": tool_calls}
+
+
+def _openai_compat_chat(name: str, system: str, user: str, temperature: float) -> str:
+    result = _openai_compat_chat_messages(
+        name,
+        [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        temperature,
+    )
+    return result.get("content") or ""
+
+
 def _providers() -> list[str]:
     """Active providers, preferred first."""
-    order = [config.AI_PROVIDER]
-    for other in ("groq", "gemini"):
-        if other not in order:
-            order.append(other)
-    return [p for p in order if {
-        "groq": config.GROQ_API_KEY,
-        "gemini": config.GEMINI_API_KEY,
-    }.get(p)]
+    keys = _keyed_providers()
+    fallbacks = ("groq", "openai", "openrouter", "gemini")
+    order = [config.AI_PROVIDER] + [p for p in fallbacks if p != config.AI_PROVIDER]
+    return [p for p in order if keys.get(p)]
 
 
 # --------------------------------------------------------------------------- #
@@ -85,14 +149,17 @@ def chat(system: str, user: str, temperature: float = 0.4) -> str:
     provider = _providers() or []
     if not provider:
         raise ProviderError(
-            f"AI not configured: set GROQ_API_KEY and/or GEMINI_API_KEY in backend/.env"
+            "AI not configured: set GROQ_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY "
+            "and/or OPENROUTER_API_KEY in backend/.env"
         )
     last_err: Exception | None = None
     for name in provider:
         try:
             if name == "gemini":
                 return _gemini_chat(system, user, temperature)
-            return _groq_chat(system, user, temperature)
+            if name == "groq":
+                return _groq_chat(system, user, temperature)
+            return _openai_compat_chat(name, system, user, temperature)
         except Exception as exc:
             last_err = exc
             # Rate-limit / quota / auth → try the next provider.
@@ -242,14 +309,17 @@ def chat_messages(
     names = _providers() or []
     if not names:
         raise ProviderError(
-            "AI not configured: set GROQ_API_KEY and/or GEMINI_API_KEY in backend/.env"
+            "AI not configured: set GROQ_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY "
+            "and/or OPENROUTER_API_KEY in backend/.env"
         )
     last_err: Exception | None = None
     for name in names:
         try:
             if name == "gemini":
                 return _gemini_chat_messages(messages, temperature, tools)
-            return _groq_chat_messages(messages, temperature, tools)
+            if name == "groq":
+                return _groq_chat_messages(messages, temperature, tools)
+            return _openai_compat_chat_messages(name, messages, temperature, tools)
         except Exception as exc:
             last_err = exc
             continue
