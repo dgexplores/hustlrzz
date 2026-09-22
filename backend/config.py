@@ -7,14 +7,21 @@ load_dotenv(BASE_DIR / ".env")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
-# Preferred provider: "groq" (free tier, no card) or "gemini".
+# Preferred provider: "groq" (free tier, no card), "gemini", "openai", or
+# "openrouter" (any OpenAI-compatible model via a single key).
 AI_PROVIDER = os.getenv("AI_PROVIDER", "groq").lower()
 
 GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
 
 # Retrieval is intentionally independent of chat-provider selection. Gemini's
 # embedding endpoint is used only when a key is configured; the core interview
@@ -44,6 +51,10 @@ DEFAULT_QUESTION_COUNT = int(os.getenv("DEFAULT_QUESTION_COUNT", "12"))
 ENABLE_WEB_SEARCH = os.getenv("ENABLE_WEB_SEARCH", "true").lower() in {"1", "true", "yes"}
 AI_REQUEST_TIMEOUT_SECONDS = int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "60"))
 WEB_SEARCH_TIMEOUT_SECONDS = int(os.getenv("WEB_SEARCH_TIMEOUT_SECONDS", "15"))
+# fetch_page tool: SSRF-hardened single-page retrieval for citation verification.
+PAGE_FETCH_TIMEOUT_SECONDS = float(os.getenv("PAGE_FETCH_TIMEOUT_SECONDS", "8"))
+PAGE_FETCH_MAX_BYTES = int(os.getenv("PAGE_FETCH_MAX_BYTES", str(1_500_000)))
+PAGE_FETCH_MAX_CHARS = int(os.getenv("PAGE_FETCH_MAX_CHARS", "8000"))
 
 # Resume Analyzer safeguards.  Quotas are ultimately enforced by the Supabase
 # RPC; these values only define product policy and request bounds.
