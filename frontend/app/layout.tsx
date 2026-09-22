@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
@@ -40,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   `;
   const swScript = `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}`;
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={GeistSans.variable}>
       <head>
         <meta name="color-scheme" content="light dark" />
         <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />

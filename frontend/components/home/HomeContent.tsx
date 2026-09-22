@@ -15,7 +15,9 @@ import {
   FileText,
   ChatsCircle,
   Play,
-  ShieldCheck,
+  Microphone,
+  ArrowsClockwise,
+  Fingerprint,
 } from "@phosphor-icons/react";
 import { usePressAndHover, useFlexSpring, useHoverSpring } from "@/hooks/useSprings";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -307,7 +309,7 @@ export function HomeContent() {
                 <Play className="h-4 w-4" aria-hidden="true" /> Try sample interview
               </HeroCTA>
             </div>
-            <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] font-medium text-muted-foreground">
+            <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] font-medium tabular-nums text-muted-foreground">
               <span className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">1</span> Prepare</span>
               <span aria-hidden="true">→</span>
               <span className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">2</span> Practice</span>
@@ -404,9 +406,13 @@ export function HomeContent() {
           </div>
 
           <div className="cascade mt-4 grid grid-cols-1 gap-6 text-sm md:grid-cols-12">
-            {["Voice and typing", "Multi-provider AI with automatic failover", "Private on-device camera processing"].map((label, i) => (
+            {[
+              { label: "Voice and typing", icon: <Microphone className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> },
+              { label: "Multi-provider AI with automatic failover", icon: <ArrowsClockwise className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> },
+              { label: "Private on-device camera processing", icon: <Fingerprint className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> },
+            ].map(({ label, icon }, i) => (
               <p key={label} style={{ "--i": i + 4 } as CSSProperties} className={`flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-4 text-muted-foreground ${i === 0 ? "md:col-span-5" : i === 1 ? "md:col-span-4" : "md:col-span-3"}`}>
-                <ShieldCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> {label}
+                {icon} {label}
               </p>
             ))}
           </div>
