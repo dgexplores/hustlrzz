@@ -77,7 +77,15 @@ app.add_middleware(
 async def _security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
+    )
+    response.headers.setdefault(
+        "Content-Security-Policy", "frame-ancestors 'none'; default-src 'none'"
+    )
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
     return response
 
 bearer = HTTPBearer(auto_error=False)
@@ -93,10 +101,16 @@ def _db_or_503():
 
 
 def rate_limited(scope: str, limit: int, window_seconds: int):
-    """Per-user sliding-window request guard bound to an authenticated user."""
+    """Per-user sliding-window request guard bound to an authenticated user.
+
+    Uses the shared Postgres limiter when Supabase is ready (multi-instance
+    safe); falls back to in-process counters otherwise.
+    """
 
     async def dependency(request: Request, user: dict = Depends(get_user)) -> dict:
-        allowed, retry_after = limiter.allow(f"{scope}:{user['uid']}", limit, window_seconds)
+        allowed, retry_after = await limiter.allow_async(
+            f"{scope}:{user['uid']}", limit, window_seconds
+        )
         if not allowed:
             raise HTTPException(
                 status_code=429,
@@ -850,11 +864,21 @@ async def start_interview(payload: InterviewStart, user: dict = Depends(rate_lim
     sess.state["duration"] = payload.duration
     sess.state["is_audio"] = payload.is_audio
     sess.state["persona"] = payload.persona
+    # Token is returned in the JSON body only — never in the WS URL, where it
+    # would leak through access logs, proxies, and browser referrers. The
+    # client sends it as the first WebSocket message instead.
     qs = (
         f"?user_id={user['uid']}&workflow_id={payload.workflow_id}"
-        f"&duration={payload.duration}&is_audio={str(payload.is_audio).lower()}&persona={payload.persona}&token={ws_token}"
+        f"&duration={payload.duration}&is_audio={str(payload.is_audio).lower()}&persona={payload.persona}"
     )
-    return {"success": True, "data": {"session_id": session_id, "websocket_parameter": qs}}
+    return {
+        "success": True,
+        "data": {
+            "session_id": session_id,
+            "websocket_parameter": qs,
+            "ws_token": ws_token,
+        },
+    }
 
 
 @router.websocket("/ws/{session_id}")
@@ -863,29 +887,37 @@ async def interview_ws(
     session_id: str,
     user_id: str = "",
     workflow_id: str = "",
-    token: str = "",
     duration: int = 15,
     is_audio: bool = False,
     persona: str = "maya",
 ):
+    await websocket.accept()
     sess = await registry.get("hustlrzz", user_id, session_id)
     expected = sess.state.get("ws_token", "") if sess else ""
     issued_at = float(sess.state.get("ws_issued_at", 0)) if sess else 0.0
     token_fresh = issued_at and (time.time() - issued_at) <= config.WS_TOKEN_TTL_SECONDS
+
+    # Handshake: first frame must be {"type": "auth", "token": ...}.
+    try:
+        first = await asyncio.wait_for(
+            websocket.receive_json(), timeout=config.WS_AUTH_TIMEOUT_SECONDS
+        )
+    except (asyncio.TimeoutError, TimeoutError, WebSocketDisconnect, Exception):
+        await websocket.close(code=1008)
+        return
+    token = str(first.get("token") or "") if isinstance(first, dict) and first.get("type") == "auth" else ""
     if (
         not sess or not token or not secrets.compare_digest(str(expected), str(token))
         or not token_fresh
     ):
-        await websocket.accept()
         await websocket.close(code=1008)
         return
     if sess.state.get("active"):
         # One live connection per session prevents duplicate transcripts.
-        await websocket.accept()
         await websocket.close(code=1013)
         return
     sess.state["active"] = True
-    # Single-use handshake token: a captured ?token= URL cannot open a second socket.
+    # Single-use handshake token: a captured token cannot open a second socket.
     sess.state["ws_issued_at"] = 0.0
     duration = max(5, min(60, int(duration or 15)))
     started_at = time.monotonic()
@@ -931,7 +963,6 @@ async def interview_ws(
     transcript: list[dict] = []
     end_presence: dict = {}
 
-    await websocket.accept()
     try:
         opener_text = questions[0].get("question") if questions else ""
         opener = {"question": opener_text or "Tell me about yourself.", "message": ""}

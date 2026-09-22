@@ -72,6 +72,8 @@ RATE_ASSESSMENT_PER_HOUR = int(os.getenv("RATE_ASSESSMENT_PER_HOUR", "6"))
 # Live-interview session hygiene.
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "3600"))
 WS_TOKEN_TTL_SECONDS = int(os.getenv("WS_TOKEN_TTL_SECONDS", "1800"))
+# Client must send the first-frame auth message within this window.
+WS_AUTH_TIMEOUT_SECONDS = float(os.getenv("WS_AUTH_TIMEOUT_SECONDS", "10"))
 
 # Company intelligence auto-refresh cadence (days).
 COMPANY_INTEL_TTL_DAYS = int(os.getenv("COMPANY_INTEL_TTL_DAYS", "7"))

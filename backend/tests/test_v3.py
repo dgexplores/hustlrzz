@@ -91,6 +91,95 @@ def test_rate_limiter_window_expiry():
     assert limiter.allow("k", 1, 1)[0]
 
 
+class _FakeRpcResult:
+    def __init__(self, data):
+        self.data = data
+
+
+class _FakeRpcCall:
+    def __init__(self, data, fail=False):
+        self._data = data
+        self._fail = fail
+
+    def execute(self):
+        if self._fail:
+            raise RuntimeError("rpc down")
+        return _FakeRpcResult(self._data)
+
+
+class _FakeRpcClient:
+    def __init__(self, data, fail=False):
+        self.calls = []
+        self._data = data
+        self._fail = fail
+
+    def rpc(self, name, params):
+        self.calls.append((name, params))
+        return _FakeRpcCall(self._data, fail=self._fail)
+
+
+def test_rate_limiter_allow_async_uses_shared_store(monkeypatch):
+    import asyncio
+
+    from backend import db as dbc
+    from backend.obs import SlidingWindowLimiter
+
+    fake = _FakeRpcClient([{"allowed": False, "retry_after": 42}])
+    monkeypatch.setattr(dbc, "is_ready", lambda: True)
+    monkeypatch.setattr(dbc, "get_client", lambda: fake)
+
+    allowed, retry = asyncio.run(SlidingWindowLimiter().allow_async("scope:u1", 5, 60))
+    assert allowed is False and retry == 42
+    name, params = fake.calls[0]
+    assert name == "rate_limit_allow"
+    assert params == {"p_key": "scope:u1", "p_limit": 5, "p_window_seconds": 60}
+
+
+def test_rate_limiter_allow_async_falls_back_to_memory(monkeypatch):
+    import asyncio
+
+    from backend import db as dbc
+    from backend.obs import SlidingWindowLimiter
+
+    monkeypatch.setattr(dbc, "is_ready", lambda: False)
+
+    limiter = SlidingWindowLimiter()
+    results = [asyncio.run(limiter.allow_async("k", 2, 60))[0] for _ in range(3)]
+    assert results == [True, True, False]
+
+
+def test_rate_limiter_allow_async_rpc_failure_degrades(monkeypatch):
+    import asyncio
+
+    from backend import db as dbc
+    from backend.obs import SlidingWindowLimiter
+
+    fake = _FakeRpcClient([{"allowed": True, "retry_after": 0}], fail=True)
+    monkeypatch.setattr(dbc, "is_ready", lambda: True)
+    monkeypatch.setattr(dbc, "get_client", lambda: fake)
+
+    allowed, retry = asyncio.run(SlidingWindowLimiter().allow_async("k", 1, 60))
+    assert allowed is True and retry == 0
+
+
+def test_rate_limiter_shared_and_memory_keys_are_isolated(monkeypatch):
+    import asyncio
+
+    from backend import db as dbc
+    from backend.obs import SlidingWindowLimiter
+
+    # Memory state must not leak into the shared path decision.
+    fake = _FakeRpcClient([{"allowed": True, "retry_after": 0}])
+    monkeypatch.setattr(dbc, "is_ready", lambda: True)
+    monkeypatch.setattr(dbc, "get_client", lambda: fake)
+
+    limiter = SlidingWindowLimiter()
+    assert limiter.allow("k", 1, 60)[0]
+    assert limiter.allow("k", 1, 60)[0] is False  # memory exhausted
+    # Shared store still answers independently (no memory short-circuit).
+    assert asyncio.run(limiter.allow_async("k", 1, 60))[0] is True
+
+
 # --------------------------------------------------------------------------- #
 # Session registry TTL
 # --------------------------------------------------------------------------- #
@@ -535,3 +624,19 @@ def test_db_helpers_fail_closed_without_client(monkeypatch):
         dbc.insert("workflows", [{}])
     with pytest.raises(RuntimeError, match="not configured"):
         dbc.select_where("workflows", {})
+
+
+def test_security_headers_on_responses():
+    from fastapi.testclient import TestClient
+
+    from backend.app import app
+
+    client = TestClient(app)
+    res = client.get("/health")
+    assert res.status_code == 200
+    assert res.headers["X-Content-Type-Options"] == "nosniff"
+    assert res.headers["X-Frame-Options"] == "DENY"
+    assert res.headers["Strict-Transport-Security"].startswith("max-age=")
+    assert "frame-ancestors 'none'" in res.headers["Content-Security-Policy"]
+    assert res.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert res.headers["Cross-Origin-Opener-Policy"] == "same-origin"

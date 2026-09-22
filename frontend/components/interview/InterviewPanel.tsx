@@ -150,11 +150,11 @@ export function InterviewPanel() {
     setElapsedSeconds(0);
     resetMetrics();
     try {
-      const response = await api<{ data: { session_id: string; websocket_parameter: string } }>("/interviews/start", {
+      const response = await api<{ data: { session_id: string; websocket_parameter: string; ws_token: string } }>("/interviews/start", {
         method: "POST",
         body: JSON.stringify({ workflow_id: workflowId, duration, is_audio: audioMode && audioSupported, persona }),
       });
-      connectWs(response.data.session_id, response.data.websocket_parameter);
+      connectWs(response.data.session_id, response.data.websocket_parameter, response.data.ws_token);
     } catch (error) {
       setPhase("setup");
       setSessionError(error instanceof Error ? error.message : "Unable to start the interview.");
@@ -162,7 +162,7 @@ export function InterviewPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflowId, duration, audioMode, audioSupported, persona, resetMetrics]);
 
-  const connectWs = (sessionId: string, query: string) => {
+  const connectWs = (sessionId: string, query: string, wsToken: string) => {
     const generation = ++generationRef.current;
     const previous = wsRef.current;
     if (previous) {
@@ -177,6 +177,8 @@ export function InterviewPanel() {
 
     socket.onopen = () => {
       if (generation !== generationRef.current) return;
+      // First frame is the auth handshake — token never appears in the URL.
+      socket.send(JSON.stringify({ type: "auth", token: wsToken }));
       setPhase("live");
     };
     socket.onmessage = (event) => {

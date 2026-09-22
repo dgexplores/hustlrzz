@@ -1,11 +1,14 @@
-"""Operational helpers: structured logging and in-process rate limiting.
+"""Operational helpers: structured logging and rate limiting.
 
-Everything here is intentionally dependency-free so it keeps working on any
-single-instance deployment (Railway free tier, Docker, local dev).
+Rate limiting prefers a shared Postgres backend (Supabase RPC) so multiple
+replicas enforce one budget. In-process memory remains as a fail-soft fallback
+for local dev and Supabase outages — single-instance correct, multi-instance
+best-effort only in that degraded mode.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 import time
@@ -32,7 +35,11 @@ log = get_logger("hustlrzz")
 
 
 class SlidingWindowLimiter:
-    """Per-key sliding-window request limiter (in-memory, single instance)."""
+    """Per-key sliding-window limiter.
+
+    ``allow`` is the in-process check. ``allow_async`` first tries the shared
+    Postgres RPC (multi-instance) and falls back to in-process state.
+    """
 
     def __init__(self) -> None:
         self._events: dict[str, deque[float]] = defaultdict(deque)
@@ -53,6 +60,32 @@ class SlidingWindowLimiter:
             for k in stale[:2000]:
                 self._events.pop(k, None)
         return True, 0
+
+    async def allow_async(self, key: str, limit: int, window_seconds: int) -> tuple[bool, int]:
+        """Shared-store check when Supabase is ready; memory fallback otherwise."""
+        try:
+            from backend import db
+
+            if db.is_ready():
+                client = db.get_client()
+
+                def _rpc() -> tuple[bool, int]:
+                    resp = client.rpc(
+                        "rate_limit_allow",
+                        {
+                            "p_key": key,
+                            "p_limit": limit,
+                            "p_window_seconds": window_seconds,
+                        },
+                    ).execute()
+                    row = (resp.data or [{}])[0]
+                    return bool(row.get("allowed", True)), int(row.get("retry_after") or 0)
+
+                return await asyncio.to_thread(_rpc)
+        except Exception as exc:
+            # Shared store down → degrade to per-process limits, never 500.
+            log.warning("shared rate limit unavailable, using in-process: %s", exc)
+        return self.allow(key, limit, window_seconds)
 
 
 limiter = SlidingWindowLimiter()

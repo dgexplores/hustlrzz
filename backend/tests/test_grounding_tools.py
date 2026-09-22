@@ -73,6 +73,19 @@ class TestAssertSafeUrl:
         with pytest.raises(web_research.FetchBlocked):
             web_research._assert_safe_url("http://metadata.example/")
 
+    def test_blocks_mixed_public_and_private(self, monkeypatch):
+        # DNS rebinding: one A record public, one private → fail closed.
+        monkeypatch.setattr(
+            socket,
+            "getaddrinfo",
+            lambda *a, **k: [
+                (2, 1, 6, "", ("93.184.216.34", 80)),
+                (2, 1, 6, "", ("10.0.0.5", 80)),
+            ],
+        )
+        with pytest.raises(web_research.FetchBlocked):
+            web_research._assert_safe_url("http://rebind.example/")
+
     def test_allows_public_ip(self, monkeypatch):
         monkeypatch.setattr(
             socket,
@@ -80,6 +93,49 @@ class TestAssertSafeUrl:
             lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 80))],
         )
         assert web_research._assert_safe_url("https://example.com/") == "https://example.com/"
+
+
+class TestPinUrl:
+    def test_pins_single_public_ip_and_keeps_host_header(self, monkeypatch):
+        monkeypatch.setattr(
+            socket,
+            "getaddrinfo",
+            lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 443))],
+        )
+        pinned, host_header, sni = web_research._pin_url("https://example.com/path?q=1")
+        assert pinned == "https://93.184.216.34:443/path?q=1"
+        assert host_header == "example.com"
+        assert sni == "example.com"
+
+    def test_non_default_port_in_host_header(self, monkeypatch):
+        monkeypatch.setattr(
+            socket,
+            "getaddrinfo",
+            lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 8443))],
+        )
+        pinned, host_header, _sni = web_research._pin_url("https://example.com:8443/x")
+        assert pinned == "https://93.184.216.34:8443/x"
+        assert host_header == "example.com:8443"
+
+    def test_ipv6_gets_brackets(self, monkeypatch):
+        monkeypatch.setattr(
+            socket,
+            "getaddrinfo",
+            lambda *a, **k: [(2, 1, 6, "", ("2606:2800:220:1:248:1893:25c8:1946", 443))],
+        )
+        pinned, _host, _sni = web_research._pin_url("https://example.com/")
+        assert pinned.startswith("https://[2606:2800:220:1:248:1893:25c8:1946]:443/")
+
+    def test_getaddrinfo_called_once(self, monkeypatch):
+        calls = []
+
+        def fake_getaddrinfo(*a, **k):
+            calls.append(a)
+            return [(2, 1, 6, "", ("93.184.216.34", 443))]
+
+        monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+        web_research._pin_url("https://example.com/")
+        assert len(calls) == 1
 
 
 class TestFetchPageText:
@@ -95,6 +151,7 @@ class TestFetchPageText:
 
     def test_happy_path_strips_html(self, monkeypatch):
         html = b"<html><head><title>Page Title</title><style>.x{}</style></head><body><script>evil()</script><h1>Hello</h1><p>World</p></body></html>"
+        seen: dict = {}
 
         class FakeResponse:
             status_code = 200
@@ -119,14 +176,17 @@ class TestFetchPageText:
             def __exit__(self, *a):
                 return False
 
-            def stream(self, method, url):
+            def stream(self, method, url, headers=None, extensions=None):
+                seen["url"] = url
+                seen["headers"] = headers or {}
+                seen["extensions"] = extensions or {}
                 return FakeResponse()
 
         monkeypatch.setattr(web_research.httpx, "Client", FakeClient)
         monkeypatch.setattr(
             web_research,
-            "_assert_safe_url",
-            lambda u: u,
+            "_pin_url",
+            lambda u: (u, "example.com", "example.com"),
         )
         result = web_research.fetch_page_text("https://example.com/article")
         assert result["title"] == "Page Title"
@@ -134,6 +194,9 @@ class TestFetchPageText:
         assert "World" in result["text"]
         assert "evil" not in result["text"]
         assert "x{}" not in result["text"]
+        # Pinned request carries Host + SNI for the original hostname.
+        assert seen["headers"].get("Host") == "example.com"
+        assert seen["extensions"].get("sni_hostname") == "example.com"
 
     def test_unsupported_content_type(self, monkeypatch):
         class FakeResponse:
@@ -159,11 +222,11 @@ class TestFetchPageText:
             def __exit__(self, *a):
                 return False
 
-            def stream(self, method, url):
+            def stream(self, method, url, headers=None, extensions=None):
                 return FakeResponse()
 
         monkeypatch.setattr(web_research.httpx, "Client", FakeClient)
-        monkeypatch.setattr(web_research, "_assert_safe_url", lambda u: u)
+        monkeypatch.setattr(web_research, "_pin_url", lambda u: (u, "example.com", "example.com"))
         result = web_research.fetch_page_text("https://example.com/file.pdf")
         assert "error" in result
         assert "content-type" in result["error"]
@@ -192,11 +255,11 @@ class TestFetchPageText:
             def __exit__(self, *a):
                 return False
 
-            def stream(self, method, url):
+            def stream(self, method, url, headers=None, extensions=None):
                 return FakeResponse()
 
         monkeypatch.setattr(web_research.httpx, "Client", FakeClient)
-        monkeypatch.setattr(web_research, "_assert_safe_url", lambda u: u)
+        monkeypatch.setattr(web_research, "_pin_url", lambda u: (u, "example.com", "example.com"))
         result = web_research.fetch_page_text("https://example.com/missing")
         assert "error" in result
         assert "404" in result["error"]
