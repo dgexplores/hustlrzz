@@ -15,7 +15,7 @@
     --secondary: 240 5% 96%;
     --secondary-foreground: 240 6% 10%;
     --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted-foreground: 240 4% 44%;
     --accent: 240 5% 96%;
     --accent-foreground: 240 6% 10%;
     --destructive: 0 70% 50%;
@@ -210,3 +210,37 @@
 /* Accordion image filter states */
 .acc-slice:hover .acc-img { filter: saturate(0.6) brightness(0.75); }
 .acc-slice:hover .acc-img + * { filter: none; }
+
+/* Report print (window.print / browser print-to-PDF): T3 */
+@media print {
+  /* Force light tokens so dark mode still prints readable */
+  :root, .dark {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+    --primary: 217 70% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 32%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 86%;
+    --input: 240 6% 80%;
+    --ring: 217 70% 40%;
+  }
+  html, body { background: #fff !important; color: hsl(var(--foreground)) !important; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-hide, header, nav { display: none !important; }
+  main { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  .print-report > * { break-inside: avoid; }
+  .print-report .grid { grid-template-columns: 1fr !important; }
+  .print-report, .print-report * { box-shadow: none !important; text-shadow: none !important; }
+  a[href]::after { content: none !important; }
+}

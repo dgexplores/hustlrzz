@@ -8,6 +8,7 @@ clears too. Computation is cheap (last 8 attempts, in-memory counts).
 from __future__ import annotations
 
 from collections import Counter
+from datetime import datetime, timedelta, timezone
 
 from backend import db as dbc
 
@@ -160,33 +161,131 @@ def get_skill_trends(user_id: str, limit: int = 12) -> list[dict]:
     return points[-12:]
 
 
-def get_spaced_repetition_schedule(user_id: str) -> list[dict]:
-    """Return next 3 skills to revisit with due dates (simple spaced repetition)."""
+# --------------------------------------------------------------------------- #
+# Spaced repetition (T9) — persisted review state in drill_reviews
+# --------------------------------------------------------------------------- #
+# Gaps in days keyed by interval_index after a review: [1, 3, 7, 14].
+# State machine (spec/arch T9):
+#   - Seed (first sight of a weak skill): interval_index=0, due_at=now —
+#     day-0 policy: the first drill is due immediately.
+#   - good: interval_index = min(i + 1, len(INTERVALS) - 1);
+#     due_at = now + INTERVALS[index] days (ladder 3 → 7 → 14 → 14); streak += 1.
+#   - again: interval_index = 0; due_at = now + INTERVALS[0] day (due sooner);
+#     streak = 0.
+INTERVALS = [1, 3, 7, 14]
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _parse_ts(value) -> datetime | None:
+    """Parse stored timestamptz (ISO string or datetime) → aware UTC."""
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    text = str(value).strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def ensure_reviews_for_user(user_id: str) -> None:
+    """Seed review rows for weak skills that are not tracked yet.
+
+    Day-0 policy: a never-reviewed weak skill is seeded with ``due_at = now``
+    so the first drill shows up immediately. Existing rows are never re-seeded.
+    Never raises — missing table / DB errors leave drills empty.
+    """
+    if not dbc.is_ready():
+        return
+    try:
+        rows = dbc.select_where("drill_reviews", {"user_id": user_id}) or []
+    except Exception:
+        return
+    tracked = {r.get("skill") for r in rows}
     digest = get_weakness_digest(user_id)
-    weak = digest.get("weak") or []
-    if not weak:
+    missing = [s for s in (digest.get("weak") or []) if s and s not in tracked]
+    if not missing:
+        return
+    now_iso = _utcnow().isoformat()
+    payload = [
+        {
+            "user_id": user_id,
+            "skill": skill,
+            "interval_index": 0,
+            "due_at": now_iso,
+            "last_result": None,
+            "streak": 0,
+        }
+        for skill in missing
+    ]
+    try:
+        dbc.insert("drill_reviews", payload)
+    except Exception:
+        return
+
+
+def _load_reviews(user_id: str) -> list[dict]:
+    if not dbc.is_ready():
         return []
-    # Simple schedule: most-weak first, due in 1, 3, 7 days
-    intervals = [1, 3, 7]
+    try:
+        return dbc.select_where("drill_reviews", {"user_id": user_id}) or []
+    except Exception:
+        return []
+
+
+def _due_reviews(user_id: str) -> list[dict]:
+    """Owned rows with due_at <= now, most overdue first."""
+    now = _utcnow()
+    due: list[tuple[datetime, dict]] = []
+    for row in _load_reviews(user_id):
+        ts = _parse_ts(row.get("due_at"))
+        if ts is not None and ts <= now:
+            due.append((ts, row))
+    due.sort(key=lambda pair: pair[0])
+    return [row for _, row in due]
+
+
+def get_spaced_repetition_schedule(user_id: str) -> list[dict]:
+    """Due review rows for the profile schedule (same due query as drills)."""
+    ensure_reviews_for_user(user_id)
     schedule = []
-    for idx, skill in enumerate(weak[:3]):
-        schedule.append({"skill": skill, "due_in_days": intervals[idx], "reason": "needs work"})
+    for row in _due_reviews(user_id):
+        schedule.append({
+            "skill": row.get("skill"),
+            "due_at": row.get("due_at"),
+            "due_in_days": 0,  # everything here is due now; due_at is the truth
+            "interval_index": int(row.get("interval_index") or 0),
+            "streak": int(row.get("streak") or 0),
+            "reason": "needs work",
+        })
     return schedule
 
 
 def get_due_drills(user_id: str) -> list[dict]:
-    """Turn the repetition schedule into one-tap practice drills.
+    """One-tap practice drills for reviews that are due now (due_at <= now).
 
     Template-based (no LLM call): deterministic, instant, and free. Each drill
     drops straight into the coaching practice flow as scenario + prompt.
     """
+    ensure_reviews_for_user(user_id)
     drills = []
-    for item in get_spaced_repetition_schedule(user_id):
-        skill = item["skill"]
+    for row in _due_reviews(user_id):
+        skill = row.get("skill") or ""
         drills.append({
             "skill": skill,
-            "due_in_days": item["due_in_days"],
-            "reason": item["reason"],
+            "due_at": row.get("due_at"),
+            "due_in_days": 0,
+            "interval_index": int(row.get("interval_index") or 0),
+            "streak": int(row.get("streak") or 0),
+            "last_result": row.get("last_result"),
+            "reason": "needs work",
             "drill": {
                 "scenario": "behavioral",
                 "prompt": (
@@ -201,3 +300,60 @@ def get_due_drills(user_id: str) -> list[dict]:
             },
         })
     return drills
+
+
+def record_review(user_id: str, skill: str, result: str) -> dict | None:
+    """Apply one review to the spaced-repetition state machine.
+
+    Returns the updated row, or None when the skill is unknown (neither
+    tracked in drill_reviews nor in the caller's weakness digest) — the
+    endpoint maps that to 404 so no garbage rows are created.
+
+    ``result`` is "good" (advance) or "again" (reset); see INTERVALS above.
+    """
+    if result not in ("good", "again"):
+        return None
+    if not dbc.is_ready():
+        return None
+
+    rows = _load_reviews(user_id)
+    row = next((r for r in rows if r.get("skill") == skill), None)
+
+    if row is None:
+        digest = get_weakness_digest(user_id)
+        if skill not in (digest.get("weak") or []):
+            return None  # unknown skill → 404 (arch: upsert only if tracked or weak)
+
+    index = int((row or {}).get("interval_index") or 0)
+    if index < 0 or index >= len(INTERVALS):
+        index = 0
+    streak = int((row or {}).get("streak") or 0)
+
+    if result == "good":
+        next_index = min(index + 1, len(INTERVALS) - 1)
+        next_streak = streak + 1
+    else:
+        next_index = 0
+        next_streak = 0
+
+    now = _utcnow()
+    values = {
+        "interval_index": next_index,
+        "due_at": (now + timedelta(days=INTERVALS[next_index])).isoformat(),
+        "last_result": result,
+        "streak": next_streak,
+        "updated_at": now.isoformat(),
+    }
+
+    if row is None:
+        inserted = dbc.insert(
+            "drill_reviews", [{"user_id": user_id, "skill": skill, **values}]
+        )
+        if inserted:
+            return inserted[0]
+        return {"user_id": user_id, "skill": skill, **values}
+
+    updated = dbc.update(
+        "drill_reviews", {"user_id": user_id, "skill": skill}, values
+    )
+    return updated if updated is not None else {**row, **values}

@@ -17,8 +17,9 @@ import zipfile
 import math
 from io import BytesIO
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from xml.etree import ElementTree
+import re
 
 from fastapi import (
     APIRouter,
@@ -28,13 +29,14 @@ from fastapi import (
     Form,
     HTTPException,
     Request,
+    Response,
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from backend import config, db as dbc
 from backend.ai import provider
@@ -141,11 +143,36 @@ def get_user(request: Request, credentials: Optional[HTTPAuthorizationCredential
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
+async def _delete_owned_or_404(table: str, id_col: str, row_id: str, user_id: str, detail: str) -> Response:
+    """Owner-only delete: load owned row first, then delete by id + user_id."""
+    rows = await asyncio.to_thread(
+        dbc.select_where, table, {id_col: row_id, "user_id": user_id}
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail=detail)
+    await asyncio.to_thread(
+        dbc.delete_where, table, {id_col: row_id, "user_id": user_id}
+    )
+    return Response(status_code=204)
+
+
 @router.get("/workflows")
 async def list_workflows(user: dict = Depends(get_user)):
     _db_or_503()
     rows = await asyncio.to_thread(dbc.select_where, "workflows", {"user_id": user["uid"]}, order="created_at")
     return {"success": True, "data": rows}
+
+
+@router.delete("/workflows/{workflow_id}")
+async def delete_workflow(
+    workflow_id: str,
+    user: dict = Depends(rate_limited("delete", config.RATE_DELETE_PER_MIN, 60)),
+):
+    """Owner-only. Deletes the workflow row only; interview sessions keep their workflow_id (no cascade)."""
+    _db_or_503()
+    return await _delete_owned_or_404(
+        "workflows", "workflow_id", workflow_id, user["uid"], "Workflow not found."
+    )
 
 
 @router.get("/interviews")
@@ -155,6 +182,32 @@ async def list_interviews(user: dict = Depends(get_user)):
         dbc.select_where, "interview_sessions", {"user_id": user["uid"]}, order="created_at"
     )
     return {"success": True, "data": rows}
+
+
+@router.get("/interviews/{session_id}")
+async def get_interview(session_id: str, user: dict = Depends(get_user)):
+    """Owner-only session detail (T7). Unknown and foreign ids both 404 — no existence oracle."""
+    _db_or_503()
+    rows = await asyncio.to_thread(
+        dbc.select_where,
+        "interview_sessions",
+        {"session_id": session_id, "user_id": user["uid"]},
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    return {"success": True, "data": rows[0]}
+
+
+@router.delete("/interviews/{session_id}")
+async def delete_interview(
+    session_id: str,
+    user: dict = Depends(rate_limited("delete", config.RATE_DELETE_PER_MIN, 60)),
+):
+    """Owner-only delete of an interview session row."""
+    _db_or_503()
+    return await _delete_owned_or_404(
+        "interview_sessions", "session_id", session_id, user["uid"], "Session not found."
+    )
 
 
 @router.get("/health")
@@ -425,6 +478,18 @@ async def get_resume_analysis(analysis_id: str, user: dict = Depends(get_user)):
         raise
     except Exception:
         raise HTTPException(status_code=503, detail="Resume Analyzer result is temporarily unavailable.")
+
+
+@router.delete("/resume-analyzer/analyses/{analysis_id}")
+async def delete_resume_analysis(
+    analysis_id: str,
+    user: dict = Depends(rate_limited("delete", config.RATE_DELETE_PER_MIN, 60)),
+):
+    """Owner-only delete of a saved resume analysis row."""
+    _db_or_503()
+    return await _delete_owned_or_404(
+        "resume_analysis", "analysis_id", analysis_id, user["uid"], "Analysis not found."
+    )
 
 
 @router.post("/resume-analyzer/analyze")
@@ -755,6 +820,35 @@ def knowledge_status(user: dict = Depends(get_user)):
     return {"success": True, "data": {"available": rag.is_ready()}}
 
 
+@router.get("/knowledge/documents")
+async def list_knowledge_documents(user: dict = Depends(get_user)):
+    """List the caller's knowledge documents, newest first."""
+    _db_or_503()
+    try:
+        docs = await rag.list_documents(user["uid"])
+        return {"success": True, "data": docs}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Knowledge documents are temporarily unavailable.")
+
+
+@router.delete("/knowledge/documents/{document_id}")
+async def delete_knowledge_document(
+    document_id: str,
+    user: dict = Depends(rate_limited("knowledge", config.RATE_KNOWLEDGE_PER_MIN, 60)),
+):
+    """Owner-only delete. Missing and foreign ids both return 404 (no existence oracle)."""
+    _db_or_503()
+    try:
+        removed = await rag.delete_document(document_id=document_id, user_id=user["uid"])
+    except rag.RAGUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception:
+        raise HTTPException(status_code=503, detail="Knowledge delete is temporarily unavailable.")
+    if not removed:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return Response(status_code=204)
+
+
 @router.post("/knowledge/documents")
 async def ingest_knowledge(payload: KnowledgeIngestRequest, user: dict = Depends(rate_limited("knowledge", config.RATE_KNOWLEDGE_PER_MIN, 60))):
     try:
@@ -791,6 +885,206 @@ async def search_knowledge(payload: KnowledgeSearchRequest, user: dict = Depends
 
 
 # --------------------------------------------------------------------------- #
+# Feedback — usefulness rating (one row per session, upsert on repeat)
+# --------------------------------------------------------------------------- #
+class FeedbackRequest(BaseModel):
+    session_id: str = Field(min_length=1, max_length=128)
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = Field(default=None, max_length=1000)
+
+
+def _ensure_feedback_session_owned(session_id: str, user_id: str) -> None:
+    """Owner-of-session gate for POST /feedback.
+
+    Interview sessions must exist in interview_sessions and belong to the
+    caller; missing and foreign ids both 404 (no existence oracle).
+    Practice-room reports persist no session row, so their widget rates a
+    client-generated ``practice-*`` id; any other unknown id is a 404.
+    """
+    rows = dbc.select_where("interview_sessions", {"session_id": session_id})
+    if rows:
+        if rows[0].get("user_id") != user_id:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        return
+    if not session_id.startswith("practice-"):
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+
+@router.post("/feedback")
+async def submit_feedback(
+    payload: FeedbackRequest,
+    user: dict = Depends(rate_limited("feedback", config.RATE_FEEDBACK_PER_MIN, 60)),
+):
+    """Upsert one rating per session_id (architect decision T4).
+
+    Second POST for the same session replaces rating/comment and returns 200
+    with the updated row — never 409. ``user_id`` always comes from the caller.
+    """
+    _db_or_503()
+    await asyncio.to_thread(
+        _ensure_feedback_session_owned, payload.session_id, user["uid"]
+    )
+    row = {
+        "user_id": user["uid"],
+        "session_id": payload.session_id,
+        "rating": payload.rating,
+        "comment": payload.comment,
+    }
+    rows = await asyncio.to_thread(dbc.upsert, "report_feedback", [row], "session_id")
+    return {"success": True, "data": rows[0] if rows else row}
+
+
+@router.get("/feedback/summary")
+async def feedback_summary(user: dict = Depends(get_user)):
+    """Caller's own average rating + count (owner average, not a global dashboard)."""
+    _db_or_503()
+    rows = await asyncio.to_thread(
+        dbc.select_where, "report_feedback", {"user_id": user["uid"]}
+    )
+    ratings = [int(r["rating"]) for r in rows if r.get("rating") is not None]
+    count = len(ratings)
+    average = round(sum(ratings) / count, 2) if count else None
+    return {"success": True, "data": {"average": average, "count": count}}
+
+
+# --------------------------------------------------------------------------- #
+# Analytics — privacy-safe product events + LAUNCH_READINESS gate metrics (T8)
+# --------------------------------------------------------------------------- #
+_PROP_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+
+
+class AnalyticsEventRequest(BaseModel):
+    """Allowlisted funnel event. Free text in props is rejected (422)."""
+
+    event_name: Literal[
+        "prepare_started", "prepare_completed", "interview_completed", "feedback_submitted"
+    ]
+    props: dict[str, Any] = Field(default_factory=dict, max_length=10)
+
+    @field_validator("props")
+    @classmethod
+    def _props_non_string_primitives_only(cls, value: dict[str, Any]) -> dict[str, Any]:
+        for key, item in value.items():
+            if not _PROP_KEY_PATTERN.match(key):
+                raise ValueError("props keys must be short lowercase identifiers")
+            if item is None or isinstance(item, (bool, int)):
+                continue
+            if isinstance(item, float):
+                if not math.isfinite(item):
+                    raise ValueError("props numbers must be finite")
+                continue
+            raise ValueError("props values must be non-string primitives — no free text")
+        return value
+
+
+@router.post("/analytics/events")
+async def track_analytics_event(
+    payload: AnalyticsEventRequest,
+    user: dict = Depends(rate_limited("analytics", config.RATE_ANALYTICS_PER_MIN, 60)),
+):
+    """Record one allowlisted funnel event for the authenticated caller.
+
+    Privacy contract: ``event_name`` is one of the four allowlisted funnel
+    steps; ``props`` may only hold non-string primitives under short
+    identifier keys (free text, resume, and transcript content → 422).
+    Unknown top-level body keys are stripped by the model. ``user_id`` and
+    ``occurred_at`` are attached server-side; the client never sends them.
+    """
+    _db_or_503()
+    row = {
+        "event_name": payload.event_name,
+        "user_id": user["uid"],
+        "occurred_at": _now(),
+        "props": payload.props,
+    }
+    rows = await asyncio.to_thread(dbc.insert, "product_events", [row])
+    return {"success": True, "data": rows[0] if rows else row}
+
+
+@router.get("/analytics/summary")
+async def analytics_summary(user: dict = Depends(get_user)):
+    """LAUNCH_READINESS gate metrics (T8). Auth required.
+
+    Scope: **global aggregates for any authenticated user** — single-tenant
+    beta accepted risk (architect decision); not multi-tenant safe.
+
+    Exact denominators (also returned in ``meta.formulas``):
+    - ``prep_completion_pct`` = product_events(prepare_completed) /
+      product_events(prepare_started) * 100; null when started = 0.
+    - ``interview_completion_pct`` = interview_sessions rows with a non-empty
+      ``report`` / total interview_sessions rows * 100; null when entered = 0.
+      Proxy: no ``interview_started`` event exists — a persisted session row
+      stands in for "entered studio", a non-empty report for "completed".
+    - ``avg_rating`` = mean of ``report_feedback.rating``; null when empty.
+
+    Uses ``get_user`` only (no rate-limit scope): read-only aggregate over
+    small tables, cheap enough for the beta.
+    """
+    _db_or_503()
+
+    async def _event_count(name: str) -> int:
+        rows = await asyncio.to_thread(dbc.select_where, "product_events", {"event_name": name})
+        return len(rows)
+
+    started = await _event_count("prepare_started")
+    completed = await _event_count("prepare_completed")
+    interview_events = await _event_count("interview_completed")
+    feedback_events = await _event_count("feedback_submitted")
+
+    sessions = await asyncio.to_thread(dbc.select_where, "interview_sessions", {})
+    entered = len(sessions)
+
+    def _has_report(session: dict) -> bool:
+        report = session.get("report")
+        if isinstance(report, (dict, list)):
+            return bool(report)
+        if isinstance(report, str):
+            return bool(report.strip())
+        return False
+
+    with_report = sum(1 for session in sessions if _has_report(session))
+
+    feedback_rows = await asyncio.to_thread(dbc.select_where, "report_feedback", {})
+    ratings = [int(r["rating"]) for r in feedback_rows if r.get("rating") is not None]
+
+    prep_pct = round(completed / started * 100, 1) if started else None
+    interview_pct = round(with_report / entered * 100, 1) if entered else None
+    avg_rating = round(sum(ratings) / len(ratings), 2) if ratings else None
+
+    return {
+        "success": True,
+        "data": {
+            "prep_completion_pct": prep_pct,
+            "interview_completion_pct": interview_pct,
+            "avg_rating": avg_rating,
+            "counts": {
+                "prepare_started": started,
+                "prepare_completed": completed,
+                "interview_completed_events": interview_events,
+                "feedback_submitted_events": feedback_events,
+                "interviews_entered": entered,
+                "interviews_with_report": with_report,
+                "feedback_count": len(ratings),
+            },
+            "meta": {
+                "scope": "global aggregates for any authenticated user (single-tenant beta)",
+                "formulas": {
+                    "prep_completion_pct": (
+                        "prepare_completed events / prepare_started events * 100"
+                    ),
+                    "interview_completion_pct": (
+                        "interview_sessions rows with non-empty report / "
+                        "interview_sessions rows entered * 100 (table proxy — "
+                        "no interview_started event exists)"
+                    ),
+                    "avg_rating": "mean of report_feedback.rating",
+                },
+            },
+        },
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Memory — weak/strong trends and spaced repetition
 # --------------------------------------------------------------------------- #
 @router.get("/memory/profile")
@@ -809,7 +1103,11 @@ async def memory_profile(user: dict = Depends(get_user)):
 
 @router.get("/memory/drills")
 async def memory_drills(user: dict = Depends(get_user)):
-    """Due spaced-repetition drills, each ready to start as a practice prompt."""
+    """Due spaced-repetition drills (due_at <= now), most overdue first.
+
+    Seeded day-0 from the weakness digest on first read; each item carries the
+    server schedule (due_at, interval_index, streak) plus a practice template.
+    """
     _db_or_503()
     try:
         from backend.memory.profile import get_due_drills
@@ -817,6 +1115,36 @@ async def memory_drills(user: dict = Depends(get_user)):
         return {"success": True, "data": await asyncio.to_thread(get_due_drills, user["uid"])}
     except Exception:
         raise HTTPException(status_code=503, detail="Practice drills temporarily unavailable.")
+
+
+class DrillReviewRequest(BaseModel):
+    result: Literal["again", "good"]
+
+
+@router.post("/memory/drills/{skill}/review")
+async def memory_drill_review(
+    skill: str,
+    payload: DrillReviewRequest,
+    user: dict = Depends(rate_limited("drill_review", config.RATE_DRILL_REVIEW_PER_MIN, 60)),
+):
+    """Advance or reset spaced-repetition state for one skill (T9).
+
+    ``good`` advances ``interval_index`` along the ``[1, 3, 7, 14]``-day
+    ladder (due in INTERVALS[new_index] days); ``again`` resets to index 0
+    (due in 1 day) and clears the streak. 404 when the skill is neither
+    tracked in drill_reviews nor in the caller's current weakness digest —
+    upsert only for known skills, never garbage rows.
+    """
+    _db_or_503()
+    try:
+        from backend.memory.profile import record_review
+
+        row = await asyncio.to_thread(record_review, user["uid"], skill, payload.result)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Practice drills temporarily unavailable.")
+    if row is None:
+        raise HTTPException(status_code=404, detail="Drill not found.")
+    return {"success": True, "data": row}
 
 
 # --------------------------------------------------------------------------- #
@@ -833,6 +1161,9 @@ class InterviewStart(BaseModel):
     duration: int = Field(15, ge=5, le=60)
     is_audio: bool = False
     persona: str = Field(default="maya", max_length=20, pattern=r"^(maya|alex|priya)$")
+    # T11 intensity: Literal → invalid values are a 422. Default "standard"
+    # preserves pre-T11 behaviour exactly (golden prompt test).
+    intensity: Literal["easy", "standard", "hard"] = "standard"
 
 
 def _fallback_interview_report() -> dict:
@@ -864,6 +1195,9 @@ async def start_interview(payload: InterviewStart, user: dict = Depends(rate_lim
     sess.state["duration"] = payload.duration
     sess.state["is_audio"] = payload.is_audio
     sess.state["persona"] = payload.persona
+    # T11: intensity rides registry state (not the WS URL) so the prompt is
+    # rebuilt from session state on connect and nothing leaks via query logs.
+    sess.state["intensity"] = payload.intensity
     # Token is returned in the JSON body only — never in the WS URL, where it
     # would leak through access logs, proxies, and browser referrers. The
     # client sends it as the first WebSocket message instead.
@@ -920,6 +1254,11 @@ async def interview_ws(
     # Single-use handshake token: a captured token cannot open a second socket.
     sess.state["ws_issued_at"] = 0.0
     duration = max(5, min(60, int(duration or 15)))
+    # T11: intensity from registry state (validated at start); normalize so a
+    # bad state value can never fail the persisted-row check constraint.
+    intensity = str(sess.state.get("intensity") or "standard")
+    if intensity not in ("easy", "standard", "hard"):
+        intensity = "standard"
     started_at = time.monotonic()
 
     # Load prepared questions for this workflow so the interviewer has a script.
@@ -950,6 +1289,7 @@ async def interview_ws(
         duration,
         company_context=stored_match.get("company_research") if isinstance(stored_match, dict) else None,
         persona=persona_val,
+        intensity=intensity,
     )
     # Memory: bias live probing toward previously weak areas
     try:
@@ -1041,6 +1381,7 @@ async def interview_ws(
                         "report": report,
                         "is_audio": is_audio,
                         "duration_seconds": elapsed_seconds,
+                        "intensity": intensity,
                         "created_at": _now(),
                     }],
                 )
