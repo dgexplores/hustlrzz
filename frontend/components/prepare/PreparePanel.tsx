@@ -3,11 +3,13 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { downloadJson } from "@/lib/download";
+import { trackEvent } from "@/lib/analytics";
+import { downloadJson, downloadMarkdown } from "@/lib/download";
+import { buildPreparePackMarkdown } from "@/lib/reportMarkdown";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, Building2, Clock3, ExternalLink, GraduationCap, Loader2, Brain, Database, Download, FileText, Radio, ShieldCheck, Upload } from "lucide-react";
+import { ArrowRight, Building2, Clock3, ExternalLink, GraduationCap, Loader2, Brain, Database, Download, FileText, Printer, Radio, ShieldCheck, Upload } from "lucide-react";
 import type { Question } from "@/lib/types";
 
 interface FlowResult {
@@ -87,6 +89,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    trackEvent("prepare_started");
     const fd = new FormData();
     fd.set("job_description", jobDescription);
     fd.set("company_name", company);
@@ -105,6 +108,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
       });
       const r = res as unknown as FlowResult;
       setResult(r);
+      trackEvent("prepare_completed");
       const extraSources = [
         { title: "Portfolio context", source_type: "portfolio", content: portfolioText },
         { title: "Candidate notes", source_type: "notes", content: notesText },
@@ -124,12 +128,12 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      <section className="motion-enter max-w-3xl pb-2">
+      <section className="motion-enter print-hide max-w-3xl pb-2">
         <h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] md:text-5xl">Prepare for the role you want.</h1>
         <p className="mt-4 text-base leading-7 text-muted-foreground">Add your experience and target role. Hustlrzz will create a focused question pack and research the company when requested.</p>
       </section>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-6 items-start">
-      <Card className="motion-enter motion-enter-delay-1 overflow-hidden border-foreground/25">
+      <Card className="motion-enter motion-enter-delay-1 print-hide overflow-hidden border-foreground/25">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5" /> Prepare your interview
@@ -226,10 +230,16 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
         </CardContent>
       </Card>
 
-      <Card className="min-h-[620px]">
+      <Card className="min-h-[620px] print-report">
         <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>Generated pack</CardTitle>          <div className="flex gap-2">
-            {result && <Button size="sm" variant="outline" onClick={() => downloadJson("hustlrzz-interview-pack.json", result)}><Download className="h-4 w-4" /> Export</Button>}
+          <CardTitle>Generated pack</CardTitle>          <div className="flex gap-2 print-hide">
+            {result && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => downloadJson("hustlrzz-interview-pack.json", result)}><Download className="h-4 w-4" /> Export</Button>
+                <Button size="sm" variant="outline" onClick={() => downloadMarkdown("hustlrzz-interview-pack.md", buildPreparePackMarkdown(result, { company: company || undefined }))}><FileText className="h-4 w-4" /> Export MD</Button>
+                <Button size="sm" variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4" /> Print</Button>
+              </>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

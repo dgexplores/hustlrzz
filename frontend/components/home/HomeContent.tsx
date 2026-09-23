@@ -148,7 +148,7 @@ function AccordionSlice({ mode, index }: { mode: typeof MODES[0]; index: number 
   return (
     <motion.a
       href={mode.href}
-      className="acc-slice pressable group relative min-h-[220px] flex-1 overflow-hidden rounded-3xl border border-border md:min-h-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="acc-slice pressable group relative min-h-[220px] flex-1 overflow-hidden rounded-2xl border border-border md:min-h-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       style={{ flexGrow: flex, "--i": index } as MotionStyle}
       onMouseEnter={expand}
       onMouseLeave={collapse}
@@ -189,7 +189,7 @@ function BentoCard({ span, icon, title, copy, index }: { span: string; icon: Rea
     <motion.article
       {...handlers}
       style={{ scale, "--i": index } as MotionStyle}
-      className={`group relative ${span} min-h-64 overflow-hidden rounded-3xl border border-border bg-card/50 p-7 md:p-9 transition-none spring-scale shadow-[0_20px_40px_-24px_hsl(var(--foreground)/0.15)]`}
+      className={`group relative ${span} min-h-64 overflow-hidden rounded-2xl border border-border bg-card/50 p-7 md:p-9 transition-none spring-scale shadow-[0_20px_40px_-24px_hsl(var(--foreground)/0.15)]`}
     >
       <motion.div
         {...handlers}
@@ -423,10 +423,6 @@ export function HomeContent() {
 
       {/* Closing CTA + footer */}
       <section className="relative overflow-hidden border-t border-border bg-primary/5 px-5 py-24 md:py-40">
-        <div
-          aria-hidden="true"
-          className="absolute -end-24 -top-24 h-96 w-96 rounded-full bg-primary/10 blur-[120px]"
-        />
         <div className="relative mx-auto max-w-7xl">
           <h2
             className={`display-type w-full text-start font-semibold text-foreground text-4xl md:text-6xl tracking-tighter leading-none md:max-w-4xl`}

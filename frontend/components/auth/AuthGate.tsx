@@ -143,6 +143,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     { href: "/resume-analyzer", label: "Resume Analyzer" },
     { href: "/assessment", label: "Assessment" },
     { href: "/coaching", label: "Coaching" },
+    { href: "/knowledge", label: "Knowledge" },
+    { href: "/settings", label: "Settings" },
   ];
   const workflowSteps = [
     { href: "/prepare", label: "1. Prepare", active: pathname === "/prepare" },

@@ -75,7 +75,7 @@ export function CoachingPanel() {
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 md:px-6">
-      <section className="motion-enter max-w-3xl pb-2">
+      <section className="motion-enter print-hide max-w-3xl pb-2">
         <h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] md:text-5xl">Coach the parts between interviews.</h1>
         <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">Check role fit, study interview patterns, plan an offer conversation, or practise with live feedback.</p>
       </section>

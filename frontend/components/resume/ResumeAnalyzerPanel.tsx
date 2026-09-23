@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label, Textarea } from "@/components/ui/input";
-import { BarChart3, CheckCircle2, FileText, Loader2, Sparkles, Upload } from "lucide-react";
+import { BarChart3, CheckCircle2, FileText, Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 
 type Usage = { free_limit: number; free_used: number; paid_remaining: number; total_analyses: number };
 type Analysis = {
@@ -23,6 +23,7 @@ export function ResumeAnalyzerPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usageError, setUsageError] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => {
@@ -50,6 +51,22 @@ export function ResumeAnalyzerPanel() {
     try { setResult((await api<{ data: Analysis }>(`/resume-analyzer/analyses/${id}`)).data); }
     catch { setError("That saved analysis is unavailable."); }
   };
+
+  const deleteHistory = async (id: string) => {
+    if (deletingId) return;
+    if (!window.confirm("Delete this saved analysis? This cannot be undone.")) return;
+    setDeletingId(id);
+    setError(null);
+    try {
+      await api<void>(`/resume-analyzer/analyses/${encodeURIComponent(id)}`, { method: "DELETE" });
+      setHistory((prev) => prev.filter((item) => item.analysis_id !== id));
+      if (result?.analysis_id === id) setResult(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
+    }
+  };
   const remaining = usage ? Math.max(0, usage.free_limit - usage.free_used) : null;
 
   return <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-6">
@@ -71,7 +88,12 @@ export function ResumeAnalyzerPanel() {
 
       <ResultPanel result={result} />
     </div>
-    <section className="pb-8"><div className="mb-4 flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Recent analyses</h2></div><div className="divide-y rounded-xl border bg-card">{history.length ? history.map((item) => <button key={item.analysis_id} onClick={() => openHistory(item.analysis_id)} className="grid w-full gap-2 px-4 py-4 text-left surface-transition hover:bg-accent sm:grid-cols-[auto_1fr_auto] sm:items-center"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">{item.resume_score}</span><span><span className="block text-sm font-semibold">ATS readiness review</span><span className="mt-1 block text-xs text-muted-foreground">{item.extracted_skills?.slice(0, 4).join(" · ") || "No skills listed"}</span></span><span className="text-xs text-muted-foreground">{item.created_at && !Number.isNaN(new Date(item.created_at).getTime()) ? new Date(item.created_at).toLocaleDateString() : "View"}</span></button>) : <p className="p-6 text-sm text-muted-foreground">Your completed reviews will appear here.</p>}</div></section>
+    <section className="pb-8"><div className="mb-4 flex items-center gap-2"><BarChart3 className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Recent analyses</h2></div><div className="divide-y rounded-xl border bg-card">{history.length ? history.map((item) => (
+      <div key={item.analysis_id} className="flex items-stretch">
+        <button type="button" onClick={() => openHistory(item.analysis_id)} className="grid flex-1 gap-2 px-4 py-4 text-left surface-transition hover:bg-accent sm:grid-cols-[auto_1fr_auto] sm:items-center"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">{item.resume_score}</span><span><span className="block text-sm font-semibold">ATS readiness review</span><span className="mt-1 block text-xs text-muted-foreground">{item.extracted_skills?.slice(0, 4).join(" · ") || "No skills listed"}</span></span><span className="text-xs text-muted-foreground">{item.created_at && !Number.isNaN(new Date(item.created_at).getTime()) ? new Date(item.created_at).toLocaleDateString() : "View"}</span></button>
+        <button type="button" aria-label="Delete saved analysis" disabled={deletingId === item.analysis_id} onClick={() => deleteHistory(item.analysis_id)} className="shrink-0 self-center rounded-lg p-2 text-muted-foreground surface-transition hover:bg-accent/45 hover:text-destructive">{deletingId === item.analysis_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button>
+      </div>
+    )) : <p className="p-6 text-sm text-muted-foreground">Your completed reviews will appear here.</p>}</div></section>
   </main>;
 }
 

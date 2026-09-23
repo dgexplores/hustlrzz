@@ -3,18 +3,20 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, wsUrl } from "@/lib/api";
-import { downloadJson } from "@/lib/download";
+import { downloadJson, downloadMarkdown } from "@/lib/download";
+import { buildInterviewReportMarkdown } from "@/lib/reportMarkdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { useAudio } from "@/hooks/useAudio";
 import { CameraPanel } from "@/components/interview/CameraPanel";
+import { FeedbackStars } from "@/components/interview/FeedbackStars";
 import { PresenceCoach } from "@/components/interview/PresenceCoach";
 import { useMetrics } from "@/context/MetricsContext";
-import { formatClock } from "@/lib/analytics";
+import { formatClock, trackEvent } from "@/lib/analytics";
 import {
   AlertCircle, ArrowRight, Bot, Building2, CheckCircle2, Download, FileText,
-  Loader2, MessageSquareText, Mic, MicOff, RefreshCw, Send, Sparkles,
+  Loader2, MessageSquareText, Mic, MicOff, Printer, RefreshCw, Send, Sparkles,
   Square, Target, Volume2, VideoOff, WifiOff, Star, Dumbbell, X,
 } from "lucide-react";
 
@@ -36,12 +38,20 @@ interface WorkflowOption {
   created_at?: string;
 }
 type SessionPhase = "setup" | "connecting" | "live" | "ending" | "complete" | "interrupted";
+type Intensity = "easy" | "standard" | "hard";
+
+const INTENSITY_OPTIONS: ReadonlyArray<{ id: Intensity; name: string; desc: string }> = [
+  { id: "easy", name: "Easy", desc: "Softer, supportive" },
+  { id: "standard", name: "Standard", desc: "Realistic" },
+  { id: "hard", name: "Hard", desc: "Challenging probes" },
+];
 
 export function InterviewPanel() {
   const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
   const [workflowId, setWorkflowId] = useState("");
   const [duration, setDuration] = useState(15);
   const [persona, setPersona] = useState("maya");
+  const [intensity, setIntensity] = useState<Intensity>("standard");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [phase, setPhase] = useState<SessionPhase>("setup");
@@ -49,6 +59,7 @@ export function InterviewPanel() {
   const [awaitingReply, setAwaitingReply] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [report, setReport] = useState<any>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [audioMode, setAudioMode] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -144,6 +155,7 @@ export function InterviewPanel() {
     setPhase("connecting");
     setSessionError(null);
     setReport(null);
+    setSessionId(null);
     reportRef.current = null;
     clearReplyTimeout();
     setTurns([]);
@@ -152,7 +164,7 @@ export function InterviewPanel() {
     try {
       const response = await api<{ data: { session_id: string; websocket_parameter: string; ws_token: string } }>("/interviews/start", {
         method: "POST",
-        body: JSON.stringify({ workflow_id: workflowId, duration, is_audio: audioMode && audioSupported, persona }),
+        body: JSON.stringify({ workflow_id: workflowId, duration, is_audio: audioMode && audioSupported, persona, intensity }),
       });
       connectWs(response.data.session_id, response.data.websocket_parameter, response.data.ws_token);
     } catch (error) {
@@ -160,7 +172,7 @@ export function InterviewPanel() {
       setSessionError(error instanceof Error ? error.message : "Unable to start the interview.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflowId, duration, audioMode, audioSupported, persona, resetMetrics]);
+  }, [workflowId, duration, audioMode, audioSupported, persona, intensity, resetMetrics]);
 
   const connectWs = (sessionId: string, query: string, wsToken: string) => {
     const generation = ++generationRef.current;
@@ -173,6 +185,7 @@ export function InterviewPanel() {
     }
     const socket = new WebSocket(wsUrl(`/ws/${sessionId}${query}`, {}));
     wsRef.current = socket;
+    setSessionId(sessionId);
     startedAtRef.current = Date.now();
 
     socket.onopen = () => {
@@ -208,6 +221,7 @@ export function InterviewPanel() {
         reportRef.current = message.data;
         setReport(message.data);
         setPhase("complete");
+        trackEvent("interview_completed");
       } else if (message.type === "error") {
         clearReplyTimeout();
         setAwaitingReply(false);
@@ -273,7 +287,7 @@ export function InterviewPanel() {
 
   return (
     <main className="mx-auto max-w-[1440px] space-y-6 px-4 py-8 md:px-6">
-      <section className="motion-enter flex flex-col gap-4 pb-2 lg:flex-row lg:items-end lg:justify-between">
+      <section className="motion-enter print-hide flex flex-col gap-4 pb-2 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           <h1 className="text-4xl font-semibold leading-[1.08] tracking-[-0.04em] md:text-5xl">Run a realistic interview.</h1>
           <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">A live human-sounding interviewer, your camera presence, and a scored debrief - all in one studio.</p>
@@ -329,6 +343,19 @@ export function InterviewPanel() {
                 <p className="text-xs text-muted-foreground">Maya is balanced, Alex pushes Amazon LPs, Priya explores collaboration at scale.</p>
               </div>
 
+              <div className="space-y-2">
+                <Label>Intensity</Label>
+                <div role="radiogroup" aria-label="Interview intensity" className="grid grid-cols-3 gap-2">
+                  {INTENSITY_OPTIONS.map((option) => (
+                    <button key={option.id} type="button" role="radio" aria-checked={intensity === option.id} onClick={() => setIntensity(option.id)} className={`rounded-xl border p-3 text-left surface-transition ${intensity === option.id ? "border-primary bg-primary/10" : "bg-background hover:bg-accent"}`}>
+                      <span className="block text-sm font-semibold">{option.name}</span>
+                      <span className="block text-xs text-muted-foreground">{option.desc}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Controls follow-up depth and tone — same interviewer, different pressure.</p>
+              </div>
+
               <label className={`flex min-h-16 cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 surface-transition ${audioMode ? "border-primary/40 bg-primary/5" : "bg-background"}`}>
                 <span className="flex items-center gap-3"><span className="rounded-lg bg-primary/10 p-2 text-primary"><Volume2 className="h-5 w-5" /></span><span><span className="block text-sm font-semibold">Voice interview</span><span className="block text-xs text-muted-foreground">Hear a natural voice and answer through your microphone.</span></span></span>
                 <input type="checkbox" checked={audioMode && audioSupported} disabled={!audioSupported} onChange={(event) => setAudioMode(event.target.checked)} className="h-5 w-5 accent-primary" aria-label="Enable voice interview" />
@@ -352,7 +379,7 @@ export function InterviewPanel() {
           </Card>
         </div>
       ) : phase === "complete" && report ? (
-        <ReportPanel report={report} metrics={metrics} onRestart={restart} />
+        <ReportPanel report={report} metrics={metrics} onRestart={restart} sessionId={sessionId} />
       ) : phase === "interrupted" ? (
         <Card className="mx-auto max-w-xl text-center">
           <CardContent className="space-y-4 py-10">
@@ -384,6 +411,7 @@ export function InterviewPanel() {
                 {elapsed}
               </span>
               <span className="hidden text-sm font-medium text-white/85 sm:block">{selectedWorkflow?.company || "Role-specific"} · live interview</span>
+              <span aria-label={`Intensity: ${intensity}`} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium capitalize text-white/70">{intensity}</span>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setShowTranscript((value) => !value)} aria-label="Toggle live transcript" aria-expanded={showTranscript} className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/75 surface-transition hover:bg-white/20 hover:text-white">
@@ -521,7 +549,7 @@ function Readiness({ icon, title, copy }: { icon: React.ReactNode; title: string
   return <div className="flex gap-3"><span className="mt-0.5 rounded-lg bg-primary/10 p-2 text-primary">{icon}</span><div><p className="text-sm font-semibold">{title}</p><p className="mt-0.5 text-sm leading-6 text-muted-foreground">{copy}</p></div></div>;
 }
 
-function ReportPanel({ report, metrics, onRestart }: { report: any; metrics: ReturnType<typeof useMetrics.getState>["metrics"]; onRestart: () => void }) {
+function ReportPanel({ report, metrics, onRestart, sessionId }: { report: any; metrics: ReturnType<typeof useMetrics.getState>["metrics"]; onRestart: () => void; sessionId: string | null }) {
   const scores = Object.entries(report?.scores || {}) as [string, number][];
   const presence = [
     ["Gestures", metrics.handDetectionCounter, `${metrics.handDetectionDuration.toFixed(0)}s active`],
@@ -530,8 +558,8 @@ function ReportPanel({ report, metrics, onRestart }: { report: any; metrics: Ret
     ["Presence score", metrics.postureScore, `gaze stability ${metrics.gazeStabilityScore}`],
   ] as const;
   const exportData = { ...report, local_presence_metrics: metrics };
-  return <div className="space-y-6">
-    <Card className="overflow-hidden"><CardContent className="grid gap-6 p-6 lg:grid-cols-[1.2fr_0.8fr]"><div><span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" />Session complete</span><h2 className="mt-4 text-3xl font-semibold tracking-tight">Your coaching debrief</h2><p className="mt-3 max-w-2xl leading-7 text-muted-foreground">{report?.summary || "Your report has been saved to practice history."}</p>{report?.verdict && <p className="mt-4 rounded-xl border bg-secondary/30 p-4 text-sm"><span className="font-semibold">Coach verdict:</span> {report.verdict}</p>}</div><div className="flex flex-col justify-end gap-2"><Button onClick={() => downloadJson("hustlrzz-coaching-report.json", exportData)}><Download className="h-4 w-4" />Export full report</Button><Button variant="outline" onClick={onRestart}><RefreshCw className="h-4 w-4" />Practice another session</Button></div></CardContent></Card>
+  return <div className="space-y-6 print-report">
+    <Card className="overflow-hidden"><CardContent className="grid gap-6 p-6 lg:grid-cols-[1.2fr_0.8fr]"><div><span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" />Session complete</span><h2 className="mt-4 text-3xl font-semibold tracking-tight">Your coaching debrief</h2><p className="mt-3 max-w-2xl leading-7 text-muted-foreground">{report?.summary || "Your report has been saved to practice history."}</p>{report?.verdict && <p className="mt-4 rounded-xl border bg-secondary/30 p-4 text-sm"><span className="font-semibold">Coach verdict:</span> {report.verdict}</p>}</div><div className="flex flex-col justify-end gap-2 print-hide">{sessionId && <FeedbackStars sessionId={sessionId} />}<Button onClick={() => downloadJson("hustlrzz-coaching-report.json", exportData)}><Download className="h-4 w-4" />Export full report</Button><Button variant="outline" onClick={() => downloadMarkdown("hustlrzz-interview-report.md", buildInterviewReportMarkdown(report))}><FileText className="h-4 w-4" />Export MD</Button><Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4" />Print / PDF</Button><Button variant="outline" onClick={onRestart}><RefreshCw className="h-4 w-4" />Practice another session</Button></div></CardContent></Card>
     {report?.hiring_manager && (
       <Card className="border-primary/20 bg-primary/[0.03]">
         <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" />Hiring-manager view</CardTitle><p className="text-xs text-muted-foreground">How a hiring manager would read this interview.</p></CardHeader>

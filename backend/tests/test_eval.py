@@ -119,19 +119,41 @@ def test_explain_answer_parse_failure(monkeypatch):
 # Spaced drills
 # --------------------------------------------------------------------------- #
 def test_due_drills_from_weak_skills(monkeypatch):
+    """T9: weak skills seed drill_reviews day-0 (due immediately)."""
     from backend.memory import profile
 
-    rows = [
-        {"gap_skills": ["caching", "system design"], "strength_skills": ["python"]},
-        {"gap_skills": ["caching"], "strength_skills": []},
-    ]
+    store = {
+        "assessment_attempts": [
+            {"user_id": "u1", "gap_skills": ["caching", "system design"], "strength_skills": ["python"]},
+            {"user_id": "u1", "gap_skills": ["caching"], "strength_skills": []},
+        ],
+        "interview_sessions": [],
+        "drill_reviews": [],
+    }
+
+    def fake_select(table, match=None, order=None):
+        rows = store.get(table, [])
+        return [
+            dict(r)
+            for r in rows
+            if all(r.get(k) == v for k, v in (match or {}).items())
+        ]
+
+    def fake_insert(table, rows):
+        for row in rows:
+            store.setdefault(table, []).append(dict(row))
+        return [dict(r) for r in rows]
+
     monkeypatch.setattr(profile.dbc, "is_ready", lambda: True)
-    monkeypatch.setattr(profile.dbc, "select_where", lambda table, match=None, order=None: rows if table == "assessment_attempts" else [])
+    monkeypatch.setattr(profile.dbc, "select_where", fake_select)
+    monkeypatch.setattr(profile.dbc, "insert", fake_insert)
+
     drills = profile.get_due_drills("u1")
-    assert [d["due_in_days"] for d in drills] == [1, 3][: len(drills)]
     assert drills[0]["skill"] == "caching"
     assert "caching" in drills[0]["drill"]["prompt"]
     assert drills[0]["drill"]["scenario"] == "behavioral"
+    assert all(d["due_in_days"] == 0 for d in drills)  # day-0 seed
+    assert len(store["drill_reviews"]) == len(drills)
 
 
 def test_due_drills_empty_without_history(monkeypatch):

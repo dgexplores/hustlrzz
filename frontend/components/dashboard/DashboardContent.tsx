@@ -6,9 +6,19 @@ import { api } from "@/lib/api";
 import { downloadJson } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowRight, BookOpenCheck, ChevronDown, ClipboardList, Download, FileText,
-  Loader2, Target, MessageSquareText, Sparkles,
+  ArrowRight, BookOpenCheck, Check, ChevronDown, ClipboardList, Download, FileText,
+  Loader2, RotateCcw, Target, MessageSquareText, Sparkles, Trash2,
 } from "lucide-react";
+
+/** Server due_at is schedule truth (T9); label due-now vs overdue. */
+function dueLabel(item: { due_at?: string; due_in_days?: number }): string {
+  const ts = item?.due_at ? Date.parse(item.due_at) : NaN;
+  if (Number.isNaN(ts)) {
+    return typeof item?.due_in_days === "number" ? `due in ${item.due_in_days}d` : "due now";
+  }
+  const overdueDays = Math.floor((Date.now() - ts) / 86_400_000);
+  return overdueDays >= 1 ? `overdue by ${overdueDays}d` : "due now";
+}
 
 export function DashboardContent() {
   const [workflows, setWorkflows] = useState<any[]>([]);
@@ -22,11 +32,63 @@ export function DashboardContent() {
   const [reloadKey, setReloadKey] = useState(0);
   const [openWorkflow, setOpenWorkflow] = useState<string | null>(null);
   const [openSession, setOpenSession] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<string | null>(null);
+
+  const reviewDrill = async (skill: string, result: "good" | "again") => {
+    if (reviewing) return;
+    setReviewing(skill);
+    try {
+      await api(`/memory/drills/${encodeURIComponent(skill)}/review`, {
+        method: "POST",
+        body: JSON.stringify({ result }),
+      });
+      const refreshed = await api<{ data: any[] }>("/memory/drills").catch(() => ({ data: [] as any[] }));
+      setDrills(refreshed.data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save that review");
+    } finally {
+      setReviewing(null);
+    }
+  };
 
   const formatDateTime = (value?: string) => {
     if (!value) return "Unknown date";
     const time = new Date(value).getTime();
     return Number.isNaN(time) ? "Unknown date" : new Date(value).toLocaleString();
+  };
+
+  const deleteWorkflow = async (w: any) => {
+    if (deletingId) return;
+    const label = w.company ? `${w.company}: ${w.title || "pack"}` : w.title || "this pack";
+    if (!window.confirm(`Delete “${label}”? This cannot be undone.`)) return;
+    setDeletingId(w.workflow_id);
+    setError(null);
+    try {
+      await api<void>(`/workflows/${encodeURIComponent(w.workflow_id)}`, { method: "DELETE" });
+      setWorkflows((prev) => prev.filter((x) => x.workflow_id !== w.workflow_id));
+      if (openWorkflow === w.workflow_id) setOpenWorkflow(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const deleteSession = async (s: any) => {
+    if (deletingId) return;
+    if (!window.confirm(`Delete this interview session from ${formatDateTime(s.created_at)}? This cannot be undone.`)) return;
+    setDeletingId(s.session_id);
+    setError(null);
+    try {
+      await api<void>(`/interviews/${encodeURIComponent(s.session_id)}`, { method: "DELETE" });
+      setSessions((prev) => prev.filter((x) => x.session_id !== s.session_id));
+      if (openSession === s.session_id) setOpenSession(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   useEffect(() => {
@@ -50,7 +112,7 @@ export function DashboardContent() {
     });
   }, [reloadKey]);
 
-  if (loading) return <div className="p-16 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  if (loading) return <div className="p-16 flex justify-center" role="status" aria-label="Loading dashboard"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /><span className="sr-only">Loading dashboard…</span></div>;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-10">
@@ -76,7 +138,7 @@ export function DashboardContent() {
         </p>
       )}
 
-      {(memory?.digest?.summary || memory?.trends?.length > 0) && (
+      {(memory?.digest?.summary || memory?.trends?.length > 0 || drills.length > 0) && (
         <section className="rounded-2xl border bg-card p-6">
           <div className="flex items-center gap-2 mb-4"><Target className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Your trajectory</h2></div>
           {memory.digest?.weak?.length > 0 && (
@@ -90,9 +152,9 @@ export function DashboardContent() {
           )}
           {memory.schedule?.length > 0 && (
             <div className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Spaced repetition — due soon</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Spaced repetition — due now</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {memory.schedule.map((s: any, i: number) => <div key={`${s.skill}-${s.due_in_days}-${i}`} className="rounded-lg border bg-secondary/30 p-3"><p className="text-sm font-medium">{s.skill}</p><p className="text-xs text-muted-foreground">due in {s.due_in_days}d</p></div>)}
+                {memory.schedule.map((s: any, i: number) => <div key={`${s.skill}-${s.due_at ?? s.due_in_days}-${i}`} className="rounded-lg border bg-secondary/30 p-3"><p className="text-sm font-medium">{s.skill}</p><p className="text-xs text-muted-foreground">{dueLabel(s)}</p></div>)}
               </div>
             </div>
           )}
@@ -101,23 +163,46 @@ export function DashboardContent() {
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Due practice — one tap to start</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-3">
                 {drills.map((d: any, i: number) => (
-                  <div key={`${d.skill}-${d.due_in_days}-${i}`} className="rounded-lg border border-primary/25 bg-primary/5 p-3">
-                    <p className="text-sm font-medium">{d.skill} <span className="font-normal text-muted-foreground">· due in {d.due_in_days}d</span></p>
+                  <div key={`${d.skill}-${d.due_at ?? d.due_in_days}-${i}`} className="rounded-lg border border-primary/25 bg-primary/5 p-3">
+                    <p className="text-sm font-medium">{d.skill} <span className="font-normal text-muted-foreground">· {dueLabel(d)}</span></p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">{d.drill?.tip}</p>
-                    <Link
-                      href="/coaching"
-                      onClick={() => {
-                        try {
-                          localStorage.setItem("hustlrzz-drill-v1", JSON.stringify({
-                            scenario: d.drill?.scenario || "behavioral",
-                            prompt: d.drill?.prompt || "",
-                          }));
-                        } catch { /* private mode */ }
-                      }}
-                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                    >
-                      Practice this <ArrowRight className="h-3 w-3" />
-                    </Link>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        className="h-10 px-3 text-xs"
+                        disabled={reviewing != null}
+                        onClick={() => reviewDrill(d.skill, "good")}
+                        aria-label={`Mark ${d.skill} complete`}
+                      >
+                        {reviewing === d.skill ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                        Complete
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-10 px-3 text-xs"
+                        disabled={reviewing != null}
+                        onClick={() => reviewDrill(d.skill, "again")}
+                        aria-label={`Mark ${d.skill} again`}
+                      >
+                        {reviewing === d.skill ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                        Again
+                      </Button>
+                      <Link
+                        href="/coaching"
+                        onClick={() => {
+                          try {
+                            localStorage.setItem("hustlrzz-drill-v1", JSON.stringify({
+                              scenario: d.drill?.scenario || "behavioral",
+                              prompt: d.drill?.prompt || "",
+                            }));
+                          } catch { /* private mode */ }
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                      >
+                        Practice this <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -146,31 +231,51 @@ export function DashboardContent() {
       <section>
         <div className="mb-4 flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Prepared packs</h2></div>
         <div className="divide-y divide-foreground/15 border-y border-foreground/20">
-          {workflows.length === 0 && <p className="py-3 text-sm text-muted-foreground">No prepared packs yet. Start in Prepare.</p>}
+          {workflows.length === 0 && (
+            <div className="rounded-2xl border bg-card/60 px-4 py-8 text-center">
+              <p className="text-sm font-medium">No prepared packs yet.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Start in Prepare — paste a resume and job description.</p>
+            </div>
+          )}
           {workflows.map((w) => {
             const open = openWorkflow === w.workflow_id;
             return (
               <div key={w.workflow_id}>
-                <button
-                  type="button"
-                  onClick={() => setOpenWorkflow(open ? null : w.workflow_id)}
-                  aria-expanded={open}
-                  className="grid w-full grid-cols-[1fr_auto] gap-2 px-1 py-4 text-left surface-transition hover:bg-accent/45"
-                >
-                  <span>
-                    <span className="block text-sm font-semibold">{w.company ? `${w.company}: ` : ""}{w.title || "Prepared interview"}</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{formatDateTime(w.created_at)} · {w.questions?.length ?? 0} questions</span>
-                    <span className="mt-1 block text-sm">{w.match?.overall_match_percent != null ? `${w.match.overall_match_percent}% match` : ""}</span>
-                  </span>
-                  <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-                </button>
+                <div className="flex items-start gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setOpenWorkflow(open ? null : w.workflow_id)}
+                    aria-expanded={open}
+                    className="grid flex-1 grid-cols-[1fr_auto] gap-2 px-1 py-4 text-left surface-transition hover:bg-accent/45"
+                  >
+                    <span>
+                      <span className="block text-sm font-semibold">{w.company ? `${w.company}: ` : ""}{w.title || "Prepared interview"}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">{formatDateTime(w.created_at)} · {w.questions?.length ?? 0} questions</span>
+                      <span className="mt-1 block text-sm">{w.match?.overall_match_percent != null ? `${w.match.overall_match_percent}% match` : ""}</span>
+                    </span>
+                    <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${w.company ? `${w.company}: ` : ""}${w.title || "prepared pack"}`}
+                    disabled={deletingId === w.workflow_id}
+                    onClick={() => deleteWorkflow(w)}
+                    className="mt-4 shrink-0 rounded-lg p-3 text-muted-foreground surface-transition hover:bg-accent/45 hover:text-destructive"
+                  >
+                    {deletingId === w.workflow_id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
                 {open && (
                   <div className="mb-4 space-y-3 rounded-xl border bg-card p-4">
                     {(w.match?.summary || w.match?.matched_skills?.length > 0 || w.match?.gap_skills?.length > 0) && (
                       <div>
                         {w.match?.summary && <p className="text-sm leading-6 text-muted-foreground">{w.match.summary}</p>}
-                        {w.match?.matched_skills?.length > 0 && <p className="mt-2 text-sm"><span className="font-semibold">Strengths:</span> <span className="text-emerald-600 dark:text-emerald-400">{w.match.matched_skills.join(", ")}</span></p>}
-                        {w.match?.gap_skills?.length > 0 && <p className="mt-1 text-sm"><span className="font-semibold">Gaps:</span> <span className="text-amber-600 dark:text-amber-400">{w.match.gap_skills.join(", ")}</span></p>}
+                        {w.match?.matched_skills?.length > 0 && <p className="mt-2 text-sm"><span className="font-semibold">Strengths:</span> <span className="text-emerald-700 dark:text-emerald-400">{w.match.matched_skills.join(", ")}</span></p>}
+                        {w.match?.gap_skills?.length > 0 && <p className="mt-1 text-sm"><span className="font-semibold">Gaps:</span> <span className="text-amber-700 dark:text-amber-400">{w.match.gap_skills.join(", ")}</span></p>}
                       </div>
                     )}
                     <details>
@@ -195,45 +300,77 @@ export function DashboardContent() {
       <section>
         <div className="mb-4 flex items-center gap-2"><BookOpenCheck className="h-5 w-5 text-primary" /><h2 className="text-xl font-semibold">Interview history</h2></div>
         <div className="divide-y divide-foreground/15 border-y border-foreground/20">
-          {sessions.length === 0 && <p className="py-3 text-sm text-muted-foreground">{feedErrors.includes("Interview history") ? "Interview history could not be loaded — retry above." : "No sessions yet."}</p>}
+          {sessions.length === 0 && (
+            <div className="rounded-2xl border bg-card/60 px-4 py-8 text-center">
+              <p className="text-sm font-medium">{feedErrors.includes("Interview history") ? "Interview history could not be loaded." : "No sessions yet."}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{feedErrors.includes("Interview history") ? "Retry from the banner above." : "Start an interview — your report lands here."}</p>
+            </div>
+          )}
           {sessions.map((s) => {
             const open = openSession === s.session_id;
             return (
               <div key={s.session_id}>
-                <button
-                  type="button"
-                  onClick={() => setOpenSession(open ? null : s.session_id)}
-                  aria-expanded={open}
-                  className="grid w-full grid-cols-[1fr_auto] gap-2 px-1 py-4 text-left surface-transition hover:bg-accent/45"
-                >
-                  <span>
-                    <span className="block text-sm font-semibold">Session · {formatDateTime(s.created_at)}</span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">{s.is_audio ? "voice" : "typed"} · {s.transcript?.length ?? 0} transcript lines{s.duration_seconds ? ` · ${Math.round(s.duration_seconds / 60)} min` : ""}</span>
-                    {s.report?.scores && (
-                      <span className="mt-2 flex flex-wrap gap-2">
-                        {Object.entries(s.report.scores).slice(0, 4).map(([label, score]) => (
-                          <span key={label} className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1 text-xs"><Target className="h-3 w-3 text-primary" />{label.replace(/_/g, " ")}: {String(score)}</span>
-                        ))}
-                      </span>
+                <div className="flex items-start gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setOpenSession(open ? null : s.session_id)}
+                    aria-expanded={open}
+                    className="grid flex-1 grid-cols-[1fr_auto] gap-2 px-1 py-4 text-left surface-transition hover:bg-accent/45"
+                  >
+                    <span>
+                      <span className="block text-sm font-semibold">Session · {formatDateTime(s.created_at)}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">{s.is_audio ? "voice" : "typed"} · {s.transcript?.length ?? 0} transcript lines{s.duration_seconds ? ` · ${Math.round(s.duration_seconds / 60)} min` : ""}</span>
+                      {s.report?.scores && (
+                        <span className="mt-2 flex flex-wrap gap-2">
+                          {Object.entries(s.report.scores).slice(0, 4).map(([label, score]) => (
+                            <span key={label} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-1 text-xs"><Target className="h-3 w-3 text-primary" />{label.replace(/_/g, " ")}: {String(score)}</span>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                    <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+                  </button>
+                  <Link
+                    href={`/dashboard/session/${s.session_id}`}
+                    aria-label={`Open full session from ${formatDateTime(s.created_at)}`}
+                    className="mt-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground surface-transition hover:bg-accent/45 hover:text-primary"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <button
+                    type="button"
+                    aria-label={`Delete session from ${formatDateTime(s.created_at)}`}
+                    disabled={deletingId === s.session_id}
+                    onClick={() => deleteSession(s)}
+                    className="mt-4 shrink-0 rounded-lg p-3 text-muted-foreground surface-transition hover:bg-accent/45 hover:text-destructive"
+                  >
+                    {deletingId === s.session_id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
                     )}
-                  </span>
-                  <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-                </button>
+                  </button>
+                </div>
                 {open && s.report && (
                   <div className="mb-4 space-y-3 rounded-xl border bg-card p-4">
                     {s.report.verdict && <p className="rounded-lg border bg-secondary/30 p-3 text-sm"><span className="font-semibold">Verdict:</span> {s.report.verdict}</p>}
                     {s.report.summary && <p className="flex gap-2 text-sm leading-6 text-muted-foreground"><MessageSquareText className="mt-1 h-4 w-4 shrink-0 text-primary" />{s.report.summary}</p>}
                     <div className="grid gap-3 sm:grid-cols-2">
                       {(s.report.strengths?.length ?? 0) > 0 && (
-                        <div><p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400"><Sparkles className="h-3.5 w-3.5" />What worked</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-muted-foreground">{s.report.strengths.slice(0, 4).map((item: string, index: number) => <li key={index}>{item}</li>)}</ul></div>
+                        <div><p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400"><Sparkles className="h-3.5 w-3.5" />What worked</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-muted-foreground">{s.report.strengths.slice(0, 4).map((item: string, index: number) => <li key={index}>{item}</li>)}</ul></div>
                       )}
                       {(s.report.improvements?.length ?? 0) > 0 && (
-                        <div><p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400"><Target className="h-3.5 w-3.5" />Improve next</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-muted-foreground">{s.report.improvements.slice(0, 4).map((item: string, index: number) => <li key={index}>{item}</li>)}</ul></div>
+                        <div><p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400"><Target className="h-3.5 w-3.5" />Improve next</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-muted-foreground">{s.report.improvements.slice(0, 4).map((item: string, index: number) => <li key={index}>{item}</li>)}</ul></div>
                       )}
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => downloadJson(`hustlrzz-session-${s.session_id.slice(0, 8)}.json`, s)}>
-                      <Download className="h-3.5 w-3.5" />Export session
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button size="sm" variant="outline" onClick={() => downloadJson(`hustlrzz-session-${s.session_id.slice(0, 8)}.json`, s)}>
+                        <Download className="h-3.5 w-3.5" />Export session
+                      </Button>
+                      <Link href={`/dashboard/session/${s.session_id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
+                        Open full session <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
                 )}
               </div>
@@ -249,7 +386,7 @@ export function DashboardContent() {
               <div key={row.attempt_id} className="rounded-xl border p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="truncate text-sm font-semibold">{row.role}{row.company ? ` · ${row.company}` : ""}</p>
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${Number(row.total_percent) >= 70 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : Number(row.total_percent) >= 50 ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-red-500/10 text-red-600 dark:text-red-400"}`}>{Number(row.total_percent)}%</span>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${Number(row.total_percent) >= 70 ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : Number(row.total_percent) >= 50 ? "bg-amber-500/10 text-amber-700 dark:text-amber-400" : "bg-red-500/10 text-red-600 dark:text-red-400"}`}>{Number(row.total_percent)}%</span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{row.band || "in progress"} · {row.level}{row.created_at && !Number.isNaN(new Date(row.created_at).getTime()) ? ` · ${new Date(row.created_at).toLocaleDateString()}` : ""}</p>
               </div>

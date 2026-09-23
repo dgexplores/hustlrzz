@@ -127,6 +127,32 @@ async def ingest_document(*, user_id: str, title: str, source_type: str, content
     return {"document_id": document_id, "chunk_count": len(chunks), "duplicate": False}
 
 
+async def list_documents(user_id: str) -> list[dict[str, Any]]:
+    """Owner-scoped document rows for the knowledge workspace (Postgres only)."""
+    rows = await asyncio.to_thread(
+        dbc.select_where, "knowledge_documents", {"user_id": user_id}, "created_at"
+    )
+    fields = ("document_id", "title", "source_type", "chunk_count", "created_at")
+    return [{field: row.get(field) for field in fields} for row in rows]
+
+
+async def delete_document(*, document_id: str, user_id: str) -> bool:
+    """Delete an owned document and its chunks. False when missing/not owned."""
+    _require_ready()
+    rows = await asyncio.to_thread(
+        dbc.select_where, "knowledge_documents", {"document_id": document_id}
+    )
+    if not any(row.get("user_id") == user_id for row in rows):
+        return False
+    await asyncio.to_thread(
+        dbc.delete_where, "knowledge_chunks", {"document_id": document_id, "user_id": user_id}
+    )
+    await asyncio.to_thread(
+        dbc.delete_where, "knowledge_documents", {"document_id": document_id, "user_id": user_id}
+    )
+    return True
+
+
 async def retrieve(*, user_id: str, query: str, top_k: int | None = None) -> list[RetrievedChunk]:
     _require_ready()
     clean_query = (query or "").strip()

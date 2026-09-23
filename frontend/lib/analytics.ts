@@ -1,4 +1,28 @@
 import { Landmark } from "./types";
+import { api } from "./api";
+
+export type ProductEventName =
+  | "prepare_started"
+  | "prepare_completed"
+  | "interview_completed"
+  | "feedback_submitted";
+
+export type ProductEventProps = Record<string, number | boolean | null>;
+
+export function buildEventPayload(name: ProductEventName, props?: ProductEventProps): {
+  event_name: ProductEventName;
+  props?: ProductEventProps;
+} {
+  if (!props || Object.keys(props).length === 0) return { event_name: name };
+  return { event_name: name, props };
+}
+
+export function trackEvent(name: ProductEventName, props?: ProductEventProps): void {
+  void api<unknown>("/analytics/events", {
+    method: "POST",
+    body: JSON.stringify(buildEventPayload(name, props)),
+  }).catch(() => {});
+}
 
 const GAZE_MIN = 0.26;
 const GAZE_MAX = 0.74;
