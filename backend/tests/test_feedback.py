@@ -7,6 +7,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from backend.app import app, get_user  # noqa: E402
+import backend.app as app_module  # noqa: E402
 from backend import db as dbc  # noqa: E402
 from backend.obs import limiter as _limiter  # noqa: E402
 
@@ -17,6 +18,10 @@ SEED = {
     "interview_sessions": [
         {"session_id": "sess-a1", "user_id": "user-a", "workflow_id": "wf-a1"},
         {"session_id": "sess-b1", "user_id": "user-b", "workflow_id": "wf-b1"},
+    ],
+    "practice_sessions": [
+        {"session_id": "practice-a1", "user_id": "user-a"},
+        {"session_id": "practice-b1", "user_id": "user-b"},
     ],
     "report_feedback": [],
 }
@@ -49,10 +54,15 @@ def client(monkeypatch):
                 store.setdefault(table, []).append(dict(incoming))
         return [dict(r) for r in store.get(table, [])]
 
+    def fake_insert(table, rows):
+        store.setdefault(table, []).extend(dict(row) for row in rows)
+        return [dict(row) for row in rows]
+
     monkeypatch.setattr(dbc, "is_ready", lambda: True)
     monkeypatch.setattr(dbc, "get_client", lambda: None)
     monkeypatch.setattr(dbc, "select_where", fake_select)
     monkeypatch.setattr(dbc, "upsert", fake_upsert)
+    monkeypatch.setattr(dbc, "insert", fake_insert)
 
     with TestClient(app) as c:
         c._store = store  # type: ignore[attr-defined]
@@ -115,10 +125,45 @@ def test_unknown_session_returns_404(client):
 
 
 def test_practice_session_id_accepted(client):
-    """Practice-room reports are session-less; widget uses a practice-* id."""
-    res = _post(client, {"session_id": "practice-abc123", "rating": 4})
+    res = _post(client, {"session_id": "practice-a1", "rating": 4})
     assert res.status_code == 200
-    assert res.json()["data"]["session_id"] == "practice-abc123"
+    assert res.json()["data"]["session_id"] == "practice-a1"
+
+
+def test_unissued_practice_session_returns_404(client):
+    res = _post(client, {"session_id": "practice-client-generated", "rating": 4})
+    assert res.status_code == 404
+    assert client._store["report_feedback"] == []  # type: ignore[attr-defined]
+
+
+def test_foreign_practice_session_returns_404(client):
+    res = _post(client, {"session_id": "practice-b1", "rating": 4})
+    assert res.status_code == 404
+    assert client._store["report_feedback"] == []  # type: ignore[attr-defined]
+
+
+def test_coaching_practice_issues_owner_bound_session(client, monkeypatch):
+    monkeypatch.setattr(
+        app_module.analysis,
+        "evaluate_coaching_practice",
+        lambda **_: {"overall_score": 80, "summary": "Good practice"},
+    )
+
+    res = client.post(
+        "/coaching/practice",
+        json={
+            "scenario": "behavioral interview",
+            "prompt": "Tell me about a difficult project.",
+            "answer": "Candidate: I led a difficult project and shipped it.",
+            "presence_metrics": {},
+        },
+    )
+
+    assert res.status_code == 200
+    session_id = res.json()["data"]["session_id"]
+    assert session_id.startswith("practice-")
+    rows = client._store["practice_sessions"]  # type: ignore[attr-defined]
+    assert {"session_id": session_id, "user_id": "user-a"} in rows
 
 
 def test_requires_auth(client):

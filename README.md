@@ -147,8 +147,9 @@ Dockerfile       backend image for Render, Railway, or another Docker host
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. For a fresh project, run `supabase/schema.sql` in the SQL editor. Existing
-   installations can apply the migrations in order, including
-   `supabase/migrations/20260815180000_resume_analyzer.sql` for Resume Analyzer quotas and history.
+   installations should apply every file in `supabase/migrations/` in order;
+   this includes Resume Analyzer, Phase 2 feedback, analytics, drills,
+   interview intensity, and practice-feedback ownership.
 3. Copy the project URL, `anon` key, and `service_role` key from **Project Settings → API**.
 
 ### 2. Start the API
@@ -181,13 +182,12 @@ delivery with Resend.
 
 ## Deployment checklist
 
-- **Supabase:** apply the schema or migrations **including
-  `supabase/migrations/20260826120000_intelligence_assessment.sql`** (company
-  intelligence cache + assessment rounds) **and
-  `supabase/migrations/20260830120000_workflow_interview_context.sql`**
-  (persists the resume text and job description behind a workflow so the live
-  interview judge scores against real context instead of an empty one). Never
-  expose `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
+- **Supabase:** fresh installs use `supabase/schema.sql`; existing installs
+  apply every migration in `supabase/migrations/` in order. The migration set
+  includes Resume Analyzer, company intelligence + assessment rounds, workflow
+  interview context, report feedback, privacy-safe analytics, spaced-repetition
+  drills, interview intensity, and practice-feedback ownership. Never expose
+  `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
 - **Vercel:** set the project root to `frontend`; configure
   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
   `NEXT_PUBLIC_API_URL` for Preview and Production.

@@ -30,12 +30,69 @@ create table if not exists interview_sessions (
   report jsonb not null default '{}',
   is_audio boolean not null default false,
   duration_seconds integer not null default 0,
+  intensity text not null default 'standard' check (intensity in ('easy', 'standard', 'hard')),
   created_at timestamptz not null default now()
 );
 
 alter table interview_sessions enable row level security;
 create policy "sessions_own_all" on interview_sessions
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table if not exists practice_sessions (
+  session_id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+alter table public.practice_sessions enable row level security;
+
+create table if not exists report_feedback (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  session_id text not null unique,
+  rating integer not null check (rating >= 1 and rating <= 5),
+  comment text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists report_feedback_user_id_idx
+  on public.report_feedback (user_id);
+alter table public.report_feedback enable row level security;
+
+create table if not exists product_events (
+  id uuid primary key default gen_random_uuid(),
+  event_name text not null
+    check (event_name in (
+      'prepare_started',
+      'prepare_completed',
+      'interview_completed',
+      'feedback_submitted'
+    )),
+  user_id text,
+  occurred_at timestamptz not null default now(),
+  props jsonb not null default '{}'::jsonb
+);
+
+create index if not exists product_events_event_name_idx
+  on public.product_events (event_name, occurred_at);
+alter table public.product_events enable row level security;
+
+create table if not exists drill_reviews (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  skill text not null,
+  interval_index integer not null default 0 check (interval_index >= 0),
+  due_at timestamptz not null default now(),
+  last_result text check (last_result is null or last_result in ('again', 'good')),
+  streak integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, skill)
+);
+
+create index if not exists drill_reviews_user_due_idx
+  on public.drill_reviews (user_id, due_at);
+alter table public.drill_reviews enable row level security;
 
 -- User profiles
 create table if not exists profiles (
