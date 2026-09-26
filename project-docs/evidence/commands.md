@@ -29,22 +29,24 @@ npm test   # → vitest run
 ```
  RUN  v3.2.7 /Users/dgsmacbook/hustlrzz/frontend
 
- ✓ lib/__tests__/api.test.ts (11 tests) 45ms
- ✓ lib/__tests__/analytics.test.ts (5 tests) 2ms
- ✓ lib/supabase/__tests__/client.test.ts (7 tests) 124ms
- ✓ lib/__tests__/download.test.ts (3 tests) 154ms
- ✓ lib/__tests__/sessionDetail.test.ts (7 tests) 27ms
+ ✓ lib/__tests__/api.test.ts (11 tests) 4ms
  ✓ lib/__tests__/reportMarkdown.test.ts (17 tests) 6ms
- ✓ lib/__tests__/settings.test.ts (7 tests) 9ms
- ✓ components/ui/__tests__/button.test.tsx (6 tests) 713ms
- ✓ components/auth/__tests__/AuthGate.test.tsx (5 tests) 532ms
+ ✓ lib/__tests__/download.test.ts (3 tests) 11ms
+ ✓ lib/__tests__/sessionDetail.test.ts (7 tests) 3ms
+ ✓ lib/supabase/__tests__/client.test.ts (7 tests) 62ms
+ ✓ components/ui/__tests__/button.test.tsx (6 tests) 115ms
+ ✓ components/auth/__tests__/AuthGate.test.tsx (5 tests) 167ms
+ ✓ lib/__tests__/settings.test.ts (7 tests) 2ms
+ ✓ lib/__tests__/analytics.test.ts (5 tests) 2ms
+ ✓ components/home/__tests__/Hero.reduced-motion.test.tsx (2 tests) 70ms
+ ✓ components/home/__tests__/Hero.test.tsx (6 tests) 106ms
 
- Test Files  9 passed (9)
-      Tests  68 passed (68)
-   Duration  5.69s
+ Test Files  11 passed (11)
+      Tests  76 passed (76)
+   Duration  2.30s
 ```
 
-Exit code: **0**. Final count: **68 passed / 9 files**.
+Exit code: **0**. Final count: **76 passed / 11 files**.
 
 ## tsc
 
@@ -95,7 +97,7 @@ Exit code: **0**.
 | `test_delete_rate_limited_returns_429_with_retry_after` | `backend/tests/test_deletes.py:164-172` | real test: 20×404 then 429 + `Retry-After` header |
 | 429 includes `Retry-After` | `backend/app.py:116-121` | header set on `HTTPException` |
 
-Full suites green: pytest **190**, vitest **68**, tsc **0**, lint **0**, build **0**.
+Full suites green: pytest **190**, vitest **76**, tsc **0**, lint **0**, build **0**.
 
 ## 2026-09-25 closeout gates
 
@@ -110,5 +112,34 @@ Full suites green: pytest **190**, vitest **68**, tsc **0**, lint **0**, build *
 | Lighthouse desktop dark | Accessibility 100, Best Practices 100, SEO 100, Agentic Browsing 100 |
 | Lighthouse mobile dark | Accessibility 100, Best Practices 100, SEO 100, Agentic Browsing 100 |
 | Signed-out route shells | `/prepare`, `/interview`, `/dashboard`, `/coaching`, `/settings`, `/knowledge` all render AuthGate sign-in |
+
+## 2026-09-26 landing page pass (local production build, `next start`)
+
+Lighthouse was re-measured after the hero rebuild. **Best Practices is 96, not 100**, on both this
+build and the deployed site. Cause: `errors-in-console` from `GET /api/auth/session` returning
+`401` for signed-out visitors. Verified pre-existing — the deployed site at `64daa64`, which does
+not contain this change, logs the identical 401 and also scores 96. Left unfixed here because it
+sits in auth code outside this change's scope.
+
+| Gate | Result |
+|---|---|
+| Lighthouse desktop light | Accessibility 100, Best Practices 96, SEO 100, Agentic Browsing 100 |
+| Lighthouse desktop dark | Accessibility 100, Best Practices 96, SEO 100, Agentic Browsing 100 |
+| Lighthouse mobile dark (390x844) | Accessibility 100, Best Practices 96, SEO 100, Agentic Browsing 100 |
+| `h1` outranks every `h2` | 72px vs 48px at 1440; 60 vs 48 at 768; 36 vs 30 at 320/390 |
+| Horizontal overflow | none at 320, 390, 768, 1024, 1440 |
+| Touch targets under 44px | none, except the visually hidden skip link |
+| Reduced motion | 3 steps render complete, zero inline transforms in the hero |
+| `/robots.txt` | now `200 text/plain` (was `404` returning the Next 404 page) |
+| `/llms.txt` | now `200 text/plain` (was `404` returning the Next 404 page) |
+
+### Pre-existing production defect found during this pass
+
+`https://hustlrzz.vercel.app/robots.txt` and `/llms.txt` both returned **404 with the Next.js 404
+HTML page**. Lighthouse on the deployed domain therefore failed `robots-txt` and `llms-txt`,
+scoring **SEO 91 and Agentic Browsing 67** in production while the same audit on localhost scored
+100 — the earlier "SEO 100 / Agentic 100" evidence was measured on localhost, where those two
+audits do not apply. Fixed by adding `frontend/public/robots.txt` and `frontend/public/llms.txt`.
+Re-verifying on production requires a deploy.
 
 Authenticated production smoke evidence remains pending deployment of the current branch.

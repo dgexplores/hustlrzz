@@ -1,0 +1,17 @@
+# Hustlrzz — https://hustlrzz.vercel.app
+# The public marketing and legal pages are crawlable. The product workspace is
+# sign-in gated, so there is nothing for a crawler to index there.
+
+User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /auth/
+Disallow: /prepare/
+Disallow: /assessment/
+Disallow: /interview/
+Disallow: /coaching/
+Disallow: /dashboard/
+Disallow: /knowledge/
+Disallow: /settings/
+Disallow: /resume-analyzer/

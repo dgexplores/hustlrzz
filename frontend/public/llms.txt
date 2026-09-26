@@ -1,0 +1,22 @@
+# Hustlrzz
+
+> Hustlrzz is an interview practice workspace. Paste a resume and a job description and it builds a focused question pack from your own evidence, then lets you rehearse against a live interviewer that follows up and scores your answers. Camera and posture signals are processed on-device and never leave the browser. Positioning, screening rounds, practice, and coaching live in one private workspace.
+
+## Public pages
+
+- [Homepage](https://hustlrzz.vercel.app/): What the product does, the three-step flow, and the full set of practice modes.
+- [Privacy policy](https://hustlrzz.vercel.app/legal/privacy): What is stored, what stays on-device, and how camera data is handled.
+- [Terms of service](https://hustlrzz.vercel.app/legal/terms): Terms governing use of the workspace.
+
+## Product modes (sign-in required)
+
+- [Prepare](https://hustlrzz.vercel.app/prepare): Resume plus job description becomes a question pack, evidence map, and company brief.
+- [Rehearse](https://hustlrzz.vercel.app/interview): A live interviewer that follows up, paces the clock, and judges answers against your material.
+- [Assess](https://hustlrzz.vercel.app/assessment): Timed aptitude, technical, and judgment rounds, scored blind.
+- [Coach](https://hustlrzz.vercel.app/coaching): Salary scripts and coaching turns for the conversations after the interview.
+- [Resume analyzer](https://hustlrzz.vercel.app/resume-analyzer): Extracts structured experience from an uploaded resume.
+
+## Notes for agents
+
+- Every route under the product modes above renders a sign-in gate when the request is unauthenticated. Content is not publicly retrievable.
+- There is no public API. The backend is not documented for third-party consumption.
