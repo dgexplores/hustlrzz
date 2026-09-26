@@ -14,20 +14,19 @@ import {
   Camera,
   FileText,
   ChatsCircle,
-  Play,
   Microphone,
   ArrowsClockwise,
   Fingerprint,
 } from "@phosphor-icons/react";
 import { usePressAndHover, useFlexSpring, useHoverSpring } from "@/hooks/useSprings";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { ProductPreview } from "@/components/home/ProductPreview";
+import { Hero } from "@/components/home/Hero";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 gsap.registerPlugin(ScrollTrigger);
 
-const SCRUB_LINE =
-  "Great interviews are rehearsed under pressure, not memorized from lists. Hustlrzz puts your evidence, the company's bar, and a live coach in one room.";
+const SCRUB_LINE = "Great interviews are rehearsed under pressure, not memorized from lists.";
+const SCRUB_TAIL = "Hustlrzz puts your evidence, the company's bar, and a live coach in one room.";
 
 const MARQUEE = ["Prepare", "Assess", "Rehearse", "Negotiate", "Remember", "Perform"];
 
@@ -40,13 +39,6 @@ const MODES = [
     image: "/images/bg-prepare.svg",
   },
   {
-    key: "assess",
-    title: "Assess",
-    copy: "Timed aptitude, technical, and judgment rounds. Scored blind, reported honestly.",
-    href: "/assessment",
-    image: "/images/bg-assess.svg",
-  },
-  {
     key: "rehearse",
     title: "Rehearse",
     copy: "A live interviewer that follows up, paces the clock, and judges against your material.",
@@ -54,8 +46,15 @@ const MODES = [
     image: "/images/bg-rehearse.svg",
   },
   {
-    key: "negotiate",
-    title: "Negotiate",
+    key: "assess",
+    title: "Assess",
+    copy: "Timed aptitude, technical, and judgment rounds. Scored blind, reported honestly.",
+    href: "/assessment",
+    image: "/images/bg-assess.svg",
+  },
+  {
+    key: "coach",
+    title: "Coach",
     copy: "Salary scripts and coaching turns for the conversations after the interview.",
     href: "/coaching",
     image: "/images/bg-negotiate.svg",
@@ -105,18 +104,14 @@ function NavCTA({ href, children }: { href: string; children: React.ReactNode })
   );
 }
 
-function HeroCTA({ href, children, primary = true }: { href: string; children: React.ReactNode; primary?: boolean }) {
+function HeroCTA({ href, children }: { href: string; children: React.ReactNode }) {
   const { scale, handlers } = usePressAndHover(0.97, 1.03);
   return (
     <Magnetic>
       <motion.span {...handlers} style={{ scale }} className="pressable inline-flex transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
         <Link
           href={href}
-          className={`inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold ${
-            primary
-              ? "bg-primary text-primary-foreground shadow-[0_12px_32px_-12px_hsl(var(--primary)/0.55)]"
-              : "border border-border bg-secondary text-secondary-foreground hover:bg-accent"
-          }`}
+          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-[0_12px_32px_-12px_hsl(var(--primary)/0.55)] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {children}
         </Link>
@@ -270,7 +265,7 @@ export function HomeContent() {
           </Link>
           <div className="hidden items-center gap-6 sm:flex">
             <NavLink href="/prepare">Prepare</NavLink>
-            <NavLink href="/assessment">Assess</NavLink>
+            <NavLink href="/interview">Rehearse</NavLink>
             <NavLink href="/coaching">Coach</NavLink>
           </div>
           <div className="flex items-center gap-2">
@@ -281,47 +276,13 @@ export function HomeContent() {
       </header>
       )}
 
-      {/* Split hero: left content, right asset */}
-      <section className="hero-bg relative overflow-hidden">
-        <div aria-hidden="true" className="absolute inset-0 hero-overlay" />
-
-        <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-12 px-4 pb-20 pt-28 md:px-6 lg:min-h-[100dvh] lg:grid-cols-12 lg:pt-24">
-          <div className="text-start lg:col-span-7">
-            <h1
-              className={`display-type w-full font-semibold text-foreground text-4xl md:text-5xl tracking-tighter leading-none`}
-            >
-              Walk in rehearsed.{" "}
-              <span
-                aria-hidden="true"
-                className="mx-1 inline-block h-[0.72em] w-20 rounded-full bg-cover bg-center align-middle opacity-80 grayscale"
-                style={{ backgroundImage: "url(/images/pill-accent.svg)" }}
-              />
-              Leave unforgettable.
-            </h1>
-            <p className="mt-7 max-w-[58ch] text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
-              Paste your resume, get a focused question pack, and practice like it is real. 3 steps, about 5 minutes.
-            </p>
-            <div className="mt-10 flex flex-wrap items-center gap-3">
-              <HeroCTA href="/prepare" primary>
-                Start preparing <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </HeroCTA>
-              <HeroCTA href="/interview" primary={false}>
-                <Play className="h-4 w-4" aria-hidden="true" /> Try sample interview
-              </HeroCTA>
-            </div>
-          </div>
-
-          <div className="lg:col-span-4 lg:col-start-9">
-            <ProductPreview />
-          </div>
-        </div>
-      </section>
+      <Hero />
 
       {/* Marquee interlude */}
       <div className="bg-background overflow-hidden border-t border-border py-8" aria-hidden="true">
         <div className="marquee-track flex w-max items-center gap-10 pe-10">
           {[...MARQUEE, ...MARQUEE].map((word, i) => (
-            <span key={i} className="display-type text-4xl font-semibold tracking-tight text-muted-foreground/80 md:text-5xl">
+            <span key={i} className="display-type text-2xl font-semibold tracking-tight text-muted-foreground/80 md:text-3xl">
               {word} <span className="ms-10 text-primary">·</span>
             </span>
           ))}
@@ -331,9 +292,7 @@ export function HomeContent() {
       {/* Bento grid */}
       <section className="bg-background px-5 py-24 md:px-10 md:py-40">
         <div className="mx-auto max-w-7xl">
-          <h2
-            className={`display-type max-w-3xl text-4xl font-semibold tracking-tighter leading-none text-foreground md:text-6xl`}
-          >
+          <h2 className="section-display text-balance max-w-3xl font-semibold text-foreground">
             One room for{" "}
             <span
               aria-hidden="true"
@@ -377,13 +336,17 @@ export function HomeContent() {
             />
           </div>
 
-          <div className="cascade mt-4 grid grid-cols-1 gap-6 text-sm md:grid-cols-12">
+          <div className="cascade mt-10 grid grid-cols-1 gap-4 border-t border-border pt-8 text-[13px] md:grid-cols-12 md:gap-6">
             {[
               { label: "Voice and typing", icon: <Microphone className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> },
               { label: "Multi-provider AI with automatic failover", icon: <ArrowsClockwise className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> },
               { label: "Private on-device camera processing", icon: <Fingerprint className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /> },
             ].map(({ label, icon }, i) => (
-              <p key={label} style={{ "--i": i + 4 } as CSSProperties} className={`flex items-center gap-2 rounded-2xl border border-border bg-card px-5 py-4 text-muted-foreground ${i === 0 ? "md:col-span-5" : i === 1 ? "md:col-span-4" : "md:col-span-3"}`}>
+              <p
+                key={label}
+                style={{ "--i": i + 4 } as CSSProperties}
+                className={`flex items-center gap-2.5 text-muted-foreground ${i === 0 ? "md:col-span-5" : i === 1 ? "md:col-span-4" : "md:col-span-3"}`}
+              >
                 {icon} {label}
               </p>
             ))}
@@ -394,10 +357,8 @@ export function HomeContent() {
       {/* Horizontal accordions */}
       <section className="border-t border-border bg-muted/50 px-5 py-24 md:px-10 md:py-40">
         <div className="mx-auto max-w-7xl">
-          <h2
-            className={`display-type max-w-2xl text-4xl font-semibold tracking-tighter leading-none text-foreground md:text-6xl`}
-          >
-            Four modes. One momentum.
+          <h2 className="section-display text-balance max-w-2xl font-semibold text-foreground">
+            The full room.
           </h2>
           <div className="cascade acc-group mt-12 flex flex-col gap-3 md:h-[420px] md:flex-row">
             {MODES.map((mode, i) => (
@@ -407,9 +368,9 @@ export function HomeContent() {
         </div>
       </section>
 
-      {/* Scrub reveal + gallery */}
+      {/* Scrubbed thesis, then the supporting claim at normal reading speed */}
       <section className="scrub-block border-t border-border bg-background px-5 py-24 md:px-10 md:py-40">
-      <div className="mx-auto max-w-4xl text-start md:text-center">
+        <div className="mx-auto max-w-4xl text-start md:text-center">
           <p className="display-type text-2xl font-medium leading-snug tracking-tight text-foreground md:text-4xl md:leading-snug">
             {SCRUB_LINE.split(" ").map((word, i) => (
               <span key={i} className="scrub-word">
@@ -417,23 +378,21 @@ export function HomeContent() {
               </span>
             ))}
           </p>
+          <p className="mx-auto mt-6 max-w-[52ch] text-pretty text-sm leading-6 text-muted-foreground md:text-base md:leading-7">
+            {SCRUB_TAIL}
+          </p>
         </div>
       </section>
 
       {/* Closing CTA + footer */}
       <section className="relative overflow-hidden border-t border-border bg-primary/5 px-5 py-24 md:py-40">
         <div className="relative mx-auto max-w-7xl">
-          <h2
-            className={`display-type w-full text-start font-semibold text-foreground text-4xl md:text-6xl tracking-tighter leading-none md:max-w-4xl`}
-          >
+          <h2 className="section-display text-balance w-full font-semibold text-foreground md:max-w-4xl">
             Your next interview starts tonight.
           </h2>
           <div className="mt-10 flex flex-wrap items-center gap-3">
-            <HeroCTA href="/prepare" primary>
+            <HeroCTA href="/prepare">
               Start preparing <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </HeroCTA>
-            <HeroCTA href="/coaching" primary={false}>
-              Open coaching
             </HeroCTA>
           </div>
           <footer className="mt-24 flex flex-col items-center justify-between gap-6 border-t border-border pt-8 text-[13px] text-muted-foreground sm:flex-row">
