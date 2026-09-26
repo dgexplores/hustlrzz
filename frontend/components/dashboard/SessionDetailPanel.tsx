@@ -276,14 +276,14 @@ export function SessionDetailPanel() {
         </CardHeader>
         <CardContent>
           {transcript.length ? (
-            <div className="max-h-[28rem] space-y-3 overflow-y-auto pr-1">
+            <div className="max-h-none space-y-3 overflow-visible pr-1 sm:max-h-[28rem] sm:overflow-y-auto">
               {transcript.map((turn, index) => (
                 <div key={`${turn.from}-${index}`} className={`flex flex-col ${turn.from === "candidate" ? "items-end" : "items-start"}`}>
                   <span className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                     {turn.from === "candidate" ? "You" : "Interviewer"}
                   </span>
                   <div
-                    className={`max-w-[90%] rounded-2xl px-3 py-2 text-left text-sm leading-6 ${
+                    className={`max-w-[90%] break-words rounded-2xl px-3 py-2 text-left text-sm leading-6 ${
                       turn.from === "candidate" ? "bg-primary/10" : "bg-secondary/60"
                     }`}
                   >

@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 
 type FeedbackStarsProps = {
-  /** Interview session id, or a client-generated `practice-*` id for practice reports. */
+  /** Server-issued interview or practice session id. */
   sessionId: string;
   /** `on-primary` for headers sitting on the cobalt fill. */
   tone?: "default" | "on-primary";
@@ -69,7 +69,7 @@ export function FeedbackStars({ sessionId, tone = "default" }: FeedbackStarsProp
             aria-label={`Rate ${value} of 5`}
             aria-pressed={value <= active}
             onClick={() => submit(value)}
-            className={`surface-transition rounded-md p-1 disabled:opacity-60 ${
+            className={`surface-transition rounded-md p-3 disabled:opacity-60 ${
               isOnPrimary ? "hover:bg-white/10" : "hover:bg-accent"
             }`}
           >

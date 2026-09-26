@@ -172,7 +172,7 @@ export function PresenceCoach({
   if (!active) return null;
 
   return (
-    <div aria-live="polite" className="pointer-events-none absolute inset-x-0 top-3 z-40 flex flex-col items-center gap-2 px-3">
+    <div aria-live="polite" className="pointer-events-none absolute inset-x-0 bottom-24 z-40 flex flex-col items-center gap-2 px-3">
       {nudges.map((nudge) => {
         const styles = TONE_STYLES[nudge.tone];
         const Icon = nudge.tone === "posture" ? Activity : nudge.tone === "gaze" ? Eye : nudge.tone === "praise" ? Sparkles : Hand;
@@ -191,7 +191,7 @@ export function PresenceCoach({
               type="button"
               onClick={() => dismiss(nudge.id)}
               aria-label="Dismiss coaching nudge"
-              className="rounded-md p-1 text-muted-foreground surface-transition hover:bg-accent hover:text-foreground"
+              className="-m-1 rounded-md p-3.5 text-muted-foreground surface-transition hover:bg-accent hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </button>

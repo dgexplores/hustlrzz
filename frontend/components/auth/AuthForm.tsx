@@ -99,7 +99,7 @@ export function AuthForm() {
                 setMessage(null);
               }}
               aria-pressed={mode === m}
-              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              className={`min-h-11 flex-1 rounded-md px-3 text-sm font-medium transition-colors ${
                 mode === m ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -121,12 +121,12 @@ export function AuthForm() {
           )}
           {mode === "signin" && (
             <div className="text-right">
-              <button type="button" onClick={() => { setMode("forgot"); setError(null); setMessage(null); }} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4">Forgot password?</button>
+              <button type="button" onClick={() => { setMode("forgot"); setError(null); setMessage(null); }} className="inline-flex min-h-11 items-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4">Forgot password?</button>
             </div>
           )}
           {mode === "forgot" && (
             <div className="text-right">
-              <button type="button" onClick={() => { setMode("signin"); setError(null); setMessage(null); }} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4">Back to sign in</button>
+              <button type="button" onClick={() => { setMode("signin"); setError(null); setMessage(null); }} className="inline-flex min-h-11 items-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4">Back to sign in</button>
             </div>
           )}
           {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-sm leading-5 text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</p>}

@@ -170,7 +170,7 @@ export function KnowledgePanel() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary">
                     {hit.source_title} · {hit.source_type}
                   </p>
-                  <p className="mt-1 text-sm leading-6 text-foreground">{hit.content}</p>
+                  <p className="mt-1 break-words text-sm leading-6 text-foreground">{hit.content}</p>
                 </li>
               ))}
             </ul>

@@ -624,6 +624,7 @@ def _sanitize_presence(metrics: dict | None) -> dict[str, float]:
 
 @router.post("/coaching/practice")
 async def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depends(rate_limited("coaching", config.RATE_COACHING_PER_MIN, 60))):
+    _db_or_503()
     allowed_metrics = _sanitize_presence(payload.presence_metrics)
 
     # Memory + RAG grounding for the next drill. Neither depends on the
@@ -659,7 +660,16 @@ async def coaching_practice(payload: CoachingPracticeRequest, user: dict = Depen
         ), timeout=config.AI_REQUEST_TIMEOUT_SECONDS)
         if not result or result.get("error"):
             raise HTTPException(status_code=502, detail="The coach returned incomplete feedback. Please retry.")
-        return {"success": True, "data": result}
+        session_id = f"practice-{secrets.token_urlsafe(24)}"
+        try:
+            await asyncio.to_thread(
+                dbc.insert,
+                "practice_sessions",
+                [{"session_id": session_id, "user_id": user["uid"]}],
+            )
+        except Exception:
+            raise HTTPException(status_code=503, detail="The practice report could not be saved. Please retry shortly.")
+        return {"success": True, "data": {**result, "session_id": session_id}}
     except (asyncio.TimeoutError, TimeoutError):
         raise HTTPException(status_code=503, detail="The practice coach timed out. Please retry shortly.")
     except provider.ProviderError as exc:
@@ -894,19 +904,10 @@ class FeedbackRequest(BaseModel):
 
 
 def _ensure_feedback_session_owned(session_id: str, user_id: str) -> None:
-    """Owner-of-session gate for POST /feedback.
-
-    Interview sessions must exist in interview_sessions and belong to the
-    caller; missing and foreign ids both 404 (no existence oracle).
-    Practice-room reports persist no session row, so their widget rates a
-    client-generated ``practice-*`` id; any other unknown id is a 404.
-    """
-    rows = dbc.select_where("interview_sessions", {"session_id": session_id})
-    if rows:
-        if rows[0].get("user_id") != user_id:
-            raise HTTPException(status_code=404, detail="Session not found.")
-        return
-    if not session_id.startswith("practice-"):
+    """Require a server-issued session owned by the authenticated caller."""
+    table = "practice_sessions" if session_id.startswith("practice-") else "interview_sessions"
+    rows = dbc.select_where(table, {"session_id": session_id})
+    if not rows or rows[0].get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Session not found.")
 
 

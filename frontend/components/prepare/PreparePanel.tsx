@@ -152,7 +152,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
               <span className="text-muted-foreground">→</span>
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-muted-foreground">3</span> Pack
             </div>
-            <Button type="button" variant="ghost" size="sm" onClick={fillSample} className="text-xs h-7">Try sample</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={fillSample} className="text-xs">Try sample</Button>
           </div>
           <div className="rounded-lg bg-secondary/70 p-3 flex gap-3 text-sm text-secondary-foreground">
             <ShieldCheck className="h-5 w-5 text-primary shrink-0" />
@@ -207,11 +207,11 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
               <p className="text-xs text-muted-foreground">Leave blank for a faster 50s pack. Add a name for a 75s pack with company research.</p>
             </div>
             <details className="rounded-lg border bg-secondary/20 p-3">
-              <summary className="cursor-pointer text-sm font-medium">Options</summary>
+              <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">Options</summary>
               <div className="mt-3 space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="nq">Questions</Label>
-                  <select id="nq" value={numQuestions} onChange={(e) => setNumQuestions(Number(e.target.value))} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <select id="nq" value={numQuestions} onChange={(e) => setNumQuestions(Number(e.target.value))} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value={5}>Quick — 5 questions</option>
                     <option value={12}>Standard — 12 questions</option>
                     <option value={20}>Deep — 20 questions</option>
@@ -222,7 +222,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
               </div>
             </details>
             {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading || (!resumeFile && !resumeText.trim())}>
+            <Button type="submit" className="h-auto min-h-11 w-full whitespace-normal px-3 py-2.5 text-center" disabled={loading || (!resumeFile && !resumeText.trim())}>
               {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Generating — {company ? "~75s with research" : "~50s"} </> : "Generate interview pack → Step 2"}
             </Button>
             <p className="text-center text-xs text-muted-foreground">Next: Practice this pack as a live interview.</p>
@@ -231,7 +231,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
       </Card>
 
       <Card className="min-h-[620px] print-report">
-        <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <CardTitle>Generated pack</CardTitle>          <div className="flex gap-2 print-hide">
             {result && (
               <>
@@ -247,7 +247,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
             <div className="rounded-xl bg-primary p-4 text-primary-foreground">
               <p className="text-sm font-semibold">Pack ready — {result.questions.length} questions • {result.company_match.overall_match_percent}% match</p>
               <p className="mt-1 text-xs opacity-80">Your next step is Practice. The interviewer will use these questions.</p>
-              <Link href="/interview" className="mt-3 inline-flex"><Button size="sm" variant="secondary" className="bg-white text-primary hover:bg-white/90">Start Practice Interview <ArrowRight className="h-4 w-4" /></Button></Link>
+              <Link href="/interview" className="surface-transition mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-primary hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97]">Start Practice Interview <ArrowRight className="h-4 w-4" /></Link>
             </div>
           )}
           {!result && (
@@ -306,7 +306,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
               )}
               {(result.company_intelligence.data?.question_patterns?.length ?? 0) > 0 && (
                 <details className="rounded-lg border p-3">
-                  <summary className="cursor-pointer text-sm font-semibold">Known question patterns ({result.company_intelligence.data!.question_patterns!.length})</summary>
+                  <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">Known question patterns ({result.company_intelligence.data!.question_patterns!.length})</summary>
                   <div className="mt-3 space-y-2">
                     {result.company_intelligence.data!.question_patterns!.map((pattern, index) => (
                       <div key={`${pattern.example}-${index}`} className="rounded-md bg-secondary/30 p-3">
@@ -367,7 +367,7 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
                 <div className="space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Likely interview loop</p><div className="space-y-2">{result.company_research.interview_structure.slice(0, 6).map((item, index) => <div key={`${item.stage}-${index}`} className="flex gap-3 rounded-lg bg-secondary/35 p-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{index + 1}</span><div><p className="text-sm font-medium">{item.stage}</p>{item.what_to_expect && <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{item.what_to_expect}</p>}<p className="mt-1 text-[11px] font-semibold text-primary">{item.source_ids.join(" · ")}</p></div></div>)}</div></div>
               )}
               {(result.company_research.question_patterns?.length ?? 0) > 0 && (
-                <details className="rounded-lg border p-3" open><summary className="cursor-pointer text-sm font-semibold">Question patterns ({result.company_research.question_patterns.length})</summary><div className="mt-3 space-y-2">{result.company_research.question_patterns.slice(0, 8).map((item, index) => <div key={`${item.example}-${index}`} className="rounded-md bg-secondary/30 p-3"><div className="flex items-start justify-between gap-2"><p className="text-sm font-medium">{item.example}</p>{item.category && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{item.category}</span>}</div>{item.why_asked && <p className="mt-1 text-xs leading-5 text-muted-foreground">Why they ask: {item.why_asked}</p>}<p className="mt-1 text-[11px] font-semibold text-primary">{item.source_ids.join(" · ")}</p></div>)}</div></details>
+                <details className="rounded-lg border p-3" open><summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">Question patterns ({result.company_research.question_patterns.length})</summary><div className="mt-3 space-y-2">{result.company_research.question_patterns.slice(0, 8).map((item, index) => <div key={`${item.example}-${index}`} className="rounded-md bg-secondary/30 p-3"><div className="flex items-start justify-between gap-2"><p className="text-sm font-medium">{item.example}</p>{item.category && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{item.category}</span>}</div>{item.why_asked && <p className="mt-1 text-xs leading-5 text-muted-foreground">Why they ask: {item.why_asked}</p>}<p className="mt-1 text-[11px] font-semibold text-primary">{item.source_ids.join(" · ")}</p></div>)}</div></details>
               )}
               {(result.company_research.evaluation_criteria?.length ?? 0) > 0 && (
                 <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">How you may be evaluated</p><div className="mt-2 flex flex-wrap gap-2">{result.company_research.evaluation_criteria.slice(0, 6).map((item, index) => <span key={`${item.criterion}-${index}`} title={item.how_to_demonstrate} className="rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground">{item.criterion} <span className="font-semibold text-primary">{item.source_ids.join("/")}</span></span>)}</div></div>
@@ -379,12 +379,12 @@ export function PreparePanel({ onDone }: { onDone?: (r: FlowResult) => void }) {
                 <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">How to prepare</p><ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">{result.company_research.preparation_actions.slice(0, 5).map((item) => <li key={item} className="flex gap-2"><span className="text-primary">•</span><span>{item}</span></li>)}</ul></div>
               )}
               {result.company_research.sources.length > 0 && (
-                <details className="rounded-lg border p-3"><summary className="cursor-pointer text-sm font-semibold">View research sources ({result.company_research.sources.length})</summary><div className="mt-3 space-y-2">{result.company_research.sources.map((source) => <a key={source.id} href={source.url} target="_blank" rel="noreferrer" className="flex items-start justify-between gap-3 rounded-md p-2 text-sm hover:bg-accent"><span><span className="font-semibold text-primary">{source.id}</span> · {source.title}<span className="mt-0.5 block text-xs text-muted-foreground">{source.domain}{source.published_at ? ` · ${source.published_at}` : ""}</span></span><ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" /></a>)}</div></details>
+                <details className="rounded-lg border p-3"><summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">View research sources ({result.company_research.sources.length})</summary><div className="mt-3 space-y-2">{result.company_research.sources.map((source) => <a key={source.id} href={source.url} target="_blank" rel="noreferrer" className="flex items-start justify-between gap-3 rounded-md p-2 text-sm hover:bg-accent"><span><span className="font-semibold text-primary">{source.id}</span> · {source.title}<span className="mt-0.5 block text-xs text-muted-foreground">{source.domain}{source.published_at ? ` · ${source.published_at}` : ""}</span></span><ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" /></a>)}</div></details>
               )}
             </div>
           )}
           {result && (
-            <div className="space-y-2 max-h-[420px] overflow-auto">
+            <div className="max-h-none space-y-2 overflow-visible sm:max-h-[420px] sm:overflow-auto">
               {result.questions.map((q, i) => (
                 <div key={i} className="rounded-lg border p-3">
                   <p className="text-sm font-medium">
@@ -436,25 +436,25 @@ function ExplainButton({ question, answer }: { question: string; answer: string 
   return (
     <div className="mt-2">
       {!open ? (
-        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setOpen(true); load("standard"); }}>
+        <Button type="button" size="sm" variant="ghost" className="text-xs" onClick={() => { setOpen(true); load("standard"); }}>
           <GraduationCap className="h-3.5 w-3.5" /> Why it works
         </Button>
       ) : (
         <div className="rounded-md bg-primary/5 p-3 space-y-2">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-1">
               {(["standard", "eli5"] as const).map((lv) => (
                 <button
                   key={lv}
                   type="button"
                   onClick={() => load(lv)}
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${level === lv ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
+                  className={`min-h-11 rounded-full px-3 text-xs font-semibold ${level === lv ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}
                 >
                   {lv === "eli5" ? "Explain simply" : "Standard"}
                 </button>
               ))}
             </div>
-            <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-muted-foreground hover:text-foreground">Hide</button>
+            <button type="button" onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center text-xs text-muted-foreground hover:text-foreground">Hide</button>
           </div>
           {loading && <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Teaching the technique…</p>}
           {error && <p className="text-xs text-destructive">{error}</p>}

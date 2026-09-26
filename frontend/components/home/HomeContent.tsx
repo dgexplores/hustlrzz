@@ -100,7 +100,7 @@ function NavCTA({ href, children }: { href: string; children: React.ReactNode })
   const { scale, handlers } = usePressAndHover(0.97, 1.03);
   return (
     <motion.span {...handlers} style={{ scale }} className="pressable rounded-full bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground transition-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-      <Link href={href} className="flex min-h-[32px] items-center">{children}</Link>
+      <Link href={href} className="flex min-h-[44px] items-center">{children}</Link>
     </motion.span>
   );
 }
@@ -168,8 +168,7 @@ function AccordionSlice({ mode, index }: { mode: typeof MODES[0]; index: number 
       <div className="absolute inset-x-0 bottom-0 p-6">
         <p className={`display-type text-2xl font-semibold text-foreground`}>{mode.title}</p>
         <motion.p
-          style={{ opacity: isExpanded ? 1 : 0, y: isExpanded ? 0 : 10 }}
-          className="mt-2 max-w-[36ch] text-sm leading-6 text-muted-foreground transition-none"
+          className={`mt-2 max-w-[36ch] text-sm leading-6 text-muted-foreground transition-none ${isExpanded ? "opacity-100" : "opacity-100 md:opacity-0"}`}
         >
           {mode.copy}
         </motion.p>
@@ -255,7 +254,7 @@ export function HomeContent() {
 
   return (
     <main ref={root} id="main-content" className="w-full max-w-full overflow-x-hidden">
-      <div aria-hidden="true" className="grain-fixed" />
+      <div aria-hidden="true" className="grain-fixed hidden md:block" />
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:text-primary-foreground">
         Skip to content
       </a>
@@ -266,7 +265,7 @@ export function HomeContent() {
           aria-label="Primary"
           className="glass-panel flex w-full max-w-3xl items-center justify-between gap-2 rounded-full py-2 pe-2 ps-5"
         >
-          <Link href="/" className="pressable text-sm font-bold tracking-tight text-foreground" aria-label="Hustlrzz home">
+          <Link href="/" className="pressable flex min-h-11 items-center text-sm font-bold tracking-tight text-foreground" aria-label="Hustlrzz home">
             Hustlrzz
           </Link>
           <div className="hidden items-center gap-6 sm:flex">
@@ -322,7 +321,7 @@ export function HomeContent() {
       <div className="bg-background overflow-hidden border-t border-border py-8" aria-hidden="true">
         <div className="marquee-track flex w-max items-center gap-10 pe-10">
           {[...MARQUEE, ...MARQUEE].map((word, i) => (
-            <span key={i} className="display-type text-4xl font-semibold tracking-tight text-muted-foreground/40 md:text-5xl">
+            <span key={i} className="display-type text-4xl font-semibold tracking-tight text-muted-foreground/80 md:text-5xl">
               {word} <span className="ms-10 text-primary">·</span>
             </span>
           ))}

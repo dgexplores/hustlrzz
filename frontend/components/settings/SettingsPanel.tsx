@@ -92,11 +92,11 @@ export function SettingsPanel() {
           ) : (
             <ul className="space-y-3">
               {methods.map((m) => (
-                <li key={m.id} className="flex items-center justify-between gap-3 rounded-xl border bg-secondary/30 px-4 py-3">
-                  <span className="text-sm font-medium">{m.label}</span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{m.detail}</span>
-                    <Badge variant="outline">{m.id}</Badge>
+                <li key={m.id} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border bg-secondary/30 px-4 py-3">
+                  <span className="shrink-0 text-sm font-medium">{m.label}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 truncate text-sm text-muted-foreground">{m.detail}</span>
+                    <Badge variant="outline" className="shrink-0">{m.id}</Badge>
                   </span>
                 </li>
               ))}
@@ -163,8 +163,8 @@ export function SettingsPanel() {
           <CardTitle className="text-lg">Legal</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-4 text-sm">
-          <Link href="/legal/privacy" className="font-semibold text-primary hover:underline">Privacy policy</Link>
-          <Link href="/legal/terms" className="font-semibold text-primary hover:underline">Terms of service</Link>
+          <Link href="/legal/privacy" className="inline-flex min-h-11 items-center font-semibold text-primary hover:underline">Privacy policy</Link>
+          <Link href="/legal/terms" className="inline-flex min-h-11 items-center font-semibold text-primary hover:underline">Terms of service</Link>
         </CardContent>
       </Card>
 

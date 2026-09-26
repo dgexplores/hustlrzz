@@ -127,14 +127,14 @@ export function DashboardContent() {
               {workflows.length === 0 ? "It takes 1 minute — paste resume + JD." : sessions.length === 0 ? `You have ${workflows.length} pack${workflows.length>1?"s": ""} ready.` : `You’ve done ${sessions.length} session${sessions.length>1?"s": ""} — check your trajectory above.`}
             </p>
           </div>
-          <Link href={workflows.length === 0 ? "/prepare" : "/interview"}><Button size="sm">{workflows.length === 0 ? "Go to Prepare" : "Go to Practice"} <ArrowRight className="h-4 w-4" /></Button></Link>
+          <Link href={workflows.length === 0 ? "/prepare" : "/interview"} className="surface-transition inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-[0_8px_22px_hsl(var(--primary)/.18)] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.97]">{workflows.length === 0 ? "Go to Prepare" : "Go to Practice"} <ArrowRight className="h-4 w-4" /></Link>
         </div>
       )}
       {error && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">{error}</p>}
       {feedErrors.length > 0 && (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
           Some sections could not load ({feedErrors.join(", ")}).{" "}
-          <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="font-semibold underline underline-offset-2">Retry</button>
+          <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2">Retry</button>
         </p>
       )}
 
@@ -169,7 +169,7 @@ export function DashboardContent() {
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <Button
                         size="sm"
-                        className="h-10 px-3 text-xs"
+                        className="px-3 text-xs"
                         disabled={reviewing != null}
                         onClick={() => reviewDrill(d.skill, "good")}
                         aria-label={`Mark ${d.skill} complete`}
@@ -180,7 +180,7 @@ export function DashboardContent() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-10 px-3 text-xs"
+                        className="px-3 text-xs"
                         disabled={reviewing != null}
                         onClick={() => reviewDrill(d.skill, "again")}
                         aria-label={`Mark ${d.skill} again`}
@@ -211,15 +211,15 @@ export function DashboardContent() {
           {memory.trends?.length > 0 && (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Score over time</p>
-              <div className="mt-3 flex items-end gap-1.5 h-24">
-                {memory.trends.map((t: any, i: number) => (
-                  <div key={`${t.date}-${t.score}-${i}`} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="w-full rounded-t bg-primary" style={{ height: `${Math.max(8, Math.min(96, Number(t.score) || 0))}%`, opacity: 0.6 + (i / memory.trends.length) * 0.4 }} title={`${t.date ?? "Unknown date"} ${t.score ?? "—"}% ${t.label ?? ""}`} />
-                    <span className="text-[10px] text-muted-foreground">{typeof t.date === "string" ? t.date.slice(5) : "—"}</span>
+              <div className="mt-3 flex h-24 items-end gap-1.5">
+                {memory.trends.slice(-12).map((t: any, i: number) => (
+                  <div key={`${t.date}-${t.score}-${i}`} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                    <div className="w-full rounded-t bg-primary" style={{ height: `${Math.max(8, Math.min(96, Number(t.score) || 0))}%`, opacity: 0.6 + (i / Math.min(memory.trends.length, 12)) * 0.4 }} title={`${t.date ?? "Unknown date"} ${t.score ?? "—"}% ${t.label ?? ""}`} />
+                    <span className="hidden text-[10px] text-muted-foreground sm:inline">{typeof t.date === "string" ? t.date.slice(5) : "—"}</span>
                   </div>
                 ))}
               </div>
-              <div className="mt-2 flex gap-2 text-xs text-muted-foreground">
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                 {memory.trends.slice(-3).map((t: any, i: number) => <span key={`${t.date}-${t.score}-${i}`}>{t.date}: {t.score}% ({t.type})</span>)}
               </div>
             </div>
@@ -260,7 +260,7 @@ export function DashboardContent() {
                     aria-label={`Delete ${w.company ? `${w.company}: ` : ""}${w.title || "prepared pack"}`}
                     disabled={deletingId === w.workflow_id}
                     onClick={() => deleteWorkflow(w)}
-                    className="mt-4 shrink-0 rounded-lg p-3 text-muted-foreground surface-transition hover:bg-accent/45 hover:text-destructive"
+                    className="mt-3 shrink-0 rounded-lg p-3.5 text-muted-foreground surface-transition hover:bg-accent/45 hover:text-destructive"
                   >
                     {deletingId === w.workflow_id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -279,8 +279,8 @@ export function DashboardContent() {
                       </div>
                     )}
                     <details>
-                      <summary className="cursor-pointer text-sm font-semibold">Question pack ({w.questions?.length ?? 0})</summary>
-                      <ol className="mt-3 max-h-64 space-y-2 overflow-auto pr-1">
+                      <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">Question pack ({w.questions?.length ?? 0})</summary>
+                      <ol className="mt-3 max-h-none space-y-2 overflow-visible pr-1 sm:max-h-64 sm:overflow-auto">
                         {(w.questions || []).slice(0, 20).map((q: any, index: number) => (
                           <li key={index} className="rounded-lg border p-2.5 text-sm">
                             <span className="mr-1 font-semibold text-muted-foreground">{index + 1}.</span>{q.question}
@@ -333,7 +333,7 @@ export function DashboardContent() {
                   <Link
                     href={`/dashboard/session/${s.session_id}`}
                     aria-label={`Open full session from ${formatDateTime(s.created_at)}`}
-                    className="mt-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground surface-transition hover:bg-accent/45 hover:text-primary"
+                    className="mt-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground surface-transition hover:bg-accent/45 hover:text-primary"
                   >
                     <ArrowRight className="h-4 w-4" />
                   </Link>
@@ -342,7 +342,7 @@ export function DashboardContent() {
                     aria-label={`Delete session from ${formatDateTime(s.created_at)}`}
                     disabled={deletingId === s.session_id}
                     onClick={() => deleteSession(s)}
-                    className="mt-4 shrink-0 rounded-lg p-3 text-muted-foreground surface-transition hover:bg-accent/45 hover:text-destructive"
+                    className="mt-3 shrink-0 rounded-lg p-3.5 text-muted-foreground surface-transition hover:bg-accent/45 hover:text-destructive"
                   >
                     {deletingId === s.session_id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

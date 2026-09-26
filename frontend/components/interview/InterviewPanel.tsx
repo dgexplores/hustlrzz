@@ -71,7 +71,7 @@ export function InterviewPanel() {
   const reportRef = useRef<any>(null);
   // A dropped reply must never lock the composer: awaitingReply auto-expires.
   const replyTimeoutRef = useRef<number | null>(null);
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const metrics = useMetrics((state) => state.metrics);
   const resetMetrics = useMetrics((state) => state.reset);
 
@@ -137,7 +137,8 @@ export function InterviewPanel() {
   }, []);
 
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const transcript = transcriptScrollRef.current;
+    if (transcript) transcript.scrollTop = transcript.scrollHeight;
   }, [turns, awaitingReply]);
 
   useEffect(() => {
@@ -324,7 +325,7 @@ export function InterviewPanel() {
 
               {selectedWorkflow && <div className="grid gap-3 rounded-xl border bg-secondary/20 p-4 sm:grid-cols-3"><BriefStat label="Company" value={selectedWorkflow.company || "Target role"} /><BriefStat label="Questions" value={String(selectedWorkflow.questions?.length ?? 0)} /><BriefStat label="Role match" value={selectedWorkflow.match?.overall_match_percent != null ? `${selectedWorkflow.match.overall_match_percent}%` : "Prepared"} /></div>}
 
-              <div className="space-y-2"><Label>Session length</Label><div role="radiogroup" aria-label="Session length" className="grid grid-cols-4 gap-2">{[10, 15, 30, 45].map((minutes) => <button key={minutes} type="button" role="radio" aria-checked={duration === minutes} onClick={() => setDuration(minutes)} className={`min-h-11 rounded-lg border px-2 text-sm font-semibold surface-transition ${duration === minutes ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`}>{minutes} min</button>)}</div></div>
+              <div className="space-y-2"><Label>Session length</Label><div role="radiogroup" aria-label="Session length" className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[10, 15, 30, 45].map((minutes) => <button key={minutes} type="button" role="radio" aria-checked={duration === minutes} onClick={() => setDuration(minutes)} className={`min-h-11 rounded-lg border px-2 text-sm font-semibold surface-transition ${duration === minutes ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`}>{minutes} min</button>)}</div></div>
 
               <div className="space-y-2">
                 <Label>Interviewer persona</Label>
@@ -334,7 +335,7 @@ export function InterviewPanel() {
                     { id: "alex", name: "Alex", desc: "Amazon LP" },
                     { id: "priya", name: "Priya", desc: "Meta collab" },
                   ].map((p) => (
-                    <button key={p.id} type="button" role="radio" aria-checked={persona === p.id} onClick={() => setPersona(p.id)} className={`rounded-xl border p-3 text-left surface-transition ${persona === p.id ? "border-primary bg-primary/10" : "bg-background hover:bg-accent"}`}>
+                    <button key={p.id} type="button" role="radio" aria-checked={persona === p.id} onClick={() => setPersona(p.id)} className={`min-h-20 rounded-xl border p-3 text-left surface-transition ${persona === p.id ? "border-primary bg-primary/10" : "bg-background hover:bg-accent"}`}>
                       <span className="block text-sm font-semibold">{p.name}</span>
                       <span className="block text-xs text-muted-foreground">{p.desc}</span>
                     </button>
@@ -347,7 +348,7 @@ export function InterviewPanel() {
                 <Label>Intensity</Label>
                 <div role="radiogroup" aria-label="Interview intensity" className="grid grid-cols-3 gap-2">
                   {INTENSITY_OPTIONS.map((option) => (
-                    <button key={option.id} type="button" role="radio" aria-checked={intensity === option.id} onClick={() => setIntensity(option.id)} className={`rounded-xl border p-3 text-left surface-transition ${intensity === option.id ? "border-primary bg-primary/10" : "bg-background hover:bg-accent"}`}>
+                    <button key={option.id} type="button" role="radio" aria-checked={intensity === option.id} onClick={() => setIntensity(option.id)} className={`min-h-20 rounded-xl border p-3 text-left surface-transition ${intensity === option.id ? "border-primary bg-primary/10" : "bg-background hover:bg-accent"}`}>
                       <span className="block text-sm font-semibold">{option.name}</span>
                       <span className="block text-xs text-muted-foreground">{option.desc}</span>
                     </button>
@@ -386,14 +387,14 @@ export function InterviewPanel() {
             <WifiOff className="mx-auto h-8 w-8 text-destructive" />
             <h2 className="text-xl font-semibold">The live connection dropped.</h2>
             <p className="text-sm leading-6 text-muted-foreground">Your transcript below is safe in this tab, but this session ended server-side. Start a fresh session to continue practicing - your prepared pack stays selected.</p>
-            <div className="flex justify-center gap-2 pt-2">
+            <div className="flex flex-wrap justify-center gap-2 pt-2">
               <Button onClick={begin}><RefreshCw className="h-4 w-4" />Start new session</Button>
               <Button variant="outline" onClick={() => { setPhase("setup"); }}>Back to setup</Button>
             </div>
             {turns.length > 0 && (
               <details className="mt-4 rounded-xl border p-4 text-left">
-                <summary className="cursor-pointer text-sm font-semibold">Recovered transcript ({turns.length} turns)</summary>
-                <div className="mt-3 max-h-64 space-y-2 overflow-auto text-sm">
+                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">Recovered transcript ({turns.length} turns)</summary>
+                <div className="mt-3 max-h-none space-y-2 overflow-visible text-sm sm:max-h-64 sm:overflow-auto">
                   {turns.map((turn, index) => <p key={index}><span className="font-semibold">{turn.role === "candidate" ? "You" : "Interviewer"}:</span> {turn.text}</p>)}
                 </div>
               </details>
@@ -404,18 +405,18 @@ export function InterviewPanel() {
         /* ------------------------------ STUDIO ------------------------------ */
         <div className="studio-bg relative overflow-hidden rounded-3xl border shadow-2xl">
           {/* Top bar */}
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 md:px-6">
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 font-mono text-sm text-white backdrop-blur">
+          <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2 md:px-6 md:py-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-white/10 px-3 font-mono text-sm text-white backdrop-blur">
                 <span className={`rec-dot h-2 w-2 rounded-full ${phase === "ending" ? "bg-amber-400" : "bg-red-500"}`} />
                 {elapsed}
               </span>
-              <span className="hidden text-sm font-medium text-white/85 sm:block">{selectedWorkflow?.company || "Role-specific"} · live interview</span>
-              <span aria-label={`Intensity: ${intensity}`} className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium capitalize text-white/70">{intensity}</span>
+              <span className="hidden truncate text-sm font-medium text-white/85 sm:block">{selectedWorkflow?.company || "Role-specific"} · live interview</span>
+              <span aria-label={`Intensity: ${intensity}`} className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium capitalize text-white/70">{intensity}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setShowTranscript((value) => !value)} aria-label="Toggle live transcript" aria-expanded={showTranscript} className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/75 surface-transition hover:bg-white/20 hover:text-white">
-                <MessageSquareText className="h-3.5 w-3.5" /> Transcript
+            <div className="flex shrink-0 items-center gap-2">
+              <button type="button" onClick={() => setShowTranscript((value) => !value)} aria-label="Toggle live transcript" aria-expanded={showTranscript} className="flex min-h-11 items-center gap-1.5 rounded-full bg-white/10 px-2.5 text-xs font-medium text-white/75 surface-transition hover:bg-white/20 hover:text-white sm:px-3">
+                <MessageSquareText className="h-4 w-4" /> <span className="hidden sm:inline">Transcript</span>
               </button>
               <span className="hidden rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300 sm:inline">Connected</span>
               <span className="hidden rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white/70 md:block">{metrics.postureScore} presence</span>
@@ -425,14 +426,14 @@ export function InterviewPanel() {
           <PresenceCoach active={connected} cameraActive={connected} sessionKey={workflowId} />
 
           {showTranscript && (
-            <div className="absolute inset-y-0 right-0 z-40 flex w-full max-w-sm flex-col border-l border-white/10 bg-black/70 backdrop-blur-xl">
+            <div className="absolute bottom-24 right-0 top-0 z-30 flex w-full max-w-sm flex-col border-l border-white/10 bg-black/70 backdrop-blur-xl">
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                 <span className="text-sm font-semibold text-white/90">Live transcript</span>
-                <button type="button" onClick={() => setShowTranscript(false)} aria-label="Close transcript" className="rounded-md p-1.5 text-white/60 surface-transition hover:bg-white/10 hover:text-white">
+                <button type="button" onClick={() => setShowTranscript(false)} aria-label="Close transcript" className="rounded-md p-3.5 text-white/60 surface-transition hover:bg-white/10 hover:text-white">
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div aria-live="polite" className="flex-1 space-y-3 overflow-y-auto p-4">
+              <div ref={transcriptScrollRef} aria-live="polite" className="flex-1 space-y-3 overflow-y-auto p-4">
                 {turns.length === 0 && <p className="text-sm text-white/50">The conversation will appear here as you go.</p>}
                 {turns.map((turn, index) => (
                   <div key={`${turn.role}-${index}`} className={`flex flex-col ${turn.role === "candidate" ? "items-end" : "items-start"}`}>
@@ -446,7 +447,7 @@ export function InterviewPanel() {
           )}
 
           {/* Stage */}
-          <div className="relative grid min-h-[520px] place-items-center px-4 pb-40 pt-14 md:pb-44">
+          <div className="relative grid min-h-[420px] place-items-center px-4 pb-40 pt-14 landscape:max-[900px]:min-h-[300px] sm:min-h-[520px] md:pb-44">
             {sessionError && (
               <div role="alert" className="absolute left-1/2 top-3 z-40 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 items-start gap-2 rounded-xl border border-amber-400/40 bg-black/70 p-3 text-xs text-amber-200 backdrop-blur-md"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{sessionError}</span></div>
             )}
@@ -459,7 +460,7 @@ export function InterviewPanel() {
           </div>
 
           {/* Control dock */}
-          <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/10 bg-black/35 px-4 py-3 backdrop-blur-xl">
+          <div className="absolute inset-x-0 bottom-0 z-40 border-t border-white/10 bg-black/35 px-3 py-3 backdrop-blur-xl sm:px-4">
             <div className="mx-auto flex max-w-4xl items-center gap-2 md:gap-3">
               {audioMode && audioSupported ? (
                 <>
@@ -479,7 +480,7 @@ export function InterviewPanel() {
                     disabled={!connected || awaitingReply}
                     placeholder={awaitingReply ? "Interviewer is responding…" : listening ? "Listening… speak or type" : "Answer with a concrete example…"}
                     aria-label="Interview answer"
-                    className="h-12 flex-1 border-white/15 bg-white/10 text-white placeholder:text-white/50 focus-visible:ring-white/40"
+                    className="h-12 min-w-0 flex-1 border-white/15 bg-white/10 text-white placeholder:text-white/50 focus-visible:ring-white/40"
                   />
                 </>
               ) : (
@@ -491,7 +492,7 @@ export function InterviewPanel() {
                   disabled={!connected || awaitingReply}
                   placeholder={awaitingReply ? "Waiting for interviewer…" : "Answer with a concrete example…"}
                   aria-label="Interview answer"
-                  className="h-12 flex-1 border-white/15 bg-white/10 text-white placeholder:text-white/50 focus-visible:ring-white/40"
+                  className="h-12 min-w-0 flex-1 border-white/15 bg-white/10 text-white placeholder:text-white/50 focus-visible:ring-white/40"
                 />
               )}
               <Button type="button" size="icon" onClick={() => send()} disabled={!connected || awaitingReply || !input.trim()} aria-label="Send answer" className="h-12 w-12 shrink-0 rounded-full"><Send className="h-5 w-5" /></Button>
@@ -529,7 +530,7 @@ function InterviewerStage({ speaking, awaitingReply, lastLine }: { speaking: boo
           <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow">speaking</span>
         )}
       </div>
-      <div className="min-h-[96px] w-full rounded-2xl border border-white/10 bg-white/5 p-5 text-base leading-7 text-white/90 backdrop-blur-md md:text-lg">
+      <div className="min-h-[96px] w-full break-words rounded-2xl border border-white/10 bg-white/5 p-5 text-base leading-7 text-white/90 backdrop-blur-md md:text-lg">
         {lastLine || "Your interviewer will open the session in a moment."}
       </div>
       <div className="mt-4 flex flex-wrap justify-center gap-2 text-[11px] text-white/50">

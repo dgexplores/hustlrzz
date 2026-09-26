@@ -325,7 +325,7 @@ export function AssessmentPanel() {
 
           {reviews.length > 0 && (
             <details className="rounded-xl border bg-card p-4">
-              <summary className="cursor-pointer text-sm font-semibold">Answer review with explanations</summary>
+              <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">Answer review with explanations</summary>
               <div className="mt-4 space-y-3">
                 {reviews.map((item) => (
                   <div key={item.qid} className="rounded-lg border p-3">
