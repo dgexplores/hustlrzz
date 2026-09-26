@@ -42,6 +42,7 @@ Directory: `project-docs/evidence/shots/` (production `next start` on `localhost
 |---|---|---|
 | `shots/hero-1440-light.png` | 1440×900 light | h1 at 72px dominating three 48px section headings; nav reads Prepare / Rehearse / Coach; three-step value chain panel at right; privacy line under the CTAs |
 | `shots/hero-390-dark.png` | 390×844 dark | Single-column stack, both CTAs on one row, panel fully visible below the fold line |
+| `shots/hero-1440-light-production.png` | 1440×900 light, **deployed** | `hustlrzz.vercel.app` after `20ef97b`; pixel-equivalent to the local build, confirming the deploy |
 
 Measured on the production build:
 
