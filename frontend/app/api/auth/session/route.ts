@@ -42,6 +42,11 @@ function readRefreshToken(req: Request): string | null {
 /**
  * GET: exchange the httpOnly refresh cookie for a fresh session (memory-bound
  * on the client). Rotates the cookie on success; clears it on failure.
+ *
+ * "Not signed in" is a successful answer, not an error: a visitor with no
+ * cookie, or a stale one, gets 200 with a null session. Returning 401 here
+ * logged a console error on every signed-out pageview and cost the landing page
+ * a Best Practices point. A genuine server misconfiguration still returns 503.
  */
 export async function GET(req: Request) {
   const supabase = supabaseServer();
@@ -50,12 +55,12 @@ export async function GET(req: Request) {
   }
   const refreshToken = readRefreshToken(req);
   if (!refreshToken) {
-    return NextResponse.json({ session: null }, { status: 401 });
+    return NextResponse.json({ session: null });
   }
 
   const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
   if (error || !data.session) {
-    return sessionCookie(NextResponse.json({ session: null }, { status: 401 }), null);
+    return sessionCookie(NextResponse.json({ session: null }), null);
   }
   const res = NextResponse.json({ session: data.session });
   return sessionCookie(res, data.session.refresh_token);
