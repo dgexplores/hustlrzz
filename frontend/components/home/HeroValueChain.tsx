@@ -12,11 +12,9 @@ const BAR_MAX = 30;
 function StepFrame({ index, label, detail, children }: { index: number; label: string; detail: string; children: React.ReactNode }) {
   return (
     <>
-      <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
-        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/12 text-[11px] text-primary">
-          {index}
-        </span>
-        <span className="text-foreground">{label}</span>
+      <div className="flex items-baseline gap-3">
+        <span className="display-serif text-2xl leading-none text-primary tabular-nums">{index}</span>
+        <span className="text-[13px] font-semibold text-foreground">{label}</span>
       </div>
       <p className="text-[12px] leading-5 text-muted-foreground">{detail}</p>
       {children}

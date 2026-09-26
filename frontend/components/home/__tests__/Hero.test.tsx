@@ -39,6 +39,27 @@ describe("Hero", () => {
     expect(heading.className).toContain("hero-display");
   });
 
+  it("sets the headline in the display serif rather than the UI sans", () => {
+    const { heading } = renderHero();
+
+    expect(heading.className).toContain("display-serif");
+  });
+
+  it("sets one headline word in italic display type for editorial contrast", () => {
+    const { heading } = renderHero();
+
+    const emphasis = heading.querySelector("em");
+
+    expect(emphasis).not.toBeNull();
+    expect(emphasis?.textContent).toMatch(/unforgettable/i);
+  });
+
+  it("labels the hero as an opening slide with an index marker", () => {
+    const { hero } = renderHero();
+
+    expect(within(hero).getByText("01")).toBeInTheDocument();
+  });
+
   it("labels the three value steps in order", () => {
     const { hero } = renderHero();
 

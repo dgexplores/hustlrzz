@@ -67,7 +67,7 @@ function HeroAction({ href, primary = true, children }: { href: string; primary?
 function MaskLine({ children }: { children: React.ReactNode }) {
   const reduce = useReducedMotion() ?? false;
   return (
-    <span className="block overflow-hidden pb-[0.14em] -mb-[0.14em]">
+    <span className="block overflow-hidden pb-[0.18em] -mb-[0.18em]">
       {reduce ? (
         children
       ) : (
@@ -89,41 +89,27 @@ function Reveal({ variants, className, children }: { variants?: typeof riseIn; c
   );
 }
 
-function Pill() {
-  return (
-    <span
-      aria-hidden="true"
-      className="mx-1 inline-block h-[0.72em] w-16 rounded-full bg-cover bg-center align-middle opacity-80 grayscale -translate-y-[0.04em] sm:w-20"
-      style={{ backgroundImage: "url(/images/pill-accent.svg)" }}
-    />
-  );
-}
-
 export function Hero() {
   const reduce = useReducedMotion() ?? false;
 
   const inner = (
     <>
-      <Reveal variants={riseIn}>
-        <p className="eyebrow text-muted-foreground">Interview prep</p>
-      </Reveal>
-
-      <h1 className="hero-display text-balance font-semibold text-foreground">
+      <h1 className="hero-display display-serif text-balance text-foreground">
         <MaskLine>Walk in rehearsed.</MaskLine>
         <MaskLine>
-          <Pill /> Leave unforgettable.
+          Leave <em>unforgettable.</em>
         </MaskLine>
       </h1>
 
       <Reveal variants={riseIn}>
-        <p className="mt-5 max-w-[58ch] text-pretty text-base leading-7 text-muted-foreground md:mt-7 md:text-lg md:leading-8">
+        <p className="mt-6 max-w-[54ch] text-pretty text-base leading-7 text-muted-foreground md:mt-8 md:text-lg md:leading-8">
           Paste your resume, get a focused question pack, and practise like it is real. Three steps, about five
           minutes.
         </p>
       </Reveal>
 
       <Reveal variants={riseIn}>
-        <div className="mt-7 flex flex-wrap items-center gap-2.5 md:mt-10 md:gap-3">
+        <div className="mt-7 flex flex-wrap items-center gap-2.5 md:mt-9 md:gap-3">
           <HeroAction href="/prepare" primary>
             Start preparing
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -136,7 +122,7 @@ export function Hero() {
       </Reveal>
 
       <Reveal variants={riseIn}>
-        <p className="mt-5 flex items-center gap-2 text-[13px] text-muted-foreground md:mt-6">
+        <p className="mt-6 flex items-center gap-2 text-[13px] text-muted-foreground">
           <Fingerprint className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span>Your camera never leaves the browser.</span>
         </p>
@@ -148,17 +134,26 @@ export function Hero() {
     <section className="hero-bg relative overflow-hidden">
       <div aria-hidden="true" className="absolute inset-0 hero-overlay" />
 
-      <div className="relative mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-10 px-4 pb-16 pt-24 sm:px-6 md:pb-20 md:pt-28 lg:min-h-[100dvh] lg:grid-cols-12 lg:gap-12 lg:pt-24">
-        {reduce ? (
-          <div className="text-start lg:col-span-7">{inner}</div>
-        ) : (
-          <motion.div variants={heroContainer} initial="hidden" animate="show" className="text-start lg:col-span-7">
-            {inner}
-          </motion.div>
-        )}
+      <div className="relative mx-auto w-full max-w-7xl px-4 pb-16 pt-24 sm:px-6 md:pb-20 md:pt-28 lg:min-h-[100dvh] lg:px-8 lg:pt-28">
+        <Reveal variants={riseIn}>
+          <div className="flex items-baseline gap-3 border-b border-border pb-3">
+            <span className="eyebrow text-primary">01</span>
+            <span className="eyebrow text-muted-foreground">Interview prep</span>
+          </div>
+        </Reveal>
 
-        <div className="lg:col-span-4 lg:col-start-9">
-          <HeroValueChain />
+        <div className="grid grid-cols-1 gap-10 pt-8 lg:grid-cols-12 lg:gap-12 lg:pt-12">
+          {reduce ? (
+            <div className="lg:col-span-7">{inner}</div>
+          ) : (
+            <motion.div variants={heroContainer} initial="hidden" animate="show" className="lg:col-span-7">
+              {inner}
+            </motion.div>
+          )}
+
+          <div className="lg:col-span-4 lg:col-start-9">
+            <HeroValueChain />
+          </div>
         </div>
       </div>
     </section>

@@ -80,38 +80,34 @@
   .spring-opacity { will-change: opacity; }
   .spring-flex { will-change: flex-grow; }
 
-  /* Display type: Geist with platform-native fallback stack.
-     Character without novelty risk; tight tracking grows with size. */
-  .display-type {
-    font-family: var(--font-geist-sans), "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    font-optical-sizing: auto;
-    font-feature-settings: "ss01", "cv11";
-  }
-
   /* Pressable: instant pointer-down response, spring return */
   .pressable { touch-action: manipulation; }
+
+  /* Display face. A high-contrast editorial serif carries the voice; the UI sans
+     (Geist) stays on body copy and controls. Instrument Serif ships 400 only, so
+     display type must never request a bold weight or the browser fakes it. */
+  .display-serif {
+    font-family: var(--font-display), "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-weight: 400;
+    font-style: normal;
+    font-optical-sizing: auto;
+  }
 
   /* Type scale. The h1 owns the largest size on the page; every section
      heading sits below it so the entry point stays unambiguous. */
   .hero-display {
-    font-family: var(--font-geist-sans), "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    font-optical-sizing: auto;
-    font-feature-settings: "ss01", "cv11";
-    font-size: 2.25rem;
-    line-height: 0.95;
-    letter-spacing: -0.03em;
+    font-size: 2.375rem;
+    line-height: 1;
+    letter-spacing: -0.018em;
   }
-  @media (min-width: 640px) { .hero-display { font-size: 3rem; } }
-  @media (min-width: 768px) { .hero-display { font-size: 3.75rem; } }
-  @media (min-width: 1024px) { .hero-display { font-size: 4.5rem; } }
+  @media (min-width: 640px) { .hero-display { font-size: 3.25rem; } }
+  @media (min-width: 768px) { .hero-display { font-size: 4rem; } }
+  @media (min-width: 1024px) { .hero-display { font-size: 4.75rem; } }
 
   .section-display {
-    font-family: var(--font-geist-sans), "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    font-optical-sizing: auto;
-    font-feature-settings: "ss01", "cv11";
-    font-size: 1.875rem;
-    line-height: 1.02;
-    letter-spacing: -0.025em;
+    font-size: 2rem;
+    line-height: 1.08;
+    letter-spacing: -0.015em;
   }
   @media (min-width: 768px) { .section-display { font-size: 3rem; } }
 
