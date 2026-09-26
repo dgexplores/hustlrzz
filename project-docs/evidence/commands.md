@@ -41,13 +41,14 @@ npm test   # → vitest run
  ✓ lib/__tests__/settings.test.ts (7 tests) 3ms
  ✓ components/home/__tests__/Hero.reduced-motion.test.tsx (2 tests) 70ms
  ✓ components/home/__tests__/Hero.test.tsx (9 tests) 126ms
+ ✓ lib/__tests__/serviceWorker.test.ts (8 tests) 843ms
 
- Test Files  12 passed (12)
-      Tests  84 passed (84)
-   Duration  2.68s
+ Test Files  13 passed (13)
+      Tests  92 passed (92)
+   Duration  2.51s
 ```
 
-Exit code: **0**. Final count: **84 passed / 12 files**.
+Exit code: **0**. Final count: **92 passed / 13 files**.
 
 ## tsc
 
@@ -98,7 +99,7 @@ Exit code: **0**.
 | `test_delete_rate_limited_returns_429_with_retry_after` | `backend/tests/test_deletes.py:164-172` | real test: 20×404 then 429 + `Retry-After` header |
 | 429 includes `Retry-After` | `backend/app.py:116-121` | header set on `HTTPException` |
 
-Full suites green: pytest **190**, vitest **84**, tsc **0**, lint **0**, build **0**.
+Full suites green: pytest **190**, vitest **92**, tsc **0**, lint **0**, build **0**.
 
 ## 2026-09-25 closeout gates
 
@@ -158,7 +159,7 @@ and a null session, so `AuthGate` takes the identical path either way.
 
 | Gate | Result |
 |---|---|
-| `npm test` | **84 passed / 12 files** (5 new: session route, incl. the 503 guard) |
+| `npm test` | **92 passed / 13 files** (5 session-route + 8 service-worker tests) |
 | `npm run lint`, `npx tsc --noEmit`, `npm run build` | clean, 17 routes |
 | Lighthouse — Accessibility | **100** |
 | Lighthouse — Best Practices | **100** (was 96) |
@@ -173,6 +174,36 @@ and a null session, so `AuthGate` takes the identical path either way.
 | `/robots.txt`, `/llms.txt` | `200 text/plain` |
 
 Lighthouse was run with `lighthouse@12` against the local production build.
+
+### Service worker was breaking crawler access
+
+With `robots.txt` added, Lighthouse on the deployed domain still failed `robots-txt` with
+"Lighthouse was unable to download a robots.txt file", even though `curl` returned the file
+correctly with `200 text/plain`. Cause: `sw.js` routed every same-origin GET that was not a
+navigation through `cacheFirst`, so `robots.txt` was claimed by the worker. `cacheFirst` had no
+error handling, so any network failure rejected the promise and the request failed outright — the
+worker could answer a crawler file with a synthetic offline 503.
+
+The worker now claims only what it actually serves — document navigations, RSC requests, and static
+assets — and passes everything else straight to the network. `robots.txt`, `llms.txt`,
+`sitemap.xml` and `manifest.webmanifest` are explicitly network-only, `cacheFirst` gained the error
+handling `networkFirst` already had, and the cache is bumped to `hustlrzz-v3` so entries cached by
+the old handler are dropped on activation.
+
+Verified in a browser with a **controlling** worker, which is the condition that reproduced the
+failure:
+
+| Check | Result |
+|---|---|
+| `navigator.serviceWorker.controller` | `true` |
+| Active cache | `hustlrzz-v3` only |
+| `/robots.txt` fetched through the worker | `200 text/plain`, real content |
+| `/llms.txt` fetched through the worker | `200 text/plain`, real content |
+| Console errors on `/` | 0 |
+
+Offline navigation degradation was not re-verified: the probe used `fetch(..., { mode: "navigate" })`
+from a page context, which the browser rejects regardless of the worker. The 503 offline fallback is
+untested.
 
 ### Previously recorded defect, now fixed
 
