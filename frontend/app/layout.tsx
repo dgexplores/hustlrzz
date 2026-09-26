@@ -1,7 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
+import { Instrument_Serif } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
+
+const display = Instrument_Serif({
+  weight: "400",
+  style: ["normal", "italic"],
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const viewport: Viewport = {
   themeColor: [
@@ -41,7 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   `;
   const swScript = `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}`;
   return (
-    <html lang="en" suppressHydrationWarning className={GeistSans.variable}>
+    <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${display.variable}`}>
       <head>
         <meta name="color-scheme" content="light dark" />
         <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />

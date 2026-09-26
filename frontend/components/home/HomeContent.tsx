@@ -161,7 +161,7 @@ function AccordionSlice({ mode, index }: { mode: typeof MODES[0]; index: number 
         className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/50 to-transparent"
       />
       <div className="absolute inset-x-0 bottom-0 p-6">
-        <p className={`display-type text-2xl font-semibold text-foreground`}>{mode.title}</p>
+        <p className="display-serif text-2xl text-foreground">{mode.title}</p>
         <motion.p
           className={`mt-2 max-w-[36ch] text-sm leading-6 text-muted-foreground transition-none ${isExpanded ? "opacity-100" : "opacity-100 md:opacity-0"}`}
         >
@@ -282,7 +282,7 @@ export function HomeContent() {
       <div className="bg-background overflow-hidden border-t border-border py-8" aria-hidden="true">
         <div className="marquee-track flex w-max items-center gap-10 pe-10">
           {[...MARQUEE, ...MARQUEE].map((word, i) => (
-            <span key={i} className="display-type text-2xl font-semibold tracking-tight text-muted-foreground/80 md:text-3xl">
+            <span key={i} className="display-serif text-2xl text-muted-foreground/90 md:text-3xl">
               {word} <span className="ms-10 text-primary">·</span>
             </span>
           ))}
@@ -292,14 +292,8 @@ export function HomeContent() {
       {/* Bento grid */}
       <section className="bg-background px-5 py-24 md:px-10 md:py-40">
         <div className="mx-auto max-w-7xl">
-          <h2 className="section-display text-balance max-w-3xl font-semibold text-foreground">
-            One room for{" "}
-            <span
-              aria-hidden="true"
-              className="mx-1 inline-block h-[0.72em] w-20 rounded-full bg-cover bg-center align-middle opacity-80 grayscale"
-              style={{ backgroundImage: "url(/images/pill-accent.svg)" }}
-            />{" "}
-            every round.
+          <h2 className="section-display display-serif text-balance max-w-3xl text-foreground">
+            One room for <em>every round.</em>
           </h2>
           <p className="mt-5 max-w-[65ch] text-base leading-7 text-muted-foreground">
             Each surface serves the same goal: a more specific, confident answer next time.
@@ -357,7 +351,7 @@ export function HomeContent() {
       {/* Horizontal accordions */}
       <section className="border-t border-border bg-muted/50 px-5 py-24 md:px-10 md:py-40">
         <div className="mx-auto max-w-7xl">
-          <h2 className="section-display text-balance max-w-2xl font-semibold text-foreground">
+          <h2 className="section-display display-serif text-balance max-w-2xl text-foreground">
             The full room.
           </h2>
           <div className="cascade acc-group mt-12 flex flex-col gap-3 md:h-[420px] md:flex-row">
@@ -371,7 +365,7 @@ export function HomeContent() {
       {/* Scrubbed thesis, then the supporting claim at normal reading speed */}
       <section className="scrub-block border-t border-border bg-background px-5 py-24 md:px-10 md:py-40">
         <div className="mx-auto max-w-4xl text-start md:text-center">
-          <p className="display-type text-2xl font-medium leading-snug tracking-tight text-foreground md:text-4xl md:leading-snug">
+          <p className="display-serif text-[1.75rem] leading-snug text-foreground md:text-5xl md:leading-snug">
             {SCRUB_LINE.split(" ").map((word, i) => (
               <span key={i} className="scrub-word">
                 {word}{" "}
@@ -387,7 +381,7 @@ export function HomeContent() {
       {/* Closing CTA + footer */}
       <section className="relative overflow-hidden border-t border-border bg-primary/5 px-5 py-24 md:py-40">
         <div className="relative mx-auto max-w-7xl">
-          <h2 className="section-display text-balance w-full font-semibold text-foreground md:max-w-4xl">
+          <h2 className="section-display display-serif text-balance w-full text-foreground md:max-w-4xl">
             Your next interview starts tonight.
           </h2>
           <div className="mt-10 flex flex-wrap items-center gap-3">
