@@ -140,6 +140,20 @@ HTML page**. Lighthouse on the deployed domain therefore failed `robots-txt` and
 scoring **SEO 91 and Agentic Browsing 67** in production while the same audit on localhost scored
 100 — the earlier "SEO 100 / Agentic 100" evidence was measured on localhost, where those two
 audits do not apply. Fixed by adding `frontend/public/robots.txt` and `frontend/public/llms.txt`.
-Re-verifying on production requires a deploy.
+
+### Production re-verification after deploy `20ef97b`
+
+| Check | Result |
+|---|---|
+| `https://hustlrzz.vercel.app/robots.txt` | `200 text/plain` |
+| `https://hustlrzz.vercel.app/llms.txt` | `200 text/plain` |
+| Lighthouse production, desktop light | Accessibility 100, Best Practices 96, **SEO 100** (was 91), **Agentic Browsing 100** (was 67) |
+| Deployed heading hierarchy | h1 72px, all h2 48px |
+| Deployed nav | Hustlrzz, Prepare, Rehearse, Coach, Start preparing |
+| Deployed value chain | 3 labelled steps; score bars 30/20/26/16/23px |
+| Deployed horizontal overflow | none at 1440 |
+
+The SEO and Agentic Browsing recovery is the point of this deploy. Best Practices remains 96 for
+the pre-existing `401` reason traced above.
 
 Authenticated production smoke evidence remains pending deployment of the current branch.
