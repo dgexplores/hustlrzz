@@ -1,6 +1,6 @@
 # EvidenceQA — Security non-regression
 
-Run: 2026-09-23. Checks against architecture §4 security checklist.
+Run: 2026-09-25. Checks against architecture §4 security checklist.
 
 ## persistSession: false — CONFIRMED
 
@@ -39,6 +39,20 @@ No blanket `https:` / `unsafe-eval`. No wildcard CORS origins added.
 
 No `access_token` / `refresh_token` / `sb-*-auth-token` writes. `client.ts:12-21` actively **purges** legacy `sb-*-auth-token` keys on boot.
 
+## Feedback ownership — CONFIRMED
+
+- `POST /coaching/practice` issues a cryptographically random `practice-*` session id and writes the authenticated `user_id` to `practice_sessions` (`backend/app.py:663-670`).
+- `POST /feedback` resolves only server-issued interview or practice sessions and requires `row.user_id == caller.uid`; missing and foreign ids return 404 (`backend/app.py:906-911`).
+- Abuse tests cover unissued practice ids, foreign practice ids, and server issuance (`backend/tests/test_feedback.py:133-165`).
+- RLS-only migration `20260925123000_practice_feedback_sessions.sql` was applied to the linked remote database and verified in `supabase migration list`.
+- Fresh installs receive the same ownership table plus Phase 2 feedback, analytics, drill, and intensity schema through `supabase/schema.sql:33-95`.
+
+## Service-worker freshness — CONFIRMED
+
+- Cache version bumped to `hustlrzz-v2`, forcing existing clients to discard the prior cache.
+- Navigations and Next RSC data use network-first with cached offline fallback; hashed/static assets remain cache-first (`frontend/public/sw.js:1-43`).
+- This prevents duplicate pre-fix headers and stale client navigation data from surviving a deployment.
+
 ## rate_limited endpoints — CONFIRMED
 
 `rate_limited(scope, limit, window)` (`backend/app.py:105-124`) binds to `user["uid"]`, raises **429** with `Retry-After` header.
@@ -58,7 +72,7 @@ No `access_token` / `refresh_token` / `sb-*-auth-token` writes. `client.ts:12-21
 
 Config constants: `backend/config.py:66-74` (`RATE_DRILL_REVIEW_PER_MIN` line 73, `RATE_DELETE_PER_MIN` line 74).
 
-429 tests asserting `Retry-After`: `test_deletes.py:164`, `test_feedback.py:144`, `test_analytics.py:141` — all in the green 187-pass suite.
+429 tests asserting `Retry-After`: `test_deletes.py:164`, `test_feedback.py:166`, `test_analytics.py:141` — all in the green 190-pass suite.
 
 ## Other checklist items
 
