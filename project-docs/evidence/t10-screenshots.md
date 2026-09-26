@@ -23,8 +23,13 @@ Directory: `project-docs/evidence/shots/` (production `npm start` on `localhost:
 
 | File | Route | Observed state |
 |---|---|---|
-| `shots/home.png` | `/` | Landing: hero, nav, sample question pack — renders clean |
+| `shots/home.png` | `/` | Earlier landing capture before the duplicate-header correction |
+| `shots/home-single-header-light.png` | `/` | Production build, 1440×1000, light theme; exactly one primary header |
+| `shots/home-single-header-dark.png` | `/` | Production build, 1440×1000, dark theme; exactly one primary header |
+| `shots/home-single-header-mobile.png` | `/` | Production build, 390×844, dark mobile; compact single header, no overlap |
 | `shots/privacy.png` | `/legal/privacy` | Privacy content page — renders clean |
 | `shots/dashboard-signed-out.png` | `/dashboard` (signed out) | AuthGate sign-in form (Welcome to Hustlrzz / Sign In / Google) — correct redirect-to-auth behavior |
+
+Lighthouse snapshot audits on the corrected production build scored Accessibility 100, Best Practices 100, SEO 100, and Agentic Browsing 100 in desktop light, desktop dark, and mobile dark viewports. The original marquee and scroll-reveal contrast failures no longer reproduce. The scroll-reveal pre-animation opacity floor was raised from 12% to 40% dark / 60% light so partially revealed text remains WCAG AA large-text contrast compliant; the reveal still animates to full opacity.
 
 Browser closed and temp server stopped after capture.

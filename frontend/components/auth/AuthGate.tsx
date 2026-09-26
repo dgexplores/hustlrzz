@@ -78,7 +78,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen" role="status" aria-label="Loading">
+      <div className="flex items-center justify-center min-h-dvh" role="status" aria-label="Loading">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         <span className="sr-only">Loading…</span>
       </div>
@@ -87,7 +87,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (configError) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background p-6">
+      <main className="flex min-h-dvh items-center justify-center bg-background p-6">
         <div className="w-full max-w-lg rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center">
           <AlertTriangle className="mx-auto h-8 w-8 text-destructive" />
           <h1 className="mt-3 text-xl font-semibold">Configuration needed</h1>
@@ -100,24 +100,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (!session) {
     if (pathname === "/") {
-      return (
-        <div className="min-h-screen bg-background">
-          <header className="sticky top-0 z-40 bg-background/78 backdrop-blur-2xl">
-            <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
-              <Link href="/" className="text-foreground">
-                <span className="text-lg font-bold tracking-[-0.04em]">HUSTLRZZ</span>
-              </Link>
-              <div className="flex items-center gap-2"><ThemeToggle /><Link href="/prepare"><Button size="sm">Get started</Button></Link></div>
-            </div>
-          </header>
-          {children}
-        </div>
-      );
+      return <div className="min-h-dvh bg-background">{children}</div>;
     }
     return (
-      <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-secondary/25 p-4">
-        <div className="absolute right-4 top-4"><ThemeToggle /></div>
+      <main className="flex min-h-[100dvh] items-center justify-center overflow-hidden bg-secondary/25 px-4 py-20 sm:py-6">
         <div className="w-full max-w-md">
+          <div className="mb-4 flex justify-end"><ThemeToggle /></div>
           <div className="flex justify-center mb-6">
             <span className="text-xl font-bold tracking-[-0.04em]">HUSTLRZZ</span>
           </div>
@@ -125,8 +113,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
           <AuthForm />
           <p className="mt-4 text-center text-xs text-muted-foreground">
             By continuing you agree to our{" "}
-            <Link href="/legal/terms" className="font-semibold text-primary hover:underline">Terms</Link> and{" "}
-            <Link href="/legal/privacy" className="font-semibold text-primary hover:underline">Privacy policy</Link>.
+            <Link href="/legal/terms" className="inline-flex min-h-11 items-center font-semibold text-primary hover:underline">Terms</Link> and{" "}
+            <Link href="/legal/privacy" className="inline-flex min-h-11 items-center font-semibold text-primary hover:underline">Privacy policy</Link>.
           </p>
         </div>
       </main>
@@ -153,7 +141,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="flex min-h-dvh flex-col bg-background">
       <header className="sticky top-0 z-40 bg-background/78 backdrop-blur-2xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
           <Link href="/" className="text-foreground" aria-label="Hustlrzz home">
@@ -164,6 +152,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
               <Link
                 key={n.href}
                 href={n.href}
+                aria-current={pathname === n.href ? "page" : undefined}
                 className={`group relative flex items-center px-3 text-sm font-medium surface-transition ${
                   pathname === n.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -178,13 +167,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 onKeyDown={(e) => { if (e.key === "Escape") setMoreOpen(false); }}
                 aria-expanded={moreOpen}
                 aria-haspopup="menu"
-                className={`flex items-center gap-1 px-3 text-sm font-medium ${moreNav.some(m => pathname === m.href) ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                className={`flex min-h-11 items-center gap-1 px-3 text-sm font-medium ${moreNav.some(m => pathname === m.href) ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
                 More <span className={`transition-transform ${moreOpen ? "rotate-180" : ""}`}>▾</span>
               </button>
               {moreOpen && (
                 <div role="menu" className="absolute top-full right-0 mt-2 w-48 rounded-xl border bg-background shadow-lg overflow-hidden">
                   {moreNav.map(m => (
-                    <Link key={m.href} href={m.href} onClick={() => setMoreOpen(false)} className={`block px-4 py-2.5 text-sm ${pathname === m.href ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>{m.label}</Link>
+                    <Link key={m.href} href={m.href} onClick={() => setMoreOpen(false)} className={`flex min-h-11 items-center px-4 text-sm ${pathname === m.href ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>{m.label}</Link>
                   ))}
                 </div>
               )}
@@ -199,19 +188,39 @@ export function AuthGate({ children }: { children: ReactNode }) {
             </Button>
           </div>
         </div>
-        <nav className="flex max-w-full items-center overflow-x-auto px-3 md:hidden" aria-label="Mobile navigation">
-          {[...nav, ...moreNav].map((item) => (
+        <nav className="grid grid-cols-5 border-t px-1 md:hidden" aria-label="Mobile navigation">
+          {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`shrink-0 border-b-2 px-3 py-2.5 text-xs font-semibold ${pathname === item.href ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              aria-current={pathname === item.href ? "page" : undefined}
+              className={`flex min-h-11 min-w-0 items-center justify-center border-b-2 px-1 text-center text-xs font-semibold ${pathname === item.href ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               {item.label}
             </Link>
           ))}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMoreOpen(!moreOpen)}
+              onKeyDown={(e) => { if (e.key === "Escape") setMoreOpen(false); }}
+              aria-expanded={moreOpen}
+              aria-haspopup="menu"
+              className={`flex min-h-11 w-full items-center justify-center border-b-2 px-1 text-xs font-semibold ${moreNav.some(m => pathname === m.href) ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}
+            >
+              More
+            </button>
+            {moreOpen && (
+              <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border bg-background shadow-lg">
+                {moreNav.map(m => (
+                  <Link key={m.href} href={m.href} onClick={() => setMoreOpen(false)} className={`flex min-h-11 items-center px-4 text-sm ${pathname === m.href ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>{m.label}</Link>
+                ))}
+              </div>
+            )}
+          </div>
         </nav>
         {(pathname === "/prepare" || pathname === "/interview" || pathname === "/dashboard") && (
-          <div className="border-t bg-secondary/30">
+          <div className="hidden border-t bg-secondary/30 md:block">
             <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2.5 md:px-6">
               {workflowSteps.map((step, i) => (
                 <div key={step.href} className="flex items-center gap-2">

@@ -41,7 +41,7 @@ export const Switch = ({
     {...aria}
     onClick={() => onCheckedChange(!checked)}
     className={cn(
-      "inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+      "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors after:absolute after:-inset-y-2.5 after:inset-x-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       checked ? "bg-primary" : "bg-input",
       className
     )}

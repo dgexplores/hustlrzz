@@ -24,4 +24,22 @@ describe("Button", () => {
     screen.getByRole("button", { name: "Save" }).click();
     expect(onClick).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["default", undefined, "h-11"],
+    ["small", "sm", "h-11"],
+    ["icon", "icon", "h-11"],
+  ] as const)("keeps the %s size touch-friendly", (_name, size, expectedClass) => {
+    render(<Button size={size}>Save</Button>);
+
+    expect(screen.getByRole("button", { name: "Save" }).className).toContain(expectedClass);
+  });
+
+  it("keeps icon buttons square and touch-friendly", () => {
+    render(<Button size="icon">Save</Button>);
+
+    const className = screen.getByRole("button", { name: "Save" }).className;
+    expect(className).toContain("h-11");
+    expect(className).toContain("w-11");
+  });
 });
