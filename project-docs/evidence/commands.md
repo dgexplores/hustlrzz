@@ -29,24 +29,25 @@ npm test   # → vitest run
 ```
  RUN  v3.2.7 /Users/dgsmacbook/hustlrzz/frontend
 
- ✓ lib/__tests__/api.test.ts (11 tests) 4ms
- ✓ lib/__tests__/reportMarkdown.test.ts (17 tests) 6ms
- ✓ lib/__tests__/download.test.ts (3 tests) 11ms
- ✓ lib/__tests__/sessionDetail.test.ts (7 tests) 3ms
- ✓ lib/supabase/__tests__/client.test.ts (7 tests) 62ms
- ✓ components/ui/__tests__/button.test.tsx (6 tests) 115ms
- ✓ components/auth/__tests__/AuthGate.test.tsx (5 tests) 167ms
- ✓ lib/__tests__/settings.test.ts (7 tests) 2ms
- ✓ lib/__tests__/analytics.test.ts (5 tests) 2ms
+ ✓ lib/__tests__/download.test.ts (3 tests) 8ms
+ ✓ lib/__tests__/api.test.ts (11 tests) 8ms
+ ✓ lib/__tests__/sessionDetail.test.ts (7 tests) 11ms
+ ✓ app/api/auth/session/__tests__/route.test.ts (5 tests) 10ms
+ ✓ lib/supabase/__tests__/client.test.ts (7 tests) 85ms
+ ✓ components/ui/__tests__/button.test.tsx (6 tests) 168ms
+ ✓ components/auth/__tests__/AuthGate.test.tsx (5 tests) 212ms
+ ✓ lib/__tests__/reportMarkdown.test.ts (17 tests) 4ms
+ ✓ lib/__tests__/analytics.test.ts (5 tests) 3ms
+ ✓ lib/__tests__/settings.test.ts (7 tests) 3ms
  ✓ components/home/__tests__/Hero.reduced-motion.test.tsx (2 tests) 70ms
- ✓ components/home/__tests__/Hero.test.tsx (6 tests) 106ms
+ ✓ components/home/__tests__/Hero.test.tsx (9 tests) 126ms
 
- Test Files  11 passed (11)
-      Tests  76 passed (76)
-   Duration  2.30s
+ Test Files  12 passed (12)
+      Tests  84 passed (84)
+   Duration  2.68s
 ```
 
-Exit code: **0**. Final count: **76 passed / 11 files**.
+Exit code: **0**. Final count: **84 passed / 12 files**.
 
 ## tsc
 
@@ -97,7 +98,7 @@ Exit code: **0**.
 | `test_delete_rate_limited_returns_429_with_retry_after` | `backend/tests/test_deletes.py:164-172` | real test: 20×404 then 429 + `Retry-After` header |
 | 429 includes `Retry-After` | `backend/app.py:116-121` | header set on `HTTPException` |
 
-Full suites green: pytest **190**, vitest **76**, tsc **0**, lint **0**, build **0**.
+Full suites green: pytest **190**, vitest **84**, tsc **0**, lint **0**, build **0**.
 
 ## 2026-09-25 closeout gates
 
@@ -115,45 +116,70 @@ Full suites green: pytest **190**, vitest **76**, tsc **0**, lint **0**, build *
 
 ## 2026-09-26 landing page pass (local production build, `next start`)
 
-Lighthouse was re-measured after the hero rebuild. **Best Practices is 96, not 100**, on both this
-build and the deployed site. Cause: `errors-in-console` from `GET /api/auth/session` returning
-`401` for signed-out visitors. Verified pre-existing — the deployed site at `64daa64`, which does
-not contain this change, logs the identical 401 and also scores 96. Left unfixed here because it
-sits in auth code outside this change's scope.
+### Typography and art direction
 
-| Gate | Result |
-|---|---|
-| Lighthouse desktop light | Accessibility 100, Best Practices 96, SEO 100, Agentic Browsing 100 |
-| Lighthouse desktop dark | Accessibility 100, Best Practices 96, SEO 100, Agentic Browsing 100 |
-| Lighthouse mobile dark (390x844) | Accessibility 100, Best Practices 96, SEO 100, Agentic Browsing 100 |
-| `h1` outranks every `h2` | 72px vs 48px at 1440; 60 vs 48 at 768; 36 vs 30 at 320/390 |
-| Horizontal overflow | none at 320, 390, 768, 1024, 1440 |
-| Touch targets under 44px | none, except the visually hidden skip link |
-| Reduced motion | 3 steps render complete, zero inline transforms in the hero |
-| `/robots.txt` | now `200 text/plain` (was `404` returning the Next 404 page) |
-| `/llms.txt` | now `200 text/plain` (was `404` returning the Next 404 page) |
+The page was previously set entirely in Geist Sans at `tracking-tighter` — the most recognisable
+generated-landing-page treatment available. Instrument Serif (self-hosted via `next/font/google`)
+now carries the h1, section headings, marquee, mode titles and manifesto thesis; Geist remains on
+body copy, controls and card titles so the two roles stay distinct. The hero reads as an opening
+slide: `01 / INTERVIEW PREP` over a hairline rule, the headline with *unforgettable* in true italic,
+and the three-step chain as an agenda panel with serif numerals. The pill-shaped SVG accent is
+removed from both the hero and the bento heading; its asset and the orphaned `.display-type`
+utility are deleted.
 
-### Pre-existing production defect found during this pass
-
-`https://hustlrzz.vercel.app/robots.txt` and `/llms.txt` both returned **404 with the Next.js 404
-HTML page**. Lighthouse on the deployed domain therefore failed `robots-txt` and `llms-txt`,
-scoring **SEO 91 and Agentic Browsing 67** in production while the same audit on localhost scored
-100 — the earlier "SEO 100 / Agentic 100" evidence was measured on localhost, where those two
-audits do not apply. Fixed by adding `frontend/public/robots.txt` and `frontend/public/llms.txt`.
-
-### Production re-verification after deploy `20ef97b`
+Instrument Serif ships 400 only, so `font-semibold` was removed from every display heading —
+leaving it makes the browser synthesise a fake bold, which is a visible craft failure on a face
+this high-contrast.
 
 | Check | Result |
 |---|---|
-| `https://hustlrzz.vercel.app/robots.txt` | `200 text/plain` |
-| `https://hustlrzz.vercel.app/llms.txt` | `200 text/plain` |
-| Lighthouse production, desktop light | Accessibility 100, Best Practices 96, **SEO 100** (was 91), **Agentic Browsing 100** (was 67) |
-| Deployed heading hierarchy | h1 72px, all h2 48px |
-| Deployed nav | Hustlrzz, Prepare, Rehearse, Coach, Start preparing |
-| Deployed value chain | 3 labelled steps; score bars 30/20/26/16/23px |
-| Deployed horizontal overflow | none at 1440 |
+| Rendered h1 family | `Instrument Serif` at `font-weight: 400` |
+| Italic emphasis | `font-style: italic` on *unforgettable.* |
+| Heading hierarchy | h1 76px vs h2 48px at 1440; 38 vs 32 at 390 |
+| Contrast, alpha-blended, both themes | **zero failures** |
+| h1 contrast | 19.9:1 light, 18.1:1 dark |
+| Worst contrast anywhere on the page | 5.2:1 against a 4.5 floor |
+| Marquee words | alpha-blended 3.46:1 light against a 3:1 floor at 80% opacity; raised to 90% opacity, now 6.43:1 dark |
 
-The SEO and Agentic Browsing recovery is the point of this deploy. Best Practices remains 96 for
-the pre-existing `401` reason traced above.
+The first contrast audit **ignored alpha** and therefore overstated ratios for `muted-foreground/80`
+text. It was redone with alpha compositing against the resolved background.
 
-Authenticated production smoke evidence remains pending deployment of the current branch.
+### Session endpoint: signed-out 401 removed
+
+`GET /api/auth/session` returned **401** when there was no refresh cookie and when a refresh token
+was rejected. "Not signed in" is a successful answer to a session probe, and the 401 logged a
+console error on every signed-out pageview, which failed the `errors-in-console` audit and held
+Best Practices at 96. It now returns **200 with `{ session: null }`** in both cases and still clears
+a rejected cookie. A genuine Supabase misconfiguration still returns **503**, so real server faults
+are not masked.
+
+Client behaviour is unchanged: `restoreSessionFromCookie` returns `null` for both a non-OK response
+and a null session, so `AuthGate` takes the identical path either way.
+
+| Gate | Result |
+|---|---|
+| `npm test` | **84 passed / 12 files** (5 new: session route, incl. the 503 guard) |
+| `npm run lint`, `npx tsc --noEmit`, `npm run build` | clean, 17 routes |
+| Lighthouse — Accessibility | **100** |
+| Lighthouse — Best Practices | **100** (was 96) |
+| Lighthouse — SEO | **100** |
+| Failing Lighthouse audits | **none** |
+| Browser console errors on `/` | **0** |
+| HTTP 4xx/5xx on `/` | **0** |
+| `GET /api/auth/session` signed out | `200 {"session":null}` |
+| Horizontal overflow | none at 320, 390, 1440 |
+| Touch targets under 44px | none, except the visually hidden skip link |
+| Reduced motion | 3 steps render complete, zero inline transforms in the hero |
+| `/robots.txt`, `/llms.txt` | `200 text/plain` |
+
+Lighthouse was run with `lighthouse@12` against the local production build.
+
+### Previously recorded defect, now fixed
+
+`https://hustlrzz.vercel.app/robots.txt` and `/llms.txt` both returned **404 with the Next.js 404
+page**. Lighthouse on the deployed domain therefore failed `robots-txt` and `llms-txt`, scoring
+**SEO 91 and Agentic Browsing 67** in production while the same audit on localhost scored 100 — the
+earlier "SEO 100 / Agentic 100" evidence was measured on localhost, where those two audits do not
+apply. Fixed by adding `frontend/public/robots.txt` and `frontend/public/llms.txt`, confirmed live.
+
+Authenticated production smoke evidence remains pending a signed-in session.
