@@ -15,3 +15,5 @@ Disallow: /dashboard/
 Disallow: /knowledge/
 Disallow: /settings/
 Disallow: /resume-analyzer/
+
+Sitemap: https://hustlrzz.vercel.app/sitemap.xml
