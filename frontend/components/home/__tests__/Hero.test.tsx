@@ -96,3 +96,24 @@ describe("Hero", () => {
     expect(hero.innerHTML).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 });
+
+/**
+ * The hero was pinned to `lg:min-h-[100dvh]` while its content is a fixed
+ * ~651px, so every pixel of surplus was dumped below the content as dead space.
+ * On a 954px viewport that was 303px of nothing; on a 1400px viewport, 749px.
+ * The hero must be sized by its content, not by the viewport.
+ */
+describe("Hero does not force a viewport-height hero", () => {
+  it("does not pin the hero to a full viewport height", () => {
+    const { hero } = renderHero();
+
+    expect(hero.className).not.toMatch(/min-h-\[100dvh\]|min-h-dvh|h-dvh/);
+  });
+
+  it("does not pin the hero's inner container to a full viewport height either", () => {
+    const { hero } = renderHero();
+    const inner = hero.querySelector("div.max-w-7xl");
+    expect(inner).not.toBeNull();
+    expect((inner as HTMLElement).className).not.toMatch(/100dvh|h-dvh/);
+  });
+});
