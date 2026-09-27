@@ -76,14 +76,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
     router.push("/");
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-dvh" role="status" aria-label="Loading">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <span className="sr-only">Loading…</span>
-      </div>
-    );
-  }
+  // The front page is the one route that renders its children signed out, so
+  // waiting on the session probe here only delays content that was never
+  // gated — and leaves crawlers a page with nothing in it. Protected routes
+  // must still wait, or a signed-in user would be shown the sign-in form.
+  const isPublicRoute = pathname === "/";
 
   if (configError) {
     return (
@@ -98,8 +95,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
+  if (loading && !isPublicRoute) {
+    return (
+      <div className="flex items-center justify-center min-h-dvh" role="status" aria-label="Loading">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="sr-only">Loading…</span>
+      </div>
+    );
+  }
+
   if (!session) {
-    if (pathname === "/") {
+    if (isPublicRoute) {
       return <div className="min-h-dvh bg-background">{children}</div>;
     }
     return (

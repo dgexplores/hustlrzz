@@ -8,6 +8,60 @@ let cookieSyncStarted = false;
 
 export const isSupabaseConfigured = Boolean(url && anon);
 
+/**
+ * PKCE leaves a `code_verifier` behind before the browser is sent to the
+ * identity provider, and needs it again on the way back. That round trip is a
+ * full page unload, so a verifier kept only in the JS heap is gone by the time
+ * `/auth/callback` runs — the exchange then never happens and sign-in fails
+ * with a misleading "check your provider configuration" message.
+ *
+ * The verifier is a single-use nonce, not a credential, so it is allowed in a
+ * tab-scoped store that dies with the tab. Session and user keys stay in
+ * memory, so access and refresh tokens never touch browser storage; reload
+ * restore continues to go through the httpOnly cookie.
+ */
+const PKCE_KEY = /-code-verifier$/;
+
+export function createAuthStorage() {
+  const memory: Record<string, string> = {};
+  let tab: Storage | null = null;
+  try {
+    tab = window.sessionStorage;
+  } catch {
+    tab = null;
+  }
+
+  const safe = <T,>(fn: () => T, fallback: T): T => {
+    if (!tab) return fallback;
+    try {
+      return fn();
+    } catch {
+      return fallback;
+    }
+  };
+
+  return {
+    getItem(key: string) {
+      if (PKCE_KEY.test(key)) return safe(() => tab!.getItem(key), null);
+      return memory[key] ?? null;
+    },
+    setItem(key: string, value: string) {
+      if (PKCE_KEY.test(key)) {
+        safe(() => tab!.setItem(key, value), undefined);
+        return;
+      }
+      memory[key] = value;
+    },
+    removeItem(key: string) {
+      if (PKCE_KEY.test(key)) {
+        safe(() => tab!.removeItem(key), undefined);
+        return;
+      }
+      delete memory[key];
+    },
+  };
+}
+
 /** Legacy installs persisted the session under sb-*-auth-token in localStorage. */
 function purgeLegacyLocalStorageSessions() {
   try {
@@ -59,9 +113,14 @@ export function getSupabase() {
     }
     client = createClient(url, anon, {
       auth: {
-        // Memory-only: never write tokens to localStorage/sessionStorage.
+        // The split adapter keeps tokens in memory and the PKCE verifier in
+        // sessionStorage, so persistSession must be true: it is what makes
+        // auth-js read the adapter on init and find the verifier that the
+        // pre-redirect page load left behind. Nothing else is read — the
+        // session key is memory-only and always empty on a fresh page load.
         // Cross-load restore comes from the httpOnly refresh cookie (AuthGate).
-        persistSession: false,
+        persistSession: true,
+        storage: createAuthStorage(),
         autoRefreshToken: true,
         detectSessionInUrl: true,
         flowType: "pkce",

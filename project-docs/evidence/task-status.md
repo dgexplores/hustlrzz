@@ -1,10 +1,10 @@
 # EvidenceQA — Task status T1–T11
 
-Run: 2026-09-27. Current suite counts: **pytest 190 passed**, **vitest 102 passed (15 files)**, tsc 0, lint 0, build 0.
+Run: 2026-09-28. Current suite counts: **pytest 190 passed**, **vitest 113 passed (17 files)**, tsc 0, lint 0, build 0.
 
 | Task | Status | QA note (EvidenceQA PASS) | Key evidence |
 |---|---|---|---|
-| **T6** Frontend test harness + CI | PASS | Vitest + RTL harness live; `npm test` green; suite covers download/api/client/AuthGate smoke per spec | `vitest` 15 files / **102 tests**; `frontend/package.json` `test` script |
+| **T6** Frontend test harness + CI | PASS | Vitest + RTL harness live; `npm test` green; suite covers download/api/client/AuthGate smoke per spec | `vitest` 17 files / **113 tests**; `frontend/package.json` `test` script |
 | **T1** Knowledge workspace | PASS | Owner-scoped list/delete pytest green (`test_knowledge_workspace.py` 5 tests); list 204/404/foreign isolation | pytest count at T1 QA: 125→; file tests start ~L73; final suite **187** |
 | **T2** Content deletion (API + UI) | PASS | `test_deletes.py` **14 tests**: 204 owner / 404 foreign / missing / twice / no-cascade + rate-limit 429 | pytest at T2: **138**; rate-limit test L164–172 asserts 429 + `Retry-After` |
 | **T3** Report export (MD + print) | PASS | Markdown export + print path; FE unit coverage | FE count at T3: **43FE**; final FE **102** |
@@ -21,7 +21,7 @@ Run: 2026-09-27. Current suite counts: **pytest 190 passed**, **vitest 102 passe
 | Suite | Count | Exit |
 |---|---|---|
 | pytest `backend/tests/` | **190 passed** (4 warnings) | 0 |
-| vitest `npm test` | **102 passed / 15 files** | 0 |
+| vitest `npm test` | **113 passed / 17 files** | 0 |
 | `npx tsc --noEmit` | 0 errors | 0 |
 | `npm run lint` | 0 errors | 0 |
 | `npm run build` | 17 routes, TS clean | 0 |
