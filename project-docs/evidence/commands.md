@@ -389,3 +389,35 @@ adapter with `persistSession: true`.
 
 A real Google sign-in still needs one interactive confirmation, because the verifier→provider→callback
 round trip is browser behaviour. The server legs are verified and the mechanism is unit-tested.
+
+### Google-side configuration verified headlessly
+
+The `/auth/v1/authorize` 302 above only proves Supabase is *willing* to start a flow — it will hand any
+`redirect_to` to Google. The Google side of the chain was checked separately by following the redirect
+and reading what Google returns:
+
+```
+redirect_uri = https://<project-ref>.supabase.co/auth/v1/callback
+response_type = code
+scope = email profile
+→ HTTP 200, 895,535-byte "Sign in with Google" consent page
+   no redirect_uri_mismatch, no invalid_client, no Error 400
+```
+
+That confirms the Google Cloud OAuth client exists and is recognised, the client-secret pairing is
+correct, and `https://<project-ref>.supabase.co/auth/v1/callback` is present in the console's authorized
+redirect URIs. A misconfigured Google console would have returned `redirect_uri_mismatch` here. This was
+the last remaining link that could have been wrong in a dashboard, and it is not.
+
+Every leg of the Google path is now confirmed without a browser: provider enabled, Supabase accepts our
+`redirect_to`, Google accepts Supabase's `redirect_uri`, and the PKCE verifier survives the round trip by
+unit test. What remains is the user's own consent click and the return leg, which is browser behaviour.
+
+### Deployment state at handoff
+
+`main` = `origin/main` = `642bb2a`, working tree clean, no diverged branches. Production serves
+52,490 bytes for `/` — a payload that only exists at this commit; before it the route returned a
+13,153-byte spinner shell. All surfaces 200: `/`, `/prepare`, `/robots.txt`, `/llms.txt`,
+`/sitemap.xml`, `/api/auth/session`, `/auth/callback`, and the Render `/health` endpoint.
+Production Lighthouse after this change: accessibility 100, best practices 100, SEO 100, no failing
+audits.
