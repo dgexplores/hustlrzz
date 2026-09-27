@@ -459,3 +459,40 @@ Mobile is unaffected: the offending declaration was `lg:`-scoped.
 
 `npm run lint` 0 warnings, `npx tsc --noEmit` clean, `npm test` **115 passed /
 17 files** (was 113), `npm run build` 18 routes.
+
+## 2026-09-28 Knowledge section completion
+
+The Knowledge page titled itself "Your knowledge base" but could not add to it. The backend already
+exposed `POST /knowledge/documents` (`app.py:862`) and the frontend never called it, so the only way
+to index anything was to go through Prepare. Three of the five accepted `source_type` values —
+`portfolio`, `notes`, `session_report` — were unreachable from any UI, because Prepare only ever
+ingests `resume` and `company_intelligence`.
+
+Other gaps found while reading the component:
+
+- `similarity` is returned by `POST /knowledge/search` and was assigned into state but **never
+  rendered** — a dead field, so every hit looked equally relevant.
+- `top_k` was hardcoded to `5` with no way to change it.
+- Delete used `window.confirm`, the only native dialog in the app.
+- No refresh control, so adding a source in Prepare required a full page reload.
+- The raw enum leaked into the UI: documents displayed as `company_intelligence`.
+- The search card rendered even with zero documents, offering to search an empty base.
+- No frontend test existed for this panel.
+
+The panel now offers an **Add a source** card wired to the existing endpoint, with all five source
+types, a 120-character hint, and explicit feedback distinguishing an ingest from a duplicate (the
+backend dedupes by content hash and returns `duplicate: true`). Search shows the similarity score and
+a bounded result-count control. Delete confirms in-app with the chunk count so the consequence is
+stated, and states that live answers stop drawing on the source. A refresh control re-reads the list.
+Raw enums are formatted for display, and the search card is hidden when there is nothing to search.
+
+The initial-load path was refactored onto the same `load` callback the refresh button uses, which
+removed a duplicated `Promise.all` that the previous version carried inline.
+
+`components/knowledge/__tests__/KnowledgePanel.test.tsx` (11 tests) was written failing first — all 11
+red against the old component. One failure was a test-precision issue rather than a product defect:
+"Company intelligence" appears in both the type dropdown and the document metadata, so the assertion
+was scoped to the document row.
+
+`npm run lint` 0 warnings, `npx tsc --noEmit` clean, `npm test` **126 passed / 18 files** (was 115 /
+17), `npm run build` 18 routes.
