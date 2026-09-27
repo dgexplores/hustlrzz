@@ -99,7 +99,7 @@ Exit code: **0**.
 | `test_delete_rate_limited_returns_429_with_retry_after` | `backend/tests/test_deletes.py:164-172` | real test: 20×404 then 429 + `Retry-After` header |
 | 429 includes `Retry-After` | `backend/app.py:116-121` | header set on `HTTPException` |
 
-Full suites green: pytest **190**, vitest **92**, tsc **0**, lint **0**, build **0**.
+Full suites green: pytest **190**, vitest **102**, tsc **0**, lint **0**, build **0**.
 
 ## 2026-09-25 closeout gates
 
@@ -159,7 +159,7 @@ and a null session, so `AuthGate` takes the identical path either way.
 
 | Gate | Result |
 |---|---|
-| `npm test` | **92 passed / 13 files** (5 session-route + 8 service-worker tests) |
+| `npm test` | **102 passed / 15 files** |
 | `npm run lint`, `npx tsc --noEmit`, `npm run build` | clean, 17 routes |
 | Lighthouse — Accessibility | **100** |
 | Lighthouse — Best Practices | **100** (was 96) |
@@ -201,9 +201,55 @@ failure:
 | `/llms.txt` fetched through the worker | `200 text/plain`, real content |
 | Console errors on `/` | 0 |
 
-Offline navigation degradation was not re-verified: the probe used `fetch(..., { mode: "navigate" })`
-from a page context, which the browser rejects regardless of the worker. The 503 offline fallback is
-untested.
+### Offline degradation, measured and then fixed
+
+The first attempt used `fetch(..., { mode: "navigate" })` from a page context, which the browser
+rejects regardless of the worker, so it proved nothing. Redone with a real document navigation while
+the context was offline, it showed precached routes were fine and everything else was not:
+
+| Offline route | Before | After |
+|---|---|---|
+| `/` | 200, full cached homepage | unchanged |
+| `/prepare` | 200, cached shell with its own offline notice | unchanged |
+| `/knowledge` | **503, plain text "Offline"** | 503, styled HTML document |
+| `/settings` | **503, plain text "Offline"** | 503, styled HTML document |
+
+"Offline" as plain text is a dead end — no styling, no navigation, no way back. A navigation now
+receives a self-contained HTML document: wordmark, honest copy, a 44px on-brand button back to the
+precached homepage, `prefers-color-scheme` support, `noindex`, and `Cache-Control: no-store`. It
+references no remote assets, because there is no network to fetch them from. Non-navigation requests
+still get plain text, since an HTML page in reply to an image request would be wrong.
+
+Verified in-browser with a controlling worker at 390x844: status 503, `text/html`, title
+"Offline — Hustlrzz", `h1` "You are offline", one `a[href="/"]` at 44px, `h1` font-size 28px, and
+zero remote asset references.
+
+### Reduced motion made consistent
+
+The hero rendered no motion components under `prefers-reduced-motion`, but `hooks/useSprings.ts`
+applied a stiffness-1000 spring instead — "very fast" rather than "no motion". `useHoverSpring`,
+`usePressAndHover`, `useFlexSpring` and `usePressable` now leave the spring at its resting value when
+reduced motion is requested, so nothing moves. `isExpanded` still flips, so accordion copy guarded by
+the flex spring stays reachable by keyboard and by reduced-motion users.
+
+Verified in-browser with `prefers-reduced-motion: reduce` emulated:
+
+| Check | Result |
+|---|---|
+| Hero inline transforms | 0 |
+| Hero value chain | 3 steps rendered complete |
+| Accordion focus | copy opacity 1, text "Prepare" readable |
+| Accordion flex growth | stays 1, no movement |
+| Primary CTA hover | transform unchanged |
+
+`usePressable`, `useSpringValue` and `useScrollReveal` are exported but never called anywhere in the
+app — pre-existing dead code, left in place. `useScrollReveal` already returns static values under
+reduced motion.
+
+### Sitemap
+
+`app/sitemap.ts` publishes the three public routes; `robots.txt` references it. The service worker
+already treats `/sitemap.xml` as network-only. `/sitemap.xml` returns `200 application/xml`.
 
 ### Previously recorded defect, now fixed
 
