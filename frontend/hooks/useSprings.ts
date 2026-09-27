@@ -8,22 +8,23 @@ export const MOMENTUM_SPRING = { damping: 20, stiffness: 180 };
 export const PRESS_SPRING = { damping: 30, stiffness: 400 };
 
 export function usePressable(initialScale = 1) {
+  const reduce = useReducedMotion();
   const scale = useSpring(initialScale, PRESS_SPRING);
   const isPressed = useRef(false);
 
   const handlers = {
     onPointerDown: () => {
       isPressed.current = true;
-      scale.set(0.97);
+      if (!reduce) scale.set(0.97);
     },
     onPointerUp: () => {
       isPressed.current = false;
-      scale.set(1);
+      if (!reduce) scale.set(1);
     },
     onPointerLeave: () => {
       if (isPressed.current) {
         isPressed.current = false;
-        scale.set(1);
+        if (!reduce) scale.set(1);
       }
     },
   };
@@ -31,19 +32,24 @@ export function usePressable(initialScale = 1) {
   return { scale, handlers };
 }
 
+/**
+ * Reduced motion means the value is never changed, not that it changes fast.
+ * The spring stays at its resting value, so nothing moves. Callers still flip
+ * their own state, so content guarded by this hook stays reachable.
+ */
 export function useHoverSpring(initialScale = 1, hoverScale = 1.03) {
   const reduce = useReducedMotion();
-  const scale = useSpring(initialScale, reduce ? { ...CRITICAL_DAMPING, stiffness: 1000 } : CRITICAL_DAMPING);
+  const scale = useSpring(initialScale, CRITICAL_DAMPING);
   const isHovered = useRef(false);
 
   const handlers = {
     onPointerEnter: () => {
       isHovered.current = true;
-      scale.set(hoverScale);
+      if (!reduce) scale.set(hoverScale);
     },
     onPointerLeave: () => {
       isHovered.current = false;
-      scale.set(1);
+      if (!reduce) scale.set(1);
     },
   };
 
@@ -52,29 +58,29 @@ export function useHoverSpring(initialScale = 1, hoverScale = 1.03) {
 
 export function usePressAndHover(pressScale = 0.97, hoverScale = 1.03) {
   const reduce = useReducedMotion();
-  const scale = useSpring(1, reduce ? { ...CRITICAL_DAMPING, stiffness: 1000 } : CRITICAL_DAMPING);
+  const scale = useSpring(1, MOMENTUM_SPRING);
   const isPressed = useRef(false);
   const isHovered = useRef(false);
 
   const handlers = {
     onPointerDown: () => {
       isPressed.current = true;
-      scale.set(pressScale);
+      if (!reduce) scale.set(pressScale);
     },
     onPointerUp: () => {
       isPressed.current = false;
-      scale.set(isHovered.current ? hoverScale : 1);
+      if (!reduce) scale.set(isHovered.current ? hoverScale : 1);
     },
     onPointerLeave: () => {
       if (isPressed.current) {
         isPressed.current = false;
       }
       isHovered.current = false;
-      scale.set(1);
+      if (!reduce) scale.set(1);
     },
     onPointerEnter: () => {
       isHovered.current = true;
-      if (!isPressed.current) scale.set(hoverScale);
+      if (!reduce && !isPressed.current) scale.set(hoverScale);
     },
   };
 
@@ -88,25 +94,27 @@ export function useSpringValue(initial: number, config = CRITICAL_DAMPING) {
 
 export function useFlexSpring(initial = 1, expanded = 2.4) {
   const reduce = useReducedMotion();
-  const flex = useSpring(initial, reduce ? { ...CRITICAL_DAMPING, stiffness: 1000 } : MOMENTUM_SPRING);
+  const flex = useSpring(initial, MOMENTUM_SPRING);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // isExpanded always flips, so the copy behind the accordion stays reachable by
+  // keyboard and by reduced-motion users; only the movement is dropped.
   const toggle = useCallback(() => {
     setIsExpanded((prev) => {
-      flex.set(prev ? 1 : expanded);
+      if (!reduce) flex.set(prev ? 1 : expanded);
       return !prev;
     });
-  }, [flex, expanded]);
+  }, [flex, expanded, reduce]);
 
   const expand = useCallback(() => {
     setIsExpanded(true);
-    flex.set(expanded);
-  }, [flex, expanded]);
+    if (!reduce) flex.set(expanded);
+  }, [flex, expanded, reduce]);
 
   const collapse = useCallback(() => {
     setIsExpanded(false);
-    flex.set(1);
-  }, [flex]);
+    if (!reduce) flex.set(1);
+  }, [flex, reduce]);
 
   return { flex, isExpanded, toggle, expand, collapse };
 }

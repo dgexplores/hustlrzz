@@ -42,6 +42,28 @@ async function loadServiceWorker() {
   fetchHandler = addEventListener.mock.calls.find((c) => c[0] === "fetch")?.[1] as Handler;
 }
 
+async function captureResponse(request: unknown): Promise<Response> {
+  let promise: Promise<Response> | undefined;
+  respondWith.mockImplementation((p: Promise<Response>) => {
+    promise = p;
+  });
+  fetchHandler({ request, respondWith });
+  if (!promise) throw new Error("handler did not respond");
+  return promise;
+}
+
+async function withNetworkFailing<T>(fn: () => Promise<T>): Promise<T> {
+  const original = globalThis.fetch;
+  globalThis.fetch = vi.fn(async () => {
+    throw new TypeError("Failed to fetch");
+  }) as unknown as typeof fetch;
+  try {
+    return await fn();
+  } finally {
+    globalThis.fetch = original;
+  }
+}
+
 describe("service worker fetch handling", () => {
   beforeEach(async () => {
     await loadServiceWorker();
@@ -91,5 +113,40 @@ describe("service worker fetch handling", () => {
     fetchHandler({ request: stubRequest("/", { mode: "navigate" }), respondWith });
 
     expect(respondWith).toHaveBeenCalledTimes(1);
+  });
+
+  describe("when the network fails", () => {
+    it("serves a styled HTML document for a navigation, not bare text", async () => {
+      const res = await withNetworkFailing(() => captureResponse(stubRequest("/knowledge", { mode: "navigate" })));
+
+      expect(res.status).toBe(503);
+      expect(res.headers.get("content-type")).toContain("text/html");
+      const body = await res.text();
+      expect(body).toContain("Hustlrzz");
+      expect(body).toContain('href="/"');
+      expect(body).toContain('name="viewport"');
+      expect(body).toContain("noindex");
+    });
+
+    it("keeps the offline document self-contained, since there is no network to fetch assets", async () => {
+      const res = await withNetworkFailing(() => captureResponse(stubRequest("/knowledge", { mode: "navigate" })));
+      const body = await res.text();
+
+      const remoteRefs = body.match(/(?:src|href)="https?:\/\/[^"]+"/g) ?? [];
+      expect(remoteRefs).toEqual([]);
+    });
+
+    it("does not cache the offline document", async () => {
+      const res = await withNetworkFailing(() => captureResponse(stubRequest("/knowledge", { mode: "navigate" })));
+
+      expect(res.headers.get("cache-control")).toContain("no-store");
+    });
+
+    it("still answers a non-navigation request with plain text", async () => {
+      const res = await withNetworkFailing(() => captureResponse(stubRequest("/images/bg-bento.svg")));
+
+      expect(res.status).toBe(503);
+      expect(res.headers.get("content-type")).toContain("text/plain");
+    });
   });
 });
