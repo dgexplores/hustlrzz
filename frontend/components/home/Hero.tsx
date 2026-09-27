@@ -134,7 +134,7 @@ export function Hero() {
     <section className="hero-bg relative overflow-hidden">
       <div aria-hidden="true" className="absolute inset-0 hero-overlay" />
 
-      <div className="relative mx-auto w-full max-w-7xl px-4 pb-16 pt-24 sm:px-6 md:pb-20 md:pt-28 lg:min-h-[100dvh] lg:px-8 lg:pt-28">
+      <div className="relative mx-auto w-full max-w-7xl px-4 pb-16 pt-24 sm:px-6 md:pb-20 md:pt-28 lg:px-8 lg:pt-28">
         <Reveal variants={riseIn}>
           <div className="flex items-baseline gap-3 border-b border-border pb-3">
             <span className="eyebrow text-primary">01</span>

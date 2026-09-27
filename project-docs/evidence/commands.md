@@ -421,3 +421,41 @@ unit test. What remains is the user's own consent click and the return leg, whic
 `/sitemap.xml`, `/api/auth/session`, `/auth/callback`, and the Render `/health` endpoint.
 Production Lighthouse after this change: accessibility 100, best practices 100, SEO 100, no failing
 audits.
+
+## 2026-09-28 Hero dead-space fix
+
+The hero's inner container carried `lg:min-h-[100dvh]` while its content is a
+fixed ~651px. Every pixel of surplus was therefore dumped *below* the content, and
+because the container was pinned to the viewport the surplus grew with the
+viewport. Measured in headless Chromium:
+
+| Viewport | Hero height | Content bottom | Dead space |
+|---|---|---|---|
+| 1440×954 | 954px | 651px | **303px** |
+| 1440×1400 | 1400px | 651px | **749px** |
+| 1280×800 | 800px | 651px | **149px** |
+
+`min-h-[100dvh]` was removed so the hero is sized by its content. The same
+measurement after the change:
+
+| Viewport | Hero height | Content bottom | Dead space |
+|---|---|---|---|
+| 1440×954 | 744px | 651px | 93px |
+| 1440×1400 | 744px | 651px | 93px |
+| 1280×800 | 744px | 651px | 93px |
+
+The hero is now a constant 744px at every viewport, and the remaining 93px is the
+section's own `pb-20` bottom padding — normal breathing room, not a layout fault.
+The gap no longer scales with the screen, which is what made it read as broken on
+a tall monitor. The primary CTA still sits above the fold: hero content ends at
+651px, inside a 744px hero.
+
+Two regression tests were added to `Hero.test.tsx` asserting that neither the
+section nor its inner container pins itself to a viewport height. They were
+written failing first — the inner-container guard failed against the old code,
+the section guard passed because the class was only ever on the child.
+
+Mobile is unaffected: the offending declaration was `lg:`-scoped.
+
+`npm run lint` 0 warnings, `npx tsc --noEmit` clean, `npm test` **115 passed /
+17 files** (was 113), `npm run build` 18 routes.
