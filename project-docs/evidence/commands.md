@@ -314,3 +314,78 @@ without a separator.
 | `npx tsc --noEmit` | clean |
 | `npm test` | **102 passed / 15 files** |
 | `npm run build` | 18 routes, `/` static |
+
+## 2026-09-28 Google OAuth and slow first load
+
+Both defects were diagnosed without opening a browser: the Supabase public API was probed with
+`curl`, and the failure was located by reading the installed `@supabase/auth-js` source rather than
+by guessing.
+
+### Google sign-in: root cause
+
+`GET /auth/v1/settings` reported `"google": true`, and `GET /auth/v1/authorize` returned **302 to
+accounts.google.com** for all three redirect targets tried, including the query-string form
+`https://hustlrzz.vercel.app/auth/callback?next=%2Fprepare`. The provider and the redirect allow list
+were both healthy, so the fault was client-side.
+
+`getSupabase()` was configured with `persistSession: false`. In `@supabase/auth-js` 2.112.4 that
+selects a **memory-backed storage adapter**:
+
+```js
+if (this.persistSession) { this.storage = globalThis.localStorage; }
+else { this.storage = memoryLocalStorageAdapter(this.memoryStorage); }
+```
+
+A PKCE flow writes a `code_verifier` before the browser leaves for the provider and needs it again on
+the way back. That round trip is a **full page unload**, so a verifier held only in the JS heap was
+gone by the time `/auth/callback` ran. `_isPKCECallback()` then found no verifier, `callbackUrlType`
+stayed `'none'`, and `_getSessionFromURL()` was never called — so no code exchange happened at all.
+The callback page reported *"Google returned without creating a session. Verify the Google provider
+and redirect URLs in Supabase."*, which pointed at a configuration that was in fact correct.
+
+The fix splits the storage adapter by key suffix. `/‑code-verifier$/` covers all three shapes that
+auth-js writes — the slot key `…-flow-<id>-code-verifier`, the pending-flow index
+`…-flows-code-verifier`, and the legacy fixed key `…-code-verifier` that `storePKCEVerifier` still
+dual-writes so that callbacks without a flow id can find their verifier. Those go to `sessionStorage`,
+which survives the redirect and dies with the tab. The session and user keys stay memory-only, so
+access and refresh tokens never reach browser storage, and `persistSession: true` is now required so
+auth-js reads the adapter on init and locates the verifier.
+
+`signInWithOAuth` was left alone: `_handleProviderSignIn` already calls `window.location.assign(url)`
+itself, so there was no second defect there.
+
+### Slow first load: root cause
+
+`AuthGate` began with `loading = true` and returned a full-screen spinner until
+`restoreSessionFromCookie()` **and** `getSession()` both resolved — a server round trip on every page,
+including the public front page, which renders its children signed out anyway. `/api/auth/session` had
+been measured between 0.4s and 9.5s, and the whole page waited for it. The homepage also server-rendered
+as that empty shell, so crawlers received a page with no content in it.
+
+The gate now skips the blocking spinner on the public route only. Protected routes still wait, so a
+signed-in user is never shown the sign-in form. The configuration-error screen still takes precedence
+over the bypass.
+
+| Check | Before | After |
+|---|---|---|
+| `GET /` SSR payload | 13,153 bytes, no page content | **51,929 bytes**, full hero, cockpit, bento, modes, manifesto, closing |
+| `GET /` crawler-visible content | none | `Simulated cockpit`, `Walk in rehearsed`, `staff_product_designer_resume`, `The full room`, `starts tonight` all present in the HTML |
+| `GET /prepare` | 13,656 bytes, `aria-label="Loading"` | unchanged — still gated, no protected content in the HTML |
+| `GET /dashboard` | 13,664 bytes | unchanged — still gated |
+| `GET /coaching` | 14,271 bytes | unchanged — still gated |
+
+### Tests
+
+`lib/supabase/__tests__/clientStorage.test.ts` (7) and
+`components/auth/__tests__/AuthGate.publicRoute.test.tsx` (4) were written failing first. The
+AuthGate file asserts the public page renders while the probe is still in flight, that a protected
+route still shows the loading status, and that the configuration error still wins. The storage file
+asserts the verifier survives a module reload, the session and user keys never reach `localStorage`
+or `sessionStorage`, a blocked `sessionStorage` throws nothing, and the client is handed a real
+adapter with `persistSession: true`.
+
+`npm run lint` 0 warnings, `npx tsc --noEmit` clean, `npm test` **113 passed / 17 files** (was 102 /
+15), `npm run build` 18 routes.
+
+A real Google sign-in still needs one interactive confirmation, because the verifier→provider→callback
+round trip is browser behaviour. The server legs are verified and the mechanism is unit-tested.
