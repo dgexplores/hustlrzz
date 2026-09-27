@@ -99,3 +99,13 @@ Two defects were caught by inspecting the rendered result rather than the code:
 
 A screenshot taken mid-animation initially reported `panelTop: -85`, which looked like a layout fault
 but was the capture scrolling. Scroll position is now asserted to be `0` before each capture.
+
+## 2026-09-27 reference replacement (`screen.png`)
+
+| Screenshot | Viewport | Shows |
+|---|---|---|
+| `shots/cockpit-1440-dark.png` | 1440 full page, dark | "SIMULATED COCKPIT v2.4" hero panel with `Latency: 24ms`, `VERIFY` / `DYNAMICS A1` / `MIC ACTIVE` badges, resume file chip, RAG question quote, level meter and `Pace: 148 wpm (Optimal)` / `Eye contact: 94%`; italic marquee; four telemetry bento cards; three trust claims; four equal mode cards with line-art icons; quote-marked manifesto; split closing; two-row footer |
+| `shots/cockpit-390-dark.png` | 390, dark, above the fold | Single-column hero. Cockpit panel drops below the CTAs and stays fully legible — no truncation on the file chip, quote, or meter. `0px` horizontal overflow. |
+
+The bento cards each gained a labelled inner panel that is legible at both widths: the resume-signals
+quotes, the three target bars, the AI-interview quote, and the `0.4/m` / `98%` / `100%` metric tiles.

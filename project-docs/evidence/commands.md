@@ -260,3 +260,57 @@ earlier "SEO 100 / Agentic 100" evidence was measured on localhost, where those 
 apply. Fixed by adding `frontend/public/robots.txt` and `frontend/public/llms.txt`, confirmed live.
 
 Authenticated production smoke evidence remains pending a signed-in session.
+
+## 2026-09-27 landing page replacement (reference `screen.png`)
+
+The hero panel and every section below it were rebuilt to match a supplied reference image. The
+existing design system was reused throughout — no new dependency, no new token file.
+
+### Hero panel: agenda chain → "SIMULATED COCKPIT v2.4"
+
+The three-step chain keeps its `ol aria-label="How it works"` and its stage labels, so the existing
+hero contract tests still assert against it. What changed is the presentation: a `SIMULATED
+COCKPIT v2.4` / `Latency: 24ms` header, a `VERIFY` badge over a resume-extraction note with a file
+chip, a `DYNAMICS A1` badge over a `RAG synthesis` question, and a `MIC ACTIVE` badge over a
+five-bar level meter with `Pace: 148 wpm (Optimal)` and `Eye contact: 94%`.
+
+The panel is explicitly labelled **SIMULATED** in its visible header, and the static values are
+presented as part of that labelled simulation. This is the same honesty boundary that removed the
+testimonial block: the page must not present illustrative telemetry as a real visitor result.
+
+Stages still play once on mount, hold, and replay on pointer-enter or focus. They never loop. Under
+`prefers-reduced-motion` the panel renders its finished state with no `motion` nodes at all.
+
+### Sections
+
+| Section | Before | After |
+|---|---|---|
+| Bento | 4 cards, copy only | 4 cards, each with a labelled telemetry panel (resume signals, target bars, AI-interview quote, three metric tiles) |
+| Trust row | 3 short labels | `Voice and typing modalities`, `Multi-provider failover gateway`, `Zero-cloud client processing` |
+| Mode cards | 4 hover-expanding flex accordions over grayscale photo collages | 4 equal cards, line-art Phosphor icon, title, descriptor, arrow |
+| Manifesto | Plain scrubbed thesis | Decorative serif quote marks; tail copy now names evidence, the company bar, and an executive coach |
+| Marquee | Serif, upright | Serif, italic |
+| Closing | Single line | `Your next interview` / *starts tonight.* on its own line |
+| Footer | 3-up row, privacy line third | Wordmark + `Process by design. Your camera never leaves the browser.`, nav, separate copyright row |
+
+`useFlexSpring` lost its last call site when the accordions were replaced and was removed from the
+`useSprings` import. The `Microphone` icon import in `HeroValueChain.tsx` was likewise dropped when
+`Verify` moved to a `CheckCircle` badge.
+
+### Text integrity
+
+The split closing heading is written as `Your next interview{" "}` before the `<br />`, so
+`textContent` and copy-paste yield `"Your next interview starts tonight."` rather than concatenating
+without a separator.
+
+### Checks
+
+| Check | Result |
+|---|---|
+| Horizontal overflow at 390 | `scrollWidth 375` vs `clientWidth 375` — **0px** |
+| Interactive targets under 44px at 390 | 1 — `Skip to content`, a visually-hidden-until-focused link (pre-existing, expands on focus) |
+| Cockpit panel at 390 | Header, badges, file chip, quote and meter all legible; no truncation |
+| `npm run lint` | clean, 0 warnings |
+| `npx tsc --noEmit` | clean |
+| `npm test` | **102 passed / 15 files** |
+| `npm run build` | 18 routes, `/` static |
