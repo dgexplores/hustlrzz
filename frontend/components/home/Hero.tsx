@@ -124,7 +124,7 @@ export function Hero() {
       <Reveal variants={riseIn}>
         <p className="mt-6 flex items-center gap-2 text-[13px] text-muted-foreground">
           <Fingerprint className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-          <span>Your camera never leaves the browser.</span>
+          <span>Your camera never leaves the browser. 100% private, client-side ML.</span>
         </p>
       </Reveal>
     </>
