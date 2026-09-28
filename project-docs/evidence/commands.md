@@ -715,3 +715,33 @@ The generation instruction for the master key is documented, with a warning to s
 durably, since it is the only thing that can decrypt stored user keys.
 
 Verified: frontend lint clean, `tsc` clean, 135 tests / 19 files, build compiled.
+
+## 2026-09-28 Auditing the README against the code
+
+Asking whether the README was actually "tailored" turned up two more stale claims
+that survived the BYOK pass, because that pass only fixed what BYOK touched.
+
+**Next.js 15 was wrong.** `frontend/package.json` pins `next: ^16.3.0`. A minor-version
+mistake is exactly the kind of detail that makes a README look maintained when it is
+not.
+
+**"+ one retry on rate limits" described resilience that does not exist.** There is no
+same-provider retry anywhere: `chat()` and `chat_messages()` each iterate the provider
+list once, and on exception record the failure and `continue` to the next provider. A
+search for `range(2)`, `retries =`, or `max_retry` in `ai/provider.py` and `app.py`
+returns nothing. The real behaviour is single-attempt-per-provider with a loud
+`ProviderError` listing what was tried. The README now says that, because claiming a
+retry implies a tolerance for transient failure that the code does not have.
+
+### Claims that were checked and deliberately left alone
+
+- "12 questions by default" — `config.py:67` sets `QUESTION_COUNT` to `12`.
+- "the three most relevant source-labelled chunks" during a live interview — correct.
+  `app.py:1504` sits inside `interview_ws` and passes `top_k=3`. A second call site at
+  `app.py:696` uses `top_k=2`, but that one is in `coaching_practice`, which the README
+  does not make a chunk-count claim about. Changing the sentence to "two" would have
+  introduced the error rather than removed one.
+- All 20 routes in the API table resolve to real handlers in `app.py`.
+- FastAPI, Tailwind, MediaPipe, pgvector, RLS, and optional Sentry all verify.
+
+Frontend gates re-run after the change: lint clean, `tsc` clean, 135 tests / 19 files.

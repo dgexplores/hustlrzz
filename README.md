@@ -86,9 +86,9 @@ negotiation wording, risky phrases to avoid, and decision guardrails.
 
 | Layer | Production approach |
 | --- | --- |
-| **Interface** | Next.js 15, TypeScript, Tailwind, accessible responsive UI with light, dark, and system themes |
+| **Interface** | Next.js 16, TypeScript, Tailwind, accessible responsive UI with light, dark, and system themes |
 | **Live service** | Python FastAPI and WebSockets |
-| **AI resilience** | Free-tier providers only by default (Groq, then Gemini) + one retry on rate limits. Paid providers are unreachable unless a user supplies a key or `AI_PROVIDER_ALLOW_PAID=1` |
+| **AI resilience** | Free-tier providers only by default (Groq, then Gemini). Each provider is attempted once, then the request fails loudly rather than falling through into a paid provider. Paid providers are unreachable unless a user supplies a key or `AI_PROVIDER_ALLOW_PAID=1` |
 | **Data & identity** | Supabase Auth + PostgreSQL with Row-Level Security |
 | **Voice & camera** | Browser-native Web Speech and in-browser MediaPipe |
 | **Deployment** | Vercel frontend + Render API (Docker, free tier) |
