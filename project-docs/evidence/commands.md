@@ -951,3 +951,34 @@ early runs, where a script asserted and exited *before* calling the delete and t
 auth user was then removed in bulk — leaving data behind. That is precisely the
 failure mode the implementation is ordered to prevent, observed from the outside.
 Three real users and their data are untouched.
+
+## 2026-09-28 Email delivery and OTP — consciously deferred
+
+Checked against the live system, not the code. The state, so this is not
+re-investigated next session:
+
+- **No OTP, no magic link, no email verification.** Signup returns an instant
+  session and `confirmation_sent_at` is `None`, so no confirmation mail is even
+  attempted. `mailer_autoconfirm` is `True` on the project.
+- **Password reset is silently broken.** `POST /auth/v1/recover` returns `200 {}`
+  for an address that cannot receive mail, because no SMTP provider is configured.
+  A user clicking "Forgot password" is told to check their inbox and nothing ever
+  arrives, so an email/password account cannot be recovered. Only the demo-rate
+  Supabase SMTP is in play, which does not deliver to arbitrary recipients.
+- The frontend already handles both the confirmed and unconfirmed branches
+  correctly (`data.session ? "Account created. You are signed in." : "Check your
+  email…"`), so enabling verification later needs no frontend change.
+- `/auth/callback` and `/auth/update-password` both exist, so the reset callback
+  target is already in place.
+- Setup instructions are in `docs/EMAIL_SETUP.md` (Resend + verified sender domain).
+
+**Decision: left as-is, deliberately.** This is a prototype, and Google sign-in is
+the intended primary path and needs no email at all. Turning verification on without
+working SMTP would break registration outright, and adding an OTP now would produce
+a code screen that silently never receives a code — worse than today's instant
+signup.
+
+Revisit when either is true: a real user needs password recovery, or a paid tier
+makes email ownership matter (with autoconfirm on, anyone can register any address
+they do not own, which is harmless in a demo and not harmless once identity carries
+value).
