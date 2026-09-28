@@ -677,3 +677,41 @@ table exists, secret is valid under the shipping code, and the running process h
 What cannot be shown from here is the authenticated round trip, since the key routes
 return 401 without a session. That last check is a UI one — the key form in Settings
 should no longer read "Not enabled on this deployment".
+
+## 2026-09-28 Sanitising the marketing claims and the README
+
+Two honesty problems found while wrapping up, both about numbers that read as
+measurements.
+
+### Fabricated figures on the landing page
+
+`98.4%` (resume match), `0.4/m` (filler count), `98%` (posture hold), `100%` (on-device),
+the 80/80/88 telemetry bars, and "Yesterday's session logged 14 probes" were all rendered
+with no indication they were illustrative. A visitor reads those as results measured on
+them. The hero panel was the only one with a visible label, and even it had two false
+marks of precision: `Simulated cockpit v2.4` and `Latency: 24ms`.
+
+Fixed by adding a visible `Sample data` marker rather than a disclaimer, because a
+disclaimer nobody reads is not a correction. `PanelLabel` gained a `sample` prop so the
+marker sits inline with the label it qualifies, and the three metric tiles got one above
+the row. The hero now reads `Simulated session` with `Not a live measurement` in place of
+the invented latency, and the fake version number is gone.
+
+### The README described a product that no longer exists
+
+Line 91 still claimed "Groq (Qwen) primary with automatic Gemini fallback" and said
+nothing about the paid providers, which is the exact configuration that was costing
+money. More seriously, **the README never mentioned bring-your-own-key at all** — an
+entire shipped feature was absent, as were the `/ai/keys` and `/ai/quota` routes, the
+three AI environment variables, the `user_ai_keys` migration, and the
+`project-docs/`, `project-specs/`, and `project-tasks/` directories.
+
+It now carries a BYOK section with the encryption scheme, the fail-closed behaviour, and
+the limitation that this backend can decrypt user keys while proxying — stated in the
+README rather than only in a commit message, because that is the document a new
+contributor or evaluator reads.
+
+The generation instruction for the master key is documented, with a warning to store it
+durably, since it is the only thing that can decrypt stored user keys.
+
+Verified: frontend lint clean, `tsc` clean, 135 tests / 19 files, build compiled.
