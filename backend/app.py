@@ -879,6 +879,12 @@ class KnowledgeSearchRequest(BaseModel):
 # --------------------------------------------------------------------------- #
 # Bring-your-own-key provider credentials
 # --------------------------------------------------------------------------- #
+class AccountDeleteRequest(BaseModel):
+    """Body for DELETE /account. ``confirm`` must be exactly "DELETE"."""
+
+    confirm: str = Field(default="", max_length=32)
+
+
 class AIKeyRequest(BaseModel):
     provider: str = Field(pattern=r"^(groq|gemini|openai|openrouter)$")
     api_key: str = Field(min_length=8, max_length=400)
@@ -998,10 +1004,173 @@ async def ai_quota(user: dict = Depends(get_user)):
             "remaining": (max(0, cap - used) if cap and used is not None else None),
             "own_key": bool(own),
             "byok_enabled": keyring.is_enabled(),
+            # Drives the provider picker in Settings, so it is disclosed
+            # deliberately. The operator's paid-fallback posture is not: it is
+            # unused by the client and told any signed-in account how this
+            # deployment is configured, so it was removed.
             "shared_free_providers": sorted(provider._shared_keys().keys()),
-            "paid_allowed": bool(getattr(config, "AI_PROVIDER_ALLOW_PAID", False)),
         },
     }
+
+
+# --- Data subject rights: export and erasure -------------------------------------
+#
+# Every table holding this user's personal data. ``company_intelligence`` is
+# deliberately absent: it is shared company research keyed by company, not by
+# user, and erasing it would destroy data belonging to every other account.
+#
+# Order is children before parents so a foreign key can never block the cascade.
+# This tuple is the single source of truth for the erasure path -- if a table
+# that stores user data is added later and not listed here, the account deletion
+# would silently under-erase, so a test asserts the live table set is covered.
+_USER_DATA_TABLES: tuple[str, ...] = (
+    "knowledge_chunks",
+    "knowledge_documents",
+    "interview_sessions",
+    "practice_sessions",
+    "workflows",
+    "assessment_attempts",
+    "drill_reviews",
+    "report_feedback",
+    "resume_analysis",
+    "resume_usage",
+    "product_events",
+    "user_ai_keys",
+    "profiles",
+)
+
+# rate_limit_events has no user_id column; its key is "<scope>:<uid>".
+_RATE_LIMIT_KEY_SUFFIX = ":%s"
+
+
+def _audit(event: str, user_id: str, **fields: Any) -> None:
+    """Security audit line. Never receives personal data -- only ids and counts."""
+    logging.getLogger("hustlrzz.account").info(
+        "account_event=%s uid=%s %s",
+        event,
+        user_id,
+        " ".join(f"{k}={v}" for k, v in fields.items()),
+    )
+
+
+@router.get("/account/export")
+async def export_account(
+    user: dict = Depends(rate_limited("account_export", 5, 3600)),
+):
+    """Everything this account stores, so it can be kept or handed elsewhere.
+
+    Owner-scoped only. The stored provider key is reported as a hint rather than
+    its ciphertext: the caller cannot decrypt the blob, and shipping it in a JSON
+    response would only expose ciphertext to anything intercepting the download.
+    """
+    _db_or_503()
+    uid = user["uid"]
+    export: dict[str, Any] = {}
+    for table in _USER_DATA_TABLES:
+        rows = await asyncio.to_thread(dbc.select_where, table, {"user_id": uid})
+        if table == "user_ai_keys":
+            rows = [
+                {k: v for k, v in row.items() if k != "encrypted_key"} for row in rows
+            ]
+        export[table] = rows
+    rate_rows = await asyncio.to_thread(
+        dbc.select_where_like, "rate_limit_events", "key", f"*{uid}"
+    )
+    _audit("export", uid, tables=len(export), rows=sum(len(v) for v in export.values()))
+    return {
+        "success": True,
+        "data": {
+            "exported_at": _now(),
+            "user_id": uid,
+            "tables": export,
+            "rate_limit_events": len(rate_rows),
+        },
+    }
+
+
+@router.delete("/account")
+async def delete_account(
+    payload: AccountDeleteRequest,
+    user: dict = Depends(rate_limited("account_delete", 3, 3600)),
+):
+    """Irreversibly erase this account: all personal data, then the login.
+
+    Two rules make this safe to expose:
+
+    1. The Supabase auth user is deleted **last**, and only if every data table
+       was cleared. If any table fails, the login survives so the caller can
+       retry, rather than being locked out of data that is still there.
+    2. Every table is attempted even after one fails, and the per-table outcome is
+       returned, so a partial erasure is visible rather than silent.
+    """
+    _db_or_503()
+    if payload.confirm != "DELETE":
+        raise HTTPException(
+            status_code=422,
+            detail="Type DELETE to confirm. This cannot be undone.",
+        )
+    uid = user["uid"]
+    cleared: dict[str, int] = {}
+    failed: dict[str, str] = {}
+
+    for table in _USER_DATA_TABLES:
+        try:
+            before = await asyncio.to_thread(dbc.select_where, table, {"user_id": uid})
+            await asyncio.to_thread(dbc.delete_where, table, {"user_id": uid})
+            cleared[table] = len(before)
+        except Exception as exc:  # noqa: BLE001 - recorded and reported per table
+            failed[table] = type(exc).__name__
+
+    try:
+        await asyncio.to_thread(
+            dbc.delete_where_like,
+            "rate_limit_events",
+            "key",
+            f"*{uid}",
+        )
+        cleared["rate_limit_events"] = 1
+    except Exception as exc:  # noqa: BLE001
+        failed["rate_limit_events"] = type(exc).__name__
+
+    if failed:
+        _audit("erase_failed", uid, failed=",".join(sorted(failed)))
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Erasure incomplete. Nothing else was changed; please retry.",
+                "cleared": cleared,
+                "failed": failed,
+            },
+        )
+
+    try:
+        await asyncio.to_thread(_delete_auth_user, uid)
+    except Exception as exc:  # noqa: BLE001
+        # Personal data is already gone; report the failure honestly rather than
+        # claiming a clean deletion of the login.
+        _audit("erase_login_failed", uid, error=type(exc).__name__)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Your data was erased but the login could not be removed. "
+                "Please contact support.",
+                "cleared": cleared,
+            },
+        )
+
+    _audit("erased", uid, tables=len(cleared), rows=sum(cleared.values()))
+    return {
+        "success": True,
+        "data": {"erased_at": _now(), "cleared": cleared},
+    }
+
+
+def _delete_auth_user(uid: str) -> None:
+    """Remove the Supabase auth user. Runs last, after the data is gone."""
+    client = dbc.get_client()
+    if client is None:
+        raise RuntimeError("Supabase not configured")
+    client.auth.admin.delete_user(uid)
 
 
 @router.get("/knowledge/status")

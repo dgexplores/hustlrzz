@@ -131,6 +131,38 @@ user keys while handling a request. That is inherent to proxying. Being structur
 unable to read them would require calling the provider from the browser, which is a
 substantially larger change.
 
+## Your data: export and deletion
+
+GDPR and CCPA give users the right to take their data and to have it erased. Both
+are implemented rather than handled by hand on request.
+
+**Export** — `GET /account/export` returns every row this account holds across
+thirteen tables as JSON, downloaded as a file. Stored provider keys are reported as
+a hint rather than their ciphertext: the caller cannot decrypt the blob, and
+shipping it in a JSON response would only expose ciphertext to anything
+intercepting the download.
+
+**Deletion** — `DELETE /account` clears thirteen user-scoped tables plus this user's
+rate-limit keys, then removes the Supabase login. Three properties make it safe to
+expose:
+
+- **The login is deleted last, and only if every table succeeded.** If any table
+  fails, the login survives so the caller can retry, rather than being locked out of
+  data that is still there. The response names exactly what cleared and what did not.
+- **Every table is attempted even after one fails**, so a partial erasure is
+  reported rather than silently partial.
+- **`company_intelligence` is never touched.** It is shared company research keyed
+  by company, not by user; erasing it would destroy data belonging to every other
+  account.
+
+Both are rate limited (5 exports and 3 deletions per hour), the delete requires the
+caller to type `DELETE`, and every erasure is written to the audit log as an id and
+row counts only — never personal data.
+
+**Backup caveat, stated plainly:** this erases rows from the live database. Rows
+already captured in a database backup or a WAL snapshot are outside the reach of any
+application-level delete, so "deleted" means "no longer in the live system".
+
 ## Built-in safeguards
 
 - Candidate data is protected by Supabase Row-Level Security.
@@ -141,6 +173,9 @@ substantially larger change.
 - Paid AI providers are unreachable without a user key or an explicit operator opt-in.
 - Stored user keys are encrypted at rest, are never returned by the API, and are bound
   to their provider and owning user.
+- Stored user keys are never returned by any endpoint, including the account export.
+- Account deletion is rate limited, requires explicit confirmation, deletes the login
+  last, and reports per-table results.
 - `GET /health` reports API, AI-provider, and database readiness.
 
 ---
@@ -323,6 +358,8 @@ delivery with Resend.
 | `GET /knowledge/status`, `POST /knowledge/documents`, `POST /knowledge/search` | Candidate-owned RAG knowledge |
 | `POST /resume-analyzer/analyze`, `GET /resume-analyzer/usage` | In-memory PDF/DOCX analysis with quota and history |
 | `GET /ai/quota` | Shared free-tier quota, BYOK availability, and enabled providers |
+| `GET /account/export` | Everything this account stores, as JSON, owner-scoped |
+| `DELETE /account` | Irreversibly erase the account. Requires `{"confirm": "DELETE"}`; data first, login last |
 | `GET /ai/keys` | List the caller's own provider keys (hints only, never key material) |
 | `PUT /ai/keys` | Store or replace one key; takes `{"provider": "...", "api_key": "..."}` in the body |
 | `DELETE /ai/keys/{provider_name}` | Remove one stored key |
