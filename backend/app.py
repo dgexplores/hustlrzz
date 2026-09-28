@@ -19,7 +19,9 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Literal, Optional
 from xml.etree import ElementTree
+import logging
 import re
+from datetime import datetime, timezone
 
 from fastapi import (
     APIRouter,
@@ -39,10 +41,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, field_validator
 
 from backend import config, db as dbc
-from backend.ai import provider
+from backend.ai import keyring, provider
 from backend.career import analysis, company_profiles
 from backend.career import intelligence as company_intel
 from backend.rag import service as rag
+
+log = logging.getLogger("hustlrzz")
 from backend.resume import service as resume_analyzer
 from backend.session import registry
 from backend.workflow.preparation import run_preparation_workflow
@@ -73,6 +77,22 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
+
+
+@app.middleware("http")
+async def _release_request_keys(request: Request, call_next):
+    """Drop any decrypted BYOK material as soon as the response is produced.
+
+    Each request runs in its own task, so the binding would not leak into the
+    next one — but holding plaintext keys longer than the request is avoidable.
+    """
+    try:
+        return await call_next(request)
+    finally:
+        token = getattr(request.state, "ai_key_token", None)
+        if token is not None:
+            provider.reset_request_keys(token)
+            request.state.ai_key_token = None
 
 
 @app.middleware("http")
@@ -124,23 +144,39 @@ def rate_limited(scope: str, limit: int, window_seconds: int):
     return dependency
 
 
-def get_user(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer)):
+async def get_user(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer)):
+    """Resolve the caller and bind their own provider keys to this request.
+
+    This must stay ``async``: a contextvar set inside a sync dependency runs in
+    a worker thread and would be invisible to the endpoint and to the
+    ``asyncio.to_thread`` calls the workflows use. Because the binding happens
+    here, every provider call downstream picks it up without threading a user
+    argument through the seven call sites that use it.
+    """
     if not credentials:
         raise HTTPException(status_code=401, detail="Missing bearer token")
     client = dbc.get_client()
     if client is None:
         raise HTTPException(status_code=503, detail="Supabase not configured")
+
+    def _resolve():
+        return client.auth.get_user(credentials.credentials).user
+
     try:
-        user = client.auth.get_user(credentials.credentials).user
-        meta = user.user_metadata or {}
-        return {
-            "uid": user.id,
-            "email": user.email or "",
-            "name": meta.get("full_name") or meta.get("name") or "",
-            "picture": meta.get("avatar_url") or meta.get("picture") or "",
-        }
+        user = await asyncio.to_thread(_resolve)
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    meta = user.user_metadata or {}
+    resolved = {
+        "uid": user.id,
+        "email": user.email or "",
+        "name": meta.get("full_name") or meta.get("name") or "",
+        "picture": meta.get("avatar_url") or meta.get("picture") or "",
+    }
+    token = provider.set_request_keys(await _load_user_keys(resolved["uid"]))
+    request.state.ai_key_token = token
+    return resolved
 
 
 async def _delete_owned_or_404(table: str, id_col: str, row_id: str, user_id: str, detail: str) -> Response:
@@ -244,6 +280,21 @@ async def start_workflow(
     user: dict = Depends(rate_limited("workflows", config.RATE_WORKFLOWS_PER_MIN, 60)),
 ):
     num_questions = max(1, min(num_questions, 50))
+    # A run is ~5 LLM calls, so a burst can exhaust a shared free tier in
+    # minutes. Callers with their own key are not capped: that quota is theirs.
+    cap = int(getattr(config, "AI_DAILY_RUN_CAP", 0) or 0)
+    if cap:
+        has_own_key = bool(await asyncio.to_thread(dbc.select_where, "user_ai_keys", {"user_id": user["uid"]})) if keyring.is_enabled() else False
+        if not has_own_key:
+            used = await asyncio.to_thread(_daily_run_count, user["uid"])
+            if used >= cap:
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"You have used today's {cap} included runs. "
+                        "Add your own provider key in Settings to lift the limit."
+                    ),
+                )
     t0 = time.time()
     rag_status = {"available": rag.is_ready(), "indexed": False}
     # Indexing is additive. An embedding outage must never prevent a candidate
@@ -823,6 +874,134 @@ class KnowledgeIngestRequest(BaseModel):
 class KnowledgeSearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
     top_k: int = Field(default=5, ge=1, le=10)
+
+
+# --------------------------------------------------------------------------- #
+# Bring-your-own-key provider credentials
+# --------------------------------------------------------------------------- #
+class AIKeyRequest(BaseModel):
+    provider: str = Field(pattern=r"^(groq|gemini|openai|openrouter)$")
+    api_key: str = Field(min_length=8, max_length=400)
+
+
+def _byok_enabled_or_503() -> None:
+    if not keyring.is_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Bring-your-own-key is not enabled on this deployment.",
+        )
+
+
+def _daily_run_count(user_id: str) -> int:
+    """Runs started today on shared quota, as a UTC calendar day."""
+    if not dbc.is_ready():
+        return 0
+    day_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = dbc.select_where("workflows", {"user_id": user_id}) or []
+    return sum(1 for r in rows if str(r.get("created_at") or "") >= day_start.isoformat())
+
+
+async def _load_user_keys(user_id: str) -> dict[str, str]:
+    """Decrypt the caller's own provider keys for this request only.
+
+    Any single unreadable row is skipped rather than failing the request: one
+    key written under a rotated master key must not break every other provider.
+    """
+    if not keyring.is_enabled() or not dbc.is_ready():
+        return {}
+    try:
+        rows = await asyncio.to_thread(dbc.select_where, "user_ai_keys", {"user_id": user_id})
+    except Exception:
+        return {}
+    resolved: dict[str, str] = {}
+    for row in rows or []:
+        name = row.get("provider")
+        if not name:
+            continue
+        try:
+            resolved[name] = keyring.decrypt_key(
+                user_id=user_id, provider=name, ciphertext=row.get("encrypted_key") or ""
+            )
+        except Exception as exc:
+            log.warning("byok: could not read stored key for %s: %s", name, type(exc).__name__)
+    return resolved
+
+
+@router.get("/ai/keys")
+async def list_ai_keys(user: dict = Depends(get_user)):
+    """Provider plus last four characters only. The key is never returned."""
+    _byok_enabled_or_503()
+    rows = await asyncio.to_thread(dbc.select_where, "user_ai_keys", {"user_id": user["uid"]})
+    return {
+        "success": True,
+        "data": [
+            {
+                "provider": r.get("provider"),
+                "key_hint": r.get("key_hint", ""),
+                "updated_at": r.get("updated_at"),
+            }
+            for r in (rows or [])
+        ],
+    }
+
+
+@router.put("/ai/keys")
+async def put_ai_key(payload: AIKeyRequest, user: dict = Depends(get_user)):
+    """Store or replace one of the caller's own provider keys, encrypted at rest."""
+    _byok_enabled_or_503()
+    try:
+        encrypted = keyring.encrypt_key(
+            user_id=user["uid"], provider=payload.provider, plaintext=payload.api_key
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    await asyncio.to_thread(
+        dbc.upsert,
+        "user_ai_keys",
+        [{
+            "user_id": user["uid"],
+            "provider": payload.provider,
+            "encrypted_key": encrypted,
+            "key_hint": keyring.key_hint(payload.api_key),
+            "updated_at": _now(),
+        }],
+        "user_id,provider",
+    )
+    return {
+        "success": True,
+        "data": {"provider": payload.provider, "key_hint": keyring.key_hint(payload.api_key)},
+    }
+
+
+@router.delete("/ai/keys/{provider_name}")
+async def delete_ai_key(provider_name: str, user: dict = Depends(get_user)):
+    _byok_enabled_or_503()
+    if not keyring.is_allowed_provider(provider_name):
+        raise HTTPException(status_code=422, detail="Unsupported provider.")
+    await asyncio.to_thread(
+        dbc.delete_where, "user_ai_keys", {"user_id": user["uid"], "provider": provider_name}
+    )
+    return Response(status_code=204)
+
+
+@router.get("/ai/quota")
+async def ai_quota(user: dict = Depends(get_user)):
+    """What this caller can run today, and which providers are in play."""
+    cap = int(getattr(config, "AI_DAILY_RUN_CAP", 0) or 0)
+    used = await asyncio.to_thread(_daily_run_count, user["uid"]) if cap else None
+    own = await asyncio.to_thread(dbc.select_where, "user_ai_keys", {"user_id": user["uid"]})
+    return {
+        "success": True,
+        "data": {
+            "daily_cap": cap,
+            "used_today": used,
+            "remaining": (max(0, cap - used) if cap and used is not None else None),
+            "own_key": bool(own),
+            "byok_enabled": keyring.is_enabled(),
+            "shared_free_providers": sorted(provider._shared_keys().keys()),
+            "paid_allowed": bool(getattr(config, "AI_PROVIDER_ALLOW_PAID", False)),
+        },
+    }
 
 
 @router.get("/knowledge/status")

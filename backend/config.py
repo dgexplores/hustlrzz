@@ -16,6 +16,23 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 # "openrouter" (any OpenAI-compatible model via a single key).
 AI_PROVIDER = os.getenv("AI_PROVIDER", "groq").lower()
 
+# Cost control. Providers without a usable free tier are kept out of the shared
+# fallback chain unless this is explicitly turned on, so exhausting a free tier
+# stops the request instead of quietly becoming a bill. A user who brings their
+# own key for such a provider still reaches it: that spend is theirs, not ours.
+AI_PROVIDER_ALLOW_PAID = os.getenv("AI_PROVIDER_ALLOW_PAID", "").strip().lower() in {
+    "1", "true", "yes", "on",
+}
+
+# Bring-your-own-key. Disabled unless a 32-byte urlsafe-base64 master key is set;
+# there is deliberately no default, so a misconfigured deploy stores nothing.
+AI_KEYS_ENCRYPTION_KEY = os.getenv("AI_KEYS_ENCRYPTION_KEY", "")
+
+# Per-user ceiling on shared-quota AI runs per day, counted as a rolling UTC
+# calendar day. Users with their own key are not capped by this, because their
+# quota is their own.
+AI_DAILY_RUN_CAP = int(os.getenv("AI_DAILY_RUN_CAP", "0"))  # 0 disables the cap
+
 GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
