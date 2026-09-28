@@ -578,3 +578,48 @@ surfaced during cleanup as `unhandled undefined` rather than as the assertion it
 `mockClear` plus a default `respond()` fixed it.
 
 Backend **229 passed** (was 190), frontend **135 passed / 19 files** (was 126 / 18).
+
+## 2026-09-28 Applying the user_ai_keys migration to production
+
+PR #32 merged as `a77ffcc`. The feature ships inert until two things exist, so both
+were checked rather than assumed.
+
+`supabase migration list --linked` showed exactly one pending migration and twelve
+already applied, so `supabase db push` could not replay anything historical. The
+statement is `CREATE TABLE IF NOT EXISTS`, one index, and `enable row level security`
+— it touches no existing table and no rows.
+
+```
+supabase db push --linked
+  Applying migration 20260928010000_user_ai_keys.sql...
+Finished supabase db push.
+```
+
+Verified through PostgREST: `user_ai_keys` is reachable and holds 0 rows.
+
+The `cryptography` import error from `failed to cache migrations catalog` is about
+pg-delta needing Docker for local diffing, not about the push. The push completed and
+the table is confirmed present, so it is noise.
+
+### What is deliberately still off
+
+`AI_KEYS_ENCRYPTION_KEY` is not set, because Render's CLI v2.26.0 exposes no
+env-var subcommand — there is no `render env`, and `render services update` covers
+service configuration rather than environment variables. Setting it needs either the
+dashboard or a Render API key, and a key should not be pasted into a chat transcript.
+
+With the keyring disabled the key routes return 503 and everything else is
+unaffected, which was confirmed against production:
+
+```
+GET /health            -> 200  {"status":"ok","ai_configured":true,"provider":"groq","db_ready":true}
+GET /ai/keys  (no auth)-> 401
+GET /ai/quota (no auth)-> 401
+startup logs           -> no keyring or encryption errors
+```
+
+The 401 rather than 503 is the meaningful detail: authentication is rejected before
+the keyring is consulted, so an unauthenticated caller cannot learn whether the
+keyring is enabled. With the key unset the app is therefore in the same working state
+as before, and the paid-provider fix — the part that was actually costing money — is
+live and independent of this.
