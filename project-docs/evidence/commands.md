@@ -623,3 +623,57 @@ the keyring is consulted, so an unauthenticated caller cannot learn whether the
 keyring is enabled. With the key unset the app is therefore in the same working state
 as before, and the paid-provider fix — the part that was actually costing money — is
 live and independent of this.
+
+### Setting the encryption key without touching a secret in a transcript
+
+The dashboard was avoided rather than used, and no key was pasted into a chat
+transcript. Render CLI v2.26.0 has no env-var subcommand — there is no `render env`,
+and `render services update` covers service configuration, not environment variables —
+so the REST API was used instead with the credential the CLI already had in
+`~/.render/cli.yaml`, read into a shell variable and never printed.
+
+The secret is generated locally and stored outside the repository at
+`~/.config/hustlrzz/AI_KEYS_ENCRYPTION_KEY` with mode 600, so it exists in exactly two
+places: that file and Render. The script is idempotent and reuses an existing file
+rather than regenerating, because regenerating after keys have been stored would make
+those keys permanently unreadable.
+
+`PATCH /v1/services/{id}/env-vars` returns 405 — that route is GET/PUT/DELETE only.
+`PUT /v1/services/{id}/env-vars/{KEY}` is the correct single-key upsert and is also
+safer, since it cannot disturb the other eleven variables. Confirmed afterwards: 12
+env vars, and the value read back from Render matches the local file byte for byte.
+
+A restart was not sufficient evidence. `render restart` returned success but the
+service answered `/health` within five seconds, and the log buffer had already scrolled
+past any startup line, so there was no way to show a new process had read the new
+environment. A forced API deploy was used instead, which produced an unambiguous
+sequence:
+
+```
+Live  e3edc4b  trigger=api  dep-dat4720jo6nc73e6gfog  10:38:00 -> 10:38:35
+10:38:32  Waiting for application startup.
+10:38:32  Application startup complete.
+10:38:32  Uvicorn running on http://0.0.0.0:10000
+```
+
+No keyring, encryption, or traceback output. That process provably holds the current
+environment.
+
+The stored value was then run through the real keyring code locally rather than
+assumed valid:
+
+```
+is_enabled()                    True
+round trip                      ok
+ciphertext contains plaintext   False (72 chars)
+key_hint                        ...MNOP
+cross-user decrypt              refused (KeyringDecryptError)
+cross-provider decrypt          refused (KeyringDecryptError)
+is_paid_provider(groq/openai)   False / True
+```
+
+Together with the applied migration and the fresh deploy, the chain is complete:
+table exists, secret is valid under the shipping code, and the running process has it.
+What cannot be shown from here is the authenticated round trip, since the key routes
+return 401 without a session. That last check is a UI one — the key form in Settings
+should no longer read "Not enabled on this deployment".
