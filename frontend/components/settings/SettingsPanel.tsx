@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { AlertCircle, CheckCircle, Loader2, LogOut } from "lucide-react";
 import { AiKeysCard } from "@/components/settings/AiKeysCard";
+import { DataRightsCard } from "@/components/settings/DataRightsCard";
 import type { User } from "@supabase/supabase-js";
 
 export function SettingsPanel() {
@@ -170,6 +171,8 @@ export function SettingsPanel() {
       </Card>
 
       <AiKeysCard />
+
+      <DataRightsCard />
 
       <div className="flex justify-end">
         <Button variant="outline" onClick={signOut} className="gap-1.5">

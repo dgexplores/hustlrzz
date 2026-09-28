@@ -87,3 +87,23 @@ def delete_where(table: str, match: dict) -> None:
     for key, value in match.items():
         q = q.eq(key, value)
     q.execute()
+
+
+def select_where_like(table: str, column: str, pattern: str) -> list[dict]:
+    """Rows whose ``column`` matches a SQL LIKE pattern.
+
+    Needed for tables keyed by a composite string rather than a user_id column,
+    such as ``rate_limit_events`` whose key is ``"<scope>:<uid>"``.
+    """
+    client = _require_client()
+    resp = client.table(table).select("*").like(column, pattern).execute()
+    return resp.data
+
+
+def delete_where_like(table: str, column: str, pattern: str) -> int:
+    """Delete rows matching a LIKE pattern. Returns the number removed."""
+    client = _require_client()
+    removed = (
+        client.table(table).delete().like(column, pattern).execute().data or []
+    )
+    return len(removed)

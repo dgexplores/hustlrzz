@@ -815,3 +815,78 @@ and the row is now split so the body shape is stated explicitly.
 
 This is the argument for testing documentation against the running service: the route
 table was internally consistent and plausible, and still wrong.
+
+## 2026-09-28 Security audit and data subject rights
+
+A full pass over the codebase against a security-and-hardening checklist. Most of it
+was already sound; two genuine gaps were found and closed.
+
+### What was already right, verified rather than assumed
+
+- **SSRF.** `career/web_research.py::_pin_url` resolves DNS once and connects to the
+  literal IP, with explicit `Host` and SNI headers, re-validated on every redirect
+  hop. This closes the TOCTOU gap that even the reference pattern in the checklist
+  admits to.
+- **SQL.** PostgREST builder throughout, `.eq()` per field, no string concatenation.
+  Checked that no caller passes a variable table name into `db.py`, which would
+  otherwise have been reachable.
+- **Access control.** Every route takes `Depends(get_user)` and scopes by
+  `user["uid"]`. Deletes route through `_delete_owned_or_404`, which returns 404
+  rather than 403 for a foreign id, so there is no existence oracle.
+- **Rate limiting.** `rate_limited` uses a shared Postgres store with an in-process
+  fallback, so it holds across instances.
+- **Prompt injection.** `ai/grounding.py` instructs the model that tool results are
+  untrusted evidence and must never be followed as instructions.
+- **Upload, XSS, secrets, logging, tokens.** Size caps with a `MAX+1` overflow read,
+  per-member DOCX byte cap, no `dangerouslySetInnerHTML`/`eval`/`exec`, no real
+  secret anywhere in history (only synthetic test fixtures), no PII or transcripts
+  logged, no auth token in localStorage.
+
+Two of my own checks were wrong before the code was: an awk pass reported fifteen
+"unprotected" endpoints because it only read three lines ahead, and a first OAuth
+probe read the wrong URL field. Neither was reported as a finding.
+
+### Gap 1 — no data subject rights
+
+There were per-item deletes but no export and no account deletion, so a GDPR or CCPA
+erasure request could not be honoured. The table list was taken from the **live**
+PostgREST spec rather than `schema.sql`, which could be stale: twenty tables, of
+which thirteen are user-scoped, one (`rate_limit_events`) is keyed `"<scope>:<uid>"`
+and needed a `like` helper added to `db.py`, and one (`company_intelligence`) is
+**shared** and must never be erased.
+
+The erasure ordering is the part that matters. Children before parents so a foreign
+key cannot stall the cascade, the auth login deleted **last and only if every table
+succeeded**, every table attempted even after a failure, and the response naming what
+cleared and what did not. A test asserts the tuple covers the live table set, so a
+table added later cannot silently under-erase.
+
+`test_account_rights.py` (19) covers that coverage guard, owner scoping of the
+export, `encrypted_key` redaction, six rejected confirmation strings, the login
+being deleted last, shared `company_intelligence` surviving, another user's rows
+surviving, rate limiting on both routes, and two partial-failure cases.
+
+### Gap 2 — `/ai/quota` disclosed operator configuration
+
+`paid_allowed` was unused by the client and told any signed-in account whether this
+deployment has paid fallback enabled. Removed, with the existing test inverted to
+assert its absence. `shared_free_providers` was **kept**: it drives the provider
+picker in Settings, so removing it would break the UI for no security gain, and
+"which vendor you use" is already public in the marketing copy. Removing a field
+because it looked like a secret is not the same as reducing exposure.
+
+### One finding deliberately not fixed
+
+`npm audit`: zero production vulnerabilities. Two moderate, both in `vitest`
+(GHSA-82fw-gwwq-j7x9), which is dev-only and never shipped. The fix crosses a major
+version and `--force` is banned by the checklist. Documented, not forced.
+
+### Test-hygiene note
+
+The account tests initially failed only when run as a file. The limiter falls back to
+in-process counters when the shared store is unavailable, and the erasure limit is
+3/hour, so tests were 429-ing each other. The fixture now stubs `allow_async` to
+allow and the rate-limit tests override it to deny. Worth knowing that the low
+destructive-operation limits are real, not test-only.
+
+Backend **248 passed** (was 229), frontend **141 passed / 20 files** (was 135 / 19).

@@ -134,8 +134,11 @@ class TestQuota:
         data = res.json()["data"]
         assert data["daily_cap"] == 20
         assert data["shared_free_providers"] == ["groq"]
-        assert data["paid_allowed"] is False
         assert data["byok_enabled"] is True
+        # The operator's paid-fallback posture is not disclosed to clients: it
+        # is unused by the UI and would tell any signed-in account how this
+        # deployment is configured.
+        assert "paid_allowed" not in data
 
     def test_openai_absent_from_free_providers_even_when_configured(self, client, monkeypatch):
         monkeypatch.setattr(config, "AI_PROVIDER_ALLOW_PAID", False)
