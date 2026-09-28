@@ -745,3 +745,73 @@ retry implies a tolerance for transient failure that the code does not have.
 - FastAPI, Tailwind, MediaPipe, pgvector, RLS, and optional Sentry all verify.
 
 Frontend gates re-run after the change: lint clean, `tsc` clean, 135 tests / 19 files.
+
+## 2026-09-28 Verifying the two things claimed as untested
+
+Both remaining items were tested rather than deferred. One turned out to be
+already correct, and the other exposed a README error I had introduced myself.
+
+### Google OAuth — verified as far as is possible without a human
+
+Supabase's authorize endpoint accepts `skip_http_redirect=true`, which returns the
+Google authorization URL instead of redirecting. Requesting the exact
+`redirect_to` that `AuthForm.tsx` builds:
+
+```
+requested : https://hustlrzz.vercel.app/auth/callback?next=/prepare
+post-auth : https://hustlrzz.vercel.app/auth/callback?next=/prepare
+verdict   : ALLOWLISTED - honored as requested
+```
+
+Google provider is enabled and a real client ID is issued
+(`1000760637977-…apps.googleusercontent.com`). A non-allowlisted origin is not
+honoured the same way, which is the classic cause of a silent loop back to `/`. So
+every failure mode that can be checked without a browser is ruled out. What remains
+is the consent click and the code-for-tokens exchange, which need a person.
+
+**A false alarm worth recording:** the first version of this test checked the
+`redirect_uri` parameter and concluded the redirect was rejected for all three
+inputs, including the production one. That was wrong. GoTrue always sends Google its
+own `/auth/v1/callback` and carries the app destination separately in `redirect_to`.
+The verdict only became meaningful after reading the correct field — and had it not
+been checked, it would have sent someone to fix a non-existent problem.
+
+### BYOK — verified end to end on production, then fully cleaned up
+
+Auth is entirely Supabase-side with no backend `/auth` routes, so a real session can
+be minted with the anon key. That made a genuine authenticated test possible rather
+than a mocked one.
+
+```
+PUT /ai/keys      -> {"provider":"groq","key_hint":"…zzzz"}   plaintext echoed: False
+GET /ai/keys      -> [{"provider":"groq","key_hint":"…zzzz"}] plaintext present: False
+GET /ai/quota     -> own_key: true, byok_enabled: true, paid_allowed: false
+```
+
+At rest, read straight from Supabase and decrypted with the live master key:
+
+```
+encrypted_key : 34mXL4LM7GOQHphLn2B9hREW0YEs…  (92 chars)
+plaintext at rest?                    False
+decrypts with the live master key:   True
+AAD under a different user:          refused (KeyringDecryptError)
+```
+
+That last line also proves the key set in this session is the one the service is
+actually using, which no amount of reading the environment variable would have
+established.
+
+Cleanup: the stored key was deleted through the API, the row count returned to 0,
+and the throwaway auth user was removed with the service-role admin API. Three
+pre-existing real users were untouched. The stored value was a fake credential.
+
+### The README error this exposed
+
+The first attempt returned `Method Not Allowed`, and the reason was in the code all
+along: the provider travels in the **body**, not the path. The real routes are
+`PUT /ai/keys` and `DELETE /ai/keys/{provider_name}`. The BYOK section added in the
+previous commit documented `PUT /ai/keys/{provider}`, which does not exist. Corrected,
+and the row is now split so the body shape is stated explicitly.
+
+This is the argument for testing documentation against the running service: the route
+table was internally consistent and plausible, and still wrong.

@@ -158,6 +158,62 @@ substantially larger change.
 6. End the interview to view the scored coaching report and saved history.
 7. Revisit **Progress → Due practice** for spaced-repetition drills from your weak areas.
 
+## Verification status
+
+What has been proven against production, and what still needs a person. Kept here so
+nobody has to guess which claims are load-bearing.
+
+### Verified end-to-end against the live deployment
+
+| Area | How it was verified | Result |
+| --- | --- | --- |
+| Google OAuth configuration | Asked Supabase to build the authorization URL for the exact `redirect_to` the frontend generates | Google provider enabled, real client ID issued, and `https://hustlrzz.vercel.app/auth/callback?next=/prepare` is allowlisted and passed through unchanged. A non-allowlisted origin is not honoured, which is the usual cause of a silent loop-back failure. |
+| BYOK, full round trip | Created a throwaway account through the Supabase Auth API to obtain a real session, then exercised the live API | `PUT /ai/keys` returns a hint only, `GET /ai/keys` never returns the plaintext, `/ai/quota` flips to `own_key: true`, and `paid_allowed` stays `false` |
+| Encryption at rest | Read the row straight out of Supabase and decrypted it with the live master key | Stored value is ciphertext with no plaintext, it decrypts correctly, and decryption under a different user id is refused |
+| Free-only routing | Read `/ai/quota` with a live session | `byok_enabled: true`, `paid_allowed: false`, `shared_free_providers: [gemini, groq]` |
+| Landing-page honesty | Grepped the served HTML | Sample-data markers present; the fabricated latency and version are gone |
+
+The throwaway account, its stored key, and its database row were all removed
+afterwards. The test key was a fake value, never a real credential.
+
+### Not verified — requires a human
+
+1. **The Google consent screen and token exchange.** Everything up to Google's
+   authorization page is confirmed, and `/auth/callback` returns 200. Nobody has
+   completed a real consent click, so the final code-for-tokens exchange is unproven.
+2. **A real prepare run end to end in a browser.** Every API is verified
+   individually; the full click-through has not been walked by a person.
+
+### Manual checks
+
+<details>
+<summary>Two-minute verification anyone can run</summary>
+
+**Google sign-in (the only untested link)**
+
+1. Sign out, then open <https://hustlrzz.vercel.app>.
+2. Click **Continue with Google** and complete consent.
+3. Expect to land on `/prepare` signed in. The worst outcome is a bounce back to
+   `/` with no error, which means the redirect is not allowlisted — see
+   [docs/GOOGLE_AUTH_SETUP.md](docs/GOOGLE_AUTH_SETUP.md).
+
+**Bring your own key**
+
+1. Open **Settings**. The key form must not say "Not enabled on this deployment".
+2. Add a key for one provider. Expect a hint ending in the last four characters.
+3. Reload. The key must still be listed and the plaintext must not be anywhere.
+4. **Remove the key afterwards** so you are not storing a real credential on a
+   server that can decrypt it.
+
+```bash
+# Unauthenticated probe. 401 is the correct answer: auth is rejected before the
+# keyring is consulted, so this cannot reveal whether BYOK is enabled.
+curl -s -o /dev/null -w '%{http_code}
+' https://hustlrzz-api.onrender.com/ai/keys
+```
+
+</details>
+
 ## Project layout
 
 ```text
@@ -267,7 +323,9 @@ delivery with Resend.
 | `GET /knowledge/status`, `POST /knowledge/documents`, `POST /knowledge/search` | Candidate-owned RAG knowledge |
 | `POST /resume-analyzer/analyze`, `GET /resume-analyzer/usage` | In-memory PDF/DOCX analysis with quota and history |
 | `GET /ai/quota` | Shared free-tier quota, BYOK availability, and enabled providers |
-| `GET /ai/keys`, `PUT /ai/keys/{provider}`, `DELETE /ai/keys/{provider}` | Bring-your-own-key credentials (returns hints only, never key material) |
+| `GET /ai/keys` | List the caller's own provider keys (hints only, never key material) |
+| `PUT /ai/keys` | Store or replace one key; takes `{"provider": "...", "api_key": "..."}` in the body |
+| `DELETE /ai/keys/{provider_name}` | Remove one stored key |
 
 ---
 
