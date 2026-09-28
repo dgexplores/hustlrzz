@@ -88,7 +88,7 @@ negotiation wording, risky phrases to avoid, and decision guardrails.
 | --- | --- |
 | **Interface** | Next.js 15, TypeScript, Tailwind, accessible responsive UI with light, dark, and system themes |
 | **Live service** | Python FastAPI and WebSockets |
-| **AI resilience** | Groq (Qwen) primary with automatic Gemini fallback + one retry on rate limits |
+| **AI resilience** | Free-tier providers only by default (Groq, then Gemini) + one retry on rate limits. Paid providers are unreachable unless a user supplies a key or `AI_PROVIDER_ALLOW_PAID=1` |
 | **Data & identity** | Supabase Auth + PostgreSQL with Row-Level Security |
 | **Voice & camera** | Browser-native Web Speech and in-browser MediaPipe |
 | **Deployment** | Vercel frontend + Render API (Docker, free tier) |
@@ -107,6 +107,30 @@ interview if embeddings or the knowledge database are unavailable.
 4. Final reports can be indexed to make future practice sessions progressively
    more useful.
 
+## Bring your own key (BYOK)
+
+Interview preparation costs several LLM calls per run. On a shared free tier those
+calls are rate-limited, so HUSTLRZZ lets a user attach their own provider key.
+
+- A user's key is stored per provider in `user_ai_keys` as **AES-256-GCM**
+  ciphertext. The provider name and the owning user id are bound in as additional
+  authenticated data, so a ciphertext cannot be replayed under a different provider
+  or a different user.
+- The master key is `AI_KEYS_ENCRYPTION_KEY`. **There is deliberately no default.**
+  When it is absent the keyring is disabled, the key routes return 503, and nothing
+  is stored — a misconfigured deployment holds no keys rather than plaintext ones.
+- The API never returns key material. Responses carry only the provider and the last
+  four characters, and a middleware releases the decrypted value once the response
+  has been produced.
+- Without a user key, only providers with a usable free tier are reachable. A
+  rate-limited free tier therefore cannot silently fall through into a paid
+  provider — which is what previously turned a free-tier 429 into a bill.
+
+**Limitation, stated plainly:** a server-side BYOK means this backend can decrypt
+user keys while handling a request. That is inherent to proxying. Being structurally
+unable to read them would require calling the provider from the browser, which is a
+substantially larger change.
+
 ## Built-in safeguards
 
 - Candidate data is protected by Supabase Row-Level Security.
@@ -114,6 +138,9 @@ interview if embeddings or the knowledge database are unavailable.
 - Camera analysis stays in the browser; the app does not upload video frames.
 - Source-aware web research is time-bounded, ignores instructions found in source snippets, and falls back to a labelled built-in profile when unavailable.
 - Timeouts and non-fatal RAG failures keep preparation and interviews responsive.
+- Paid AI providers are unreachable without a user key or an explicit operator opt-in.
+- Stored user keys are encrypted at rest, are never returned by the API, and are bound
+  to their provider and owning user.
 - `GET /health` reports API, AI-provider, and database readiness.
 
 ---
@@ -134,10 +161,13 @@ interview if embeddings or the knowledge database are unavailable.
 ## Project layout
 
 ```text
-backend/         FastAPI: preparation, live interviewer, judge, coaching, RAG
-frontend/        Next.js: auth, prepare, interview, coaching, dashboard
+backend/         FastAPI: preparation, live interviewer, judge, coaching, RAG, AI providers
+frontend/        Next.js: auth, prepare, interview, coaching, dashboard, settings
 supabase/        schema, migrations, hosted Auth configuration
-docs/            operations guidance, including future verified-email setup
+docs/            operations guidance, including Google auth and verified-email setup
+project-docs/    evidence log: what was verified, how, and what remains unproven
+project-specs/   product and technical specifications
+project-tasks/   task breakdowns
 Dockerfile       backend image for Render, Railway, or another Docker host
 ```
 
@@ -186,8 +216,8 @@ delivery with Resend.
   apply every migration in `supabase/migrations/` in order. The migration set
   includes Resume Analyzer, company intelligence + assessment rounds, workflow
   interview context, report feedback, privacy-safe analytics, spaced-repetition
-  drills, interview intensity, and practice-feedback ownership. Never expose
-  `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
+  drills, interview intensity, practice-feedback ownership, and `user_ai_keys` for
+  bring-your-own-key. Never expose `SUPABASE_SERVICE_ROLE_KEY` in frontend variables.
 - **Vercel:** set the project root to `frontend`; configure
   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
   `NEXT_PUBLIC_API_URL` for Preview and Production.
@@ -195,6 +225,18 @@ delivery with Resend.
   Set `ENABLE_WEB_SEARCH=true` for on-demand company intelligence (enabled by
   default in new deployments). `WEB_SEARCH_TIMEOUT_SECONDS=15` keeps broad web
   research bounded and lets preparation fall back safely when sources are slow.
+  - **Bring your own key:** apply the `user_ai_keys` migration, then set
+    `AI_KEYS_ENCRYPTION_KEY` to a 32-byte URL-safe base64 value. Generate one with
+    `python3 -c "import base64,os;print(base64.urlsafe_b64encode(os.urandom(32)).decode())"`.
+    **Store it somewhere durable** — it is the only thing that can decrypt stored
+    user keys, and it cannot be recovered. With it unset, BYOK stays disabled and the
+    key routes return 503. Both steps are optional; without them the shared free tier
+    is used and nothing is stored.
+  - `AI_PROVIDER_ALLOW_PAID=1` re-enables paid providers (OpenAI, OpenRouter) for
+    **all** users. Unset by default. Prefer BYOK, which is per-user and metered
+    against the user's own quota.
+  - `AI_DAILY_RUN_CAP` bounds runs per user per UTC day and is `0` (off) by default.
+    It is not applied to a caller using their own key, since that quota is theirs.
 - **Google sign-in:** enable the Google provider and register the production
   callback URLs by following [the Google authentication setup](docs/GOOGLE_AUTH_SETUP.md).
 - **RAG:** configure `GEMINI_API_KEY` to enable embeddings. The app remains
@@ -224,6 +266,8 @@ delivery with Resend.
 | `GET /memory/drills` | Due spaced-repetition drills from your weak areas |
 | `GET /knowledge/status`, `POST /knowledge/documents`, `POST /knowledge/search` | Candidate-owned RAG knowledge |
 | `POST /resume-analyzer/analyze`, `GET /resume-analyzer/usage` | In-memory PDF/DOCX analysis with quota and history |
+| `GET /ai/quota` | Shared free-tier quota, BYOK availability, and enabled providers |
+| `GET /ai/keys`, `PUT /ai/keys/{provider}`, `DELETE /ai/keys/{provider}` | Bring-your-own-key credentials (returns hints only, never key material) |
 
 ---
 

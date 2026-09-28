@@ -163,10 +163,31 @@ function ModeCard({ mode, index }: { mode: typeof MODES[number]; index: number }
   );
 }
 
-function PanelLabel({ left, right }: { left: string; right: string }) {
+/**
+ * Every figure on this page is illustrative, not measured. Without a visible marker
+ * a number like 98.4% or "14 probes" reads as a real result for the visitor, which
+ * would be a false claim about the product's performance.
+ */
+function SampleBadge({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={
+        "inline-flex items-center rounded border border-border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-muted-foreground " +
+        className
+      }
+    >
+      Sample data
+    </span>
+  );
+}
+
+function PanelLabel({ left, right, sample = false }: { left: string; right: string; sample?: boolean }) {
   return (
     <div className="flex items-center justify-between border-b border-border pb-2 text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
-      <span>{left}</span>
+      <span className="flex items-center gap-2">
+        {left}
+        {sample && <SampleBadge />}
+      </span>
       <span className="text-emerald-600 dark:text-emerald-400">{right}</span>
     </div>
   );
@@ -341,7 +362,7 @@ export function HomeContent() {
                 Add a resume and job description. Hustlrzz creates a tailored, high-pressure interview brief.
               </p>
               <div className="mt-6 rounded-xl border border-border bg-background/40 px-4 py-3">
-                <PanelLabel left="Resume signals" right="Within score 98.4%" />
+                <PanelLabel left="Resume signals" right="Within score 98.4%" sample />
                 <div className="mt-1">
                   <SignalRow quote="Reframed real-life storytelling engine for B2B CRM clients" badge="Bam" />
                   <SignalRow quote="Reduced latency by 40% across cross-border API endpoints" badge="Not chat" />
@@ -359,7 +380,7 @@ export function HomeContent() {
                 standards for the target tier.
               </p>
               <div className="mt-6 rounded-xl border border-border bg-background/40 px-4 py-3">
-                <PanelLabel left="Targets &amp; telemetry" right="Top 3" />
+                <PanelLabel left="Targets &amp; telemetry" right="Top 3" sample />
                 <div className="mt-1">
                   <BarRow label="System design paper" pct={80} />
                   <BarRow label="Case study" pct={80} />
@@ -378,7 +399,7 @@ export function HomeContent() {
                 line of thought.
               </p>
               <div className="mt-6 rounded-xl border border-border bg-background/40 px-4 py-3">
-                <PanelLabel left="AI interview" right="Probing" />
+                <PanelLabel left="AI interview" right="Probing" sample />
                 <blockquote className="border-l-2 border-primary/50 py-2 pl-3 text-[12px] leading-5 text-foreground/90">
                   &ldquo;You mentioned restructuring the team. What were the retention considerations at that
                   stage?&rdquo;
@@ -398,10 +419,13 @@ export function HomeContent() {
                 Evaluate sentence integrity alongside cognitive load, posture, gaze stability, and filler words.
                 Complete telemetry computed locally.
               </p>
-              <div className="mt-6 grid grid-cols-3 gap-3">
+              <div className="mt-6">
+                <SampleBadge className="mb-2" />
+              <div className="grid grid-cols-3 gap-3">
                 <MetricTile value="0.4/m" label="Filler count" />
                 <MetricTile value="98%" label="Posture hold" />
                 <MetricTile value="100%" label="On-device one" />
+              </div>
               </div>
             </BentoCard>
           </div>

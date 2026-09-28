@@ -123,9 +123,9 @@ export function HeroValueChain() {
       <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
         <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-          Simulated cockpit v2.4
+          Simulated session
         </p>
-        <p className="text-[11px] tabular-nums text-muted-foreground">Latency: 24ms</p>
+        <p className="text-[11px] text-muted-foreground">Not a live measurement</p>
       </div>
 
       <ol aria-label="How it works" className="mt-4 flex flex-col gap-5">
