@@ -496,3 +496,85 @@ was scoped to the document row.
 
 `npm run lint` 0 warnings, `npx tsc --noEmit` clean, `npm test` **126 passed / 18 files** (was 115 /
 17), `npm run build` 18 routes.
+
+## 2026-09-28 Free-by-default AI and bring-your-own-key
+
+Two defects behind the cost question, and the premise it rested on was wrong.
+
+### It was not BYOK
+
+`grep -rli byok` returned zero files. `ai/provider.py` read every provider key from
+server-side config (`GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`,
+`OPENROUTER_API_KEY`), so every user's question pack billed the operator's single key.
+There was no per-user key storage, no key column, and nothing collected from the user.
+
+### A free-tier 429 was causing spend, not preventing it
+
+```python
+except Exception as exc:
+    last_err = exc
+    # Rate-limit / quota / auth → try the next provider.
+    continue
+```
+
+The chain was `groq -> openai -> openrouter -> gemini`. Two of those are paid. When the free
+Groq tier returned 429 the request did not stop — it continued into OpenAI and OpenRouter
+and spent real money. Both `chat()` and `chat_messages()` now report which providers were
+tried, and a provider with no usable free tier is only reachable when the **user** supplied
+their own key or an operator sets `AI_PROVIDER_ALLOW_PAID=1`.
+
+### Free-tier ceilings, for calibration
+
+A prepare run is 5 LLM calls, ~9,500 input tokens, ~8,200 output tokens. Against the free-for-dev
+index (updated 2026-09-27):
+
+| Tier | Ceiling | Usable? |
+|---|---|---|
+| Gemini Flash | 5 req/min, 20 req/day | 4 runs/day total — no |
+| Gemma 4 | 30 req/min, 14.4k req/day, 16k input tok/min | ~1.7 runs/min, input-token bound |
+| Groq free | exists | exact free-plan numbers are on the account Limits page |
+
+Free tiers change without notice and vendor pages are the authority. Google states exact limits
+are only visible in AI Studio. These are ceilings on the shared key, not on a user with their own key.
+
+### Key storage
+
+`backend/ai/keyring.py`, AES-256-GCM, with the provider name and owning user id bound in as
+additional authenticated data — so a ciphertext cannot be replayed under a different provider or
+a different user. The master key comes from `AI_KEYS_ENCRYPTION_KEY`; when it is absent the
+keyring is **disabled** and the routes return 503. There is no default, so a misconfigured deploy
+stores nothing rather than storing plaintext.
+
+Two findings while building it:
+
+- `base64.urlsafe_b64decode` is lenient and silently discards non-alphabet characters, so
+  `"not base64 !!!"` decoded to a short key instead of being rejected. The master key is now
+  decoded with `validate=True`.
+- A `contextvar` set inside a **sync** FastAPI dependency runs in a worker thread and is invisible
+  to the endpoint and to the `asyncio.to_thread` calls the workflows use. `get_user` therefore had
+  to become `async`, which is why the binding is invisible to all seven provider call sites.
+
+Keys are never returned by the API — only provider plus the last four characters — and a
+middleware releases the decrypted material as soon as the response is produced.
+
+### Cost control
+
+`AI_DAILY_RUN_CAP` caps runs per user per UTC day. It is `0` (off) by default. A caller with
+their own key is not capped, because that quota is theirs. `cryptography` is now a pinned
+dependency rather than relying on it arriving transitively.
+
+### Tests
+
+`test_keyring.py` (19) covers the fail-closed master key, strict base64, AAD binding across users
+and providers, tamper detection, rotation, and hint-only display. `test_byok.py` (17) covers the
+routes, that the stored value is ciphertext that decrypts back, that the key is never in a
+response, paid exclusion and opt-in, user-key priority, and the cap including the BYOK bypass.
+`AiKeysCard.test.tsx` (9) covers the settings UI. Two pre-existing chain tests asserted the old
+behaviour — that OpenAI joins the chain — and were replaced with the intended rules.
+
+One test-hygiene fix worth recording: `apiMock.mockReset()` in `beforeEach` wiped the mock
+implementation while a previous test's component still had an in-flight `load()`, so the failure
+surfaced during cleanup as `unhandled undefined` rather than as the assertion it belonged to.
+`mockClear` plus a default `respond()` fixed it.
+
+Backend **229 passed** (was 190), frontend **135 passed / 19 files** (was 126 / 18).

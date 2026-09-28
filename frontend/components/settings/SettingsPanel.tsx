@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { AlertCircle, CheckCircle, Loader2, LogOut } from "lucide-react";
+import { AiKeysCard } from "@/components/settings/AiKeysCard";
 import type { User } from "@supabase/supabase-js";
 
 export function SettingsPanel() {
@@ -167,6 +168,8 @@ export function SettingsPanel() {
           <Link href="/legal/terms" className="inline-flex min-h-11 items-center font-semibold text-primary hover:underline">Terms of service</Link>
         </CardContent>
       </Card>
+
+      <AiKeysCard />
 
       <div className="flex justify-end">
         <Button variant="outline" onClick={signOut} className="gap-1.5">

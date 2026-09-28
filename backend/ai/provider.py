@@ -12,11 +12,42 @@ interviewer, judge, summarizer and analysis modules stay provider-agnostic.
 
 from __future__ import annotations
 
+import contextvars
 import json
 import re
 from typing import Any
 
 from backend import config
+from backend.ai.keyring import PAID_PROVIDERS
+
+# Keys belonging to the user making the current request, set once per request by
+# the auth dependency. `asyncio.to_thread` copies the context, so the workflow
+# threads below observe the same binding.
+_user_keys: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar(
+    "user_ai_keys", default=None
+)
+
+
+def set_request_keys(keys: dict[str, str] | None):
+    """Bind this request's own keys. Returns a token for reset_request_keys."""
+    return _user_keys.set(keys or None)
+
+
+def reset_request_keys(token) -> None:
+    try:
+        _user_keys.reset(token)
+    except ValueError:
+        # The context changed (e.g. a thread boundary). Dropping the reference is
+        # the safe outcome: the request falls back to the shared keys.
+        _user_keys.set(None)
+
+
+def request_keys() -> dict[str, str]:
+    return _user_keys.get() or {}
+
+
+def _paid_allowed() -> bool:
+    return bool(getattr(config, "AI_PROVIDER_ALLOW_PAID", False))
 
 
 class ProviderError(RuntimeError):
@@ -35,13 +66,32 @@ def is_configured() -> bool:
     return bool(_providers())
 
 
-def _keyed_providers() -> dict[str, str]:
-    return {
+def _shared_keys() -> dict[str, str]:
+    """Operator keys, minus paid providers unless explicitly opted in.
+
+    A free-tier 429 must not be a cue to spend: OpenAI has no usable free tier,
+    so it is only ever reachable when the *user* brings their own key or an
+    operator sets AI_PROVIDER_ALLOW_PAID=1.
+    """
+    keys = {
         "groq": config.GROQ_API_KEY,
         "gemini": config.GEMINI_API_KEY,
         "openai": config.OPENAI_API_KEY,
         "openrouter": config.OPENROUTER_API_KEY,
     }
+    keys = {name: value for name, value in keys.items() if value}
+    if not _paid_allowed():
+        keys = {name: value for name, value in keys.items() if name not in PAID_PROVIDERS}
+    return keys
+
+
+def _keyed_providers() -> dict[str, str]:
+    """A user's own key wins over the shared key for that provider."""
+    resolved = _shared_keys()
+    for name, value in request_keys().items():
+        if value:
+            resolved[name] = value
+    return resolved
 
 
 # --------------------------------------------------------------------------- #
@@ -153,6 +203,7 @@ def chat(system: str, user: str, temperature: float = 0.4) -> str:
             "and/or OPENROUTER_API_KEY in backend/.env"
         )
     last_err: Exception | None = None
+    attempted: list[str] = []
     for name in provider:
         try:
             if name == "gemini":
@@ -162,9 +213,16 @@ def chat(system: str, user: str, temperature: float = 0.4) -> str:
             return _openai_compat_chat(name, system, user, temperature)
         except Exception as exc:
             last_err = exc
-            # Rate-limit / quota / auth → try the next provider.
+            # Rate-limit / quota / auth → try the next provider. Paid providers
+            # are not in this list unless the user brought their own key or an
+            # operator opted in, so exhausting the free tier stops here rather
+            # than quietly becoming a bill.
+            attempted.append(name)
             continue
-    raise ProviderError(f"All AI providers failed (last: {last_err})") from last_err
+    detail = f"All AI providers failed (tried: {', '.join(attempted) or 'none configured'}"
+    if last_err is not None:
+        detail += f"; last: {last_err}"
+    raise ProviderError(detail + ")") from last_err
 
 
 def _groq_chat_messages(
@@ -313,6 +371,7 @@ def chat_messages(
             "and/or OPENROUTER_API_KEY in backend/.env"
         )
     last_err: Exception | None = None
+    attempted: list[str] = []
     for name in names:
         try:
             if name == "gemini":
@@ -322,8 +381,14 @@ def chat_messages(
             return _openai_compat_chat_messages(name, messages, temperature, tools)
         except Exception as exc:
             last_err = exc
+            # See chat(): a rate-limited free tier stops here rather than
+            # quietly falling through into a paid provider.
+            attempted.append(name)
             continue
-    raise ProviderError(f"All AI providers failed (last: {last_err})") from last_err
+    detail = f"All AI providers failed (tried: {', '.join(attempted) or 'none configured'}"
+    if last_err is not None:
+        detail += f"; last: {last_err}"
+    raise ProviderError(detail + ")") from last_err
 
 
 def extract_json(text: str) -> Any:

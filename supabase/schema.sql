@@ -264,3 +264,19 @@ revoke all on function public.rate_limit_allow(text, integer, integer) from publ
 revoke all on function public.rate_limit_allow(text, integer, integer) from anon;
 revoke all on function public.rate_limit_allow(text, integer, integer) from authenticated;
 grant execute on function public.rate_limit_allow(text, integer, integer) to service_role;
+
+-- Bring-your-own-key provider credentials (AES-256-GCM ciphertext at rest).
+create table if not exists user_ai_keys (
+  id bigint generated always as identity primary key,
+  user_id uuid not null,
+  provider text not null,
+  encrypted_key text not null,
+  key_hint text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, provider)
+);
+
+create index if not exists user_ai_keys_user_id_idx on user_ai_keys (user_id);
+
+alter table user_ai_keys enable row level security;

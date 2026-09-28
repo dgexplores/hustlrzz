@@ -9,6 +9,8 @@ websockets==14.1
 groq==0.15.0
 google-generativeai==0.8.3
 supabase==2.13.0
+# Direct dependency: AES-256-GCM for bring-your-own-key storage.
+cryptography==50.0.1
 pypdf==6.16.2
 ddgs==9.15.0
 sentry-sdk==2.68.1

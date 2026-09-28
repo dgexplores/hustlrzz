@@ -348,13 +348,55 @@ class TestProviderChain:
         monkeypatch.setattr(config, "AI_PROVIDER", "groq")
         assert provider._providers() == ["groq"]
 
-    def test_openai_joins_chain(self, monkeypatch):
+    def test_paid_provider_is_excluded_by_default(self, monkeypatch):
+        """OpenAI has no free tier, so a shared key must not reach the chain.
+
+        A free-tier 429 used to walk straight into OpenAI and spend money.
+        """
         monkeypatch.setattr(config, "GROQ_API_KEY", "gsk_x")
         monkeypatch.setattr(config, "GEMINI_API_KEY", "")
         monkeypatch.setattr(config, "OPENAI_API_KEY", "sk-test")
         monkeypatch.setattr(config, "OPENROUTER_API_KEY", "")
         monkeypatch.setattr(config, "AI_PROVIDER", "groq")
+        monkeypatch.setattr(config, "AI_PROVIDER_ALLOW_PAID", False, raising=False)
+        assert provider._providers() == ["groq"]
+
+    def test_paid_provider_joins_when_operator_opts_in(self, monkeypatch):
+        monkeypatch.setattr(config, "GROQ_API_KEY", "gsk_x")
+        monkeypatch.setattr(config, "GEMINI_API_KEY", "")
+        monkeypatch.setattr(config, "OPENAI_API_KEY", "sk-test")
+        monkeypatch.setattr(config, "OPENROUTER_API_KEY", "")
+        monkeypatch.setattr(config, "AI_PROVIDER", "groq")
+        monkeypatch.setattr(config, "AI_PROVIDER_ALLOW_PAID", True, raising=False)
         assert provider._providers() == ["groq", "openai"]
+
+    def test_paid_provider_reachable_when_the_user_brings_their_own_key(self, monkeypatch):
+        monkeypatch.setattr(config, "GROQ_API_KEY", "gsk_x")
+        monkeypatch.setattr(config, "GEMINI_API_KEY", "")
+        monkeypatch.setattr(config, "OPENAI_API_KEY", "")
+        monkeypatch.setattr(config, "OPENROUTER_API_KEY", "")
+        monkeypatch.setattr(config, "AI_PROVIDER", "groq")
+        monkeypatch.setattr(config, "AI_PROVIDER_ALLOW_PAID", False, raising=False)
+
+        token = provider.set_request_keys({"openai": "sk-user"})
+        try:
+            chain = provider._providers()
+        finally:
+            provider.reset_request_keys(token)
+        assert chain == ["groq", "openai"]
+
+    def test_user_key_wins_over_the_shared_key(self, monkeypatch):
+        monkeypatch.setattr(config, "GROQ_API_KEY", "shared")
+        monkeypatch.setattr(config, "GEMINI_API_KEY", "")
+        monkeypatch.setattr(config, "OPENAI_API_KEY", "")
+        monkeypatch.setattr(config, "OPENROUTER_API_KEY", "")
+
+        token = provider.set_request_keys({"groq": "user-key"})
+        try:
+            assert provider._keyed_providers()["groq"] == "user-key"
+        finally:
+            provider.reset_request_keys(token)
+        assert provider._keyed_providers()["groq"] == "shared"
 
     def test_openrouter_preferred_first(self, monkeypatch):
         monkeypatch.setattr(config, "GROQ_API_KEY", "gsk_x")
@@ -362,9 +404,10 @@ class TestProviderChain:
         monkeypatch.setattr(config, "OPENAI_API_KEY", "sk")
         monkeypatch.setattr(config, "OPENROUTER_API_KEY", "or-key")
         monkeypatch.setattr(config, "AI_PROVIDER", "openrouter")
+        monkeypatch.setattr(config, "AI_PROVIDER_ALLOW_PAID", False, raising=False)
         chain = provider._providers()
         assert chain[0] == "openrouter"
-        assert set(chain) == {"openrouter", "groq", "openai", "gemini"}
+        assert set(chain) == {"openrouter", "groq", "gemini"}
 
     def test_no_keys_raises(self, monkeypatch):
         monkeypatch.setattr(config, "GROQ_API_KEY", "")
