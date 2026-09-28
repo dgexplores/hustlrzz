@@ -91,9 +91,10 @@ class _Db:
         import fnmatch
 
         self.like_deleted.append((table, pattern))
+        before = len(self.rows.get(table, []))
         kept = [r for r in self.rows.get(table, []) if not fnmatch.fnmatch(r.get(column, ""), pattern)]
         self.rows[table] = kept
-        return len(self.rows[table])
+        return before - len(kept)
 
 
 @pytest.fixture
@@ -223,6 +224,11 @@ class TestErasure:
         keys = [r["key"] for r in env.db.rows["rate_limit_events"]]
         assert f"knowledge:{UID}" not in keys
         assert f"knowledge:{OTHER}" in keys
+
+    def test_reports_the_actual_rate_limit_count(self, env):
+        """The response is an audit record; it must not overstate what it cleared."""
+        cleared = env.request("DELETE", "/account", json={"confirm": "DELETE"}).json()["data"]["cleared"]
+        assert cleared["rate_limit_events"] == 1
 
     def test_deletes_the_login(self, env):
         env.request("DELETE", "/account", json={"confirm": "DELETE"})

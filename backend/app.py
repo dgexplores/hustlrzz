@@ -1091,7 +1091,12 @@ async def export_account(
 @router.delete("/account")
 async def delete_account(
     payload: AccountDeleteRequest,
-    user: dict = Depends(rate_limited("account_delete", 3, 3600)),
+    # 10/hour rather than 3. The limiter is a dependency, so it runs *before* the
+    # confirmation check below, and a user who mistypes three times would be locked
+    # out of the delete flow for an hour with no recourse. The confirmation word is
+    # a fixed public string, so a tight limit buys no brute-force protection; the
+    # value here is only bounding repeated erasure attempts.
+    user: dict = Depends(rate_limited("account_delete", 10, 3600)),
 ):
     """Irreversibly erase this account: all personal data, then the login.
 
@@ -1122,13 +1127,12 @@ async def delete_account(
             failed[table] = type(exc).__name__
 
     try:
-        await asyncio.to_thread(
+        cleared["rate_limit_events"] = await asyncio.to_thread(
             dbc.delete_where_like,
             "rate_limit_events",
             "key",
             f"*{uid}",
         )
-        cleared["rate_limit_events"] = 1
     except Exception as exc:  # noqa: BLE001
         failed["rate_limit_events"] = type(exc).__name__
 
