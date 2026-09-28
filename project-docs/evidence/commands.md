@@ -890,3 +890,64 @@ allow and the rate-limit tests override it to deny. Worth knowing that the low
 destructive-operation limits are real, not test-only.
 
 Backend **248 passed** (was 229), frontend **141 passed / 20 files** (was 135 / 19).
+
+## 2026-09-28 End-to-end erasure verified against production
+
+The unit tests use a fake database, so the erasure was exercised against the live
+deployment with a real Supabase session and real rows.
+
+A unique marker was written into four tables, **confirmed present** with a
+user-scoped query, and the account was then erased. Afterwards the whole table was
+queried, not just the caller's rows:
+
+```
+workflows            marker rows remaining in WHOLE table = 0
+interview_sessions   marker rows remaining in WHOLE table = 0
+knowledge_documents  marker rows remaining in WHOLE table = 0
+knowledge_chunks     marker rows remaining in WHOLE table = 0
+total marker rows anywhere: 0 -> ERASED
+company_intelligence rows: 2 (unchanged)
+auth login: removed
+```
+
+The earlier "verified" runs were worthless and should not have been read as proof.
+The seed silently failed, and the check passed anyway for two reasons: PostgREST
+returns an **empty body** on a successful insert, so the status-code check was
+meaningless, and the confirmation strings were re-tested against an account that had
+already been erased. A marker sweep across whole tables found zero sensitive strings
+— which was true, because the rows had never been created. Adding an `assert` that
+the markers were present before deleting is what exposed it; without that assert the
+run would have reported a clean pass on an untested path.
+
+The real blockers were mundane: `id` is `GENERATED ALWAYS AS IDENTITY` so it must
+not be supplied, `knowledge_documents.source_type` is CHECK-constrained and does not
+accept `note`, and `knowledge_chunks.embedding` is `vector(768) not null`.
+
+`knowledge_documents.document_id` already carries `ON DELETE CASCADE` to
+`knowledge_chunks`, so the database cascades chunks on its own. The code still
+deletes children first, which is redundant but harmless and would be load-bearing if
+that constraint were ever dropped.
+
+### Two defects the live run exposed
+
+**Three typos locked a user out for an hour.** The rate limiter is a dependency, so it
+runs before the confirmation check. With a 3/hour budget, a user who mistyped three
+times hit 429 on the real service — observed, not theorised. The confirmation word is
+a fixed public string, so a tight limit buys no brute-force protection at all; the
+limit exists to bound repeated erasure attempts, and 10/hour does that without
+stranding someone. Moving validation ahead of the limiter would fix it properly but
+needs the dependency restructured, which is a larger change than the problem warrants
+right now.
+
+**The response overstated what it cleared.** `rate_limit_events` was reported as a
+hardcoded `1` instead of the number of rows removed. Small, but it is an audit
+record, and an audit that overstates is worse than one that is silent. Now returns
+the real count, with a test.
+
+### Cleanup
+
+Four throwaway accounts and 6 orphan rows removed. The orphans came from the failed
+early runs, where a script asserted and exited *before* calling the delete and the
+auth user was then removed in bulk — leaving data behind. That is precisely the
+failure mode the implementation is ordered to prevent, observed from the outside.
+Three real users and their data are untouched.
