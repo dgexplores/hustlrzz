@@ -8,7 +8,8 @@
 [Backend health ↗](https://hustlrzz-api.onrender.com/health) &nbsp;·&nbsp;
 [Explore the code](https://github.com/dgexplores/hustlrzz)
 
-[Launch readiness, privacy boundaries, and rollout gates](docs/LAUNCH_READINESS.md)
+[Launch readiness, privacy boundaries, and rollout gates](docs/LAUNCH_READINESS.md) &nbsp;·&nbsp;
+[Live screenshots](docs/SCREENSHOTS.md)
 
 ---
 

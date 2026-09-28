@@ -982,3 +982,24 @@ Revisit when either is true: a real user needs password recovery, or a paid tier
 makes email ownership matter (with autoconfirm on, anyone can register any address
 they do not own, which is harmless in a demo and not harmless once identity carries
 value).
+
+## 2026-09-28 Screenshots captured from the live deployment
+
+`docs/SCREENSHOTS.md` plus five PNGs, all taken from production at 1440x900 rather
+than from local mock-ups. The two authenticated shots were obtained by signing in
+through the real login form with a throwaway account, deleted immediately after. No
+personal data and no real API key appear in any of them.
+
+This incidentally settled one of the two items that had been open: the Settings
+screenshot shows the bring-your-own-key card rendering its normal state, where a
+disabled keyring renders "Not enabled on this deployment" instead. That is visual
+confirmation that `AI_KEYS_ENCRYPTION_KEY` reached production and the card is live.
+`document.body.innerText.includes("Not enabled")` returned false on the live page.
+
+A capture detail worth recording: the landing sections use scroll-reveal animations,
+so the `SAMPLE DATA` badges are present in the DOM but excluded from `innerText`
+until scrolled into view. A naive text assertion reported zero badges on a page that
+had four, which would have read as the fix not being deployed. Screenshot and read
+the pixels instead of trusting `innerText`.
+
+The Google consent screen remains untested; it needs a person.
