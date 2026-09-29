@@ -48,6 +48,9 @@ this card renders "Not enabled on this deployment" instead.
 space, and a substring are all rejected, and the server enforces the same check
 independently of the client.
 
+For every screen rather than a few highlights, see the
+[interface gallery](images_project/INDEX.md).
+
 ## What these do not cover
 
 - **Google sign-in completing a consent screen.** Untested — it needs a human at the

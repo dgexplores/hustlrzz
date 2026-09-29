@@ -1003,3 +1003,48 @@ had four, which would have read as the fix not being deployed. Screenshot and re
 the pixels instead of trusting `innerText`.
 
 The Google consent screen remains untested; it needs a person.
+
+## 2026-09-29 Interface gallery, and a production bug it found
+
+`docs/images_project/` — twelve screens captured from the live deployment at
+1440x900, downscaled to 1100px (the raw captures came out at 2880px because of device
+pixel ratio, 2.8M down to 1.4M). Authenticated shots were taken by signing in
+through the real login form with a throwaway account, deleted afterwards.
+
+### The bug
+
+Screenshotting every screen surfaced a fault that no test covered: **every
+knowledge-base add failed in production.** The UI reported "Knowledge indexing is
+temporarily unavailable" and `POST /knowledge/documents` returned 503.
+
+Root cause: `backend/config.py` defaulted `RAG_EMBEDDING_MODEL` to
+`models/text-embedding-004`, which no longer resolves for the configured Gemini key:
+
+```
+404  models/text-embedding-004 is not found for API version v1beta
+```
+
+The key reaches only `gemini-embedding-001`, `gemini-embedding-2-preview`, and
+`gemini-embedding-2`. So the source-type picker, the add form, the duplicate
+detection, and the search built in the knowledge-completion work were all
+non-functional against the real provider. The unit tests stub `_embed`, so the model
+name was never exercised.
+
+Fixed in three places so a fresh deploy cannot reintroduce it: the default in
+`backend/config.py`, `backend/.env.example`, and `render.yaml`. The dimension was
+already safe — `_embed` passes `output_dimensionality=config.RAG_EMBEDDING_DIMENSIONS`
+(default 768) and raises if the returned vector length does not match, so
+`gemini-embedding-001` fits the existing `vector(768)` column with no migration.
+
+Verified end to end in the browser: adding a source returned "Added and split into 1
+chunk", and searching `onboarding` returned it with a **68% match** — which also
+confirms the similarity-score rendering, previously fetched into state and never
+displayed.
+
+### A capture detail
+
+`fill_form` set the knowledge textarea's DOM value without React seeing the change,
+so the submit button stayed disabled and the first click silently did nothing.
+Typing real keystrokes updated state and the button enabled. Worth knowing: a
+disabled button after a programmatic fill is a harness artefact, not an application
+bug, and the symptom looks exactly like a broken feature.

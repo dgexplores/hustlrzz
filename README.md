@@ -17,7 +17,9 @@
   &nbsp;·&nbsp;
   <a href="https://github.com/dgexplores/hustlrzz">Explore the code</a>
   &nbsp;·&nbsp;
-  <a href="docs/SCREENSHOTS.md">All screenshots</a>
+  <a href="docs/images_project/INDEX.md">Interface gallery</a>
+  &nbsp;·&nbsp;
+  <a href="docs/SCREENSHOTS.md">Annotated screenshots</a>
 </p>
 
 <p align="center"><sub>

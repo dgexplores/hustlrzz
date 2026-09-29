@@ -23,6 +23,11 @@ services:
         value: qwen/qwen3.8-27b
       - key: GEMINI_MODEL
         value: gemini-2.5-flash
+      # text-embedding-004 is retired and 404s for the configured key, which made
+      # every knowledge-base add fail. gemini-embedding-001 honours
+      # output_dimensionality and fits the existing vector(768) column.
+      - key: RAG_EMBEDDING_MODEL
+        value: models/gemini-embedding-001
       - key: CORS_ORIGINS
         value: https://hustlrzz.vercel.app,http://localhost:3000
       - key: ENABLE_WEB_SEARCH

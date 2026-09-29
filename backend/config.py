@@ -43,7 +43,11 @@ OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/ap
 # Retrieval is intentionally independent of chat-provider selection. Gemini's
 # embedding endpoint is used only when a key is configured; the core interview
 # workflow stays available without knowledge-base search.
-RAG_EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", "models/text-embedding-004")
+# text-embedding-004 no longer resolves for the configured Gemini key and returns
+# 404, which surfaced as "Knowledge indexing is temporarily unavailable" on every
+# add. gemini-embedding-001 is available and honours output_dimensionality, so it
+# fits the existing vector(768) column unchanged.
+RAG_EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", "models/gemini-embedding-001")
 RAG_EMBEDDING_DIMENSIONS = int(os.getenv("RAG_EMBEDDING_DIMENSIONS", "768"))
 RAG_MAX_DOCUMENT_CHARS = int(os.getenv("RAG_MAX_DOCUMENT_CHARS", "200000"))
 RAG_CHUNK_CHARS = int(os.getenv("RAG_CHUNK_CHARS", "900"))
