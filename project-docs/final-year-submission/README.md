@@ -34,8 +34,8 @@ references → thank you → **links (final slide)**.
 ### `report/`
 | File | |
 |---|---|
-| `Hustlrzz_Report.docx` | Synopsis report, 14 pages |
-| `Hustlrzz_Report.pdf` | Same report, 14 pages |
+| `Hustlrzz_Report.docx` | Synopsis report, 13 pages |
+| `Hustlrzz_Report.pdf` | Same report, 13 pages |
 
 ### `guide/`
 | File | |
