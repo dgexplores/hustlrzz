@@ -298,6 +298,13 @@ curl -s -o /dev/null -w '%{http_code}
 
 </details>
 
+## Final year submission
+
+The presentation deck, synopsis report, and in-depth project guide are kept
+together in [`project-docs/final-year-submission/`](project-docs/final-year-submission/).
+Each is available in both Office and PDF form, and the folder states the current
+build status — roughly 40% functional — module by module.
+
 ## Project layout
 
 ```text
@@ -305,7 +312,7 @@ backend/         FastAPI: preparation, live interviewer, judge, coaching, RAG, A
 frontend/        Next.js: auth, prepare, interview, coaching, dashboard, settings
 supabase/        schema, migrations, hosted Auth configuration
 docs/            operations guidance, including Google auth and verified-email setup
-project-docs/    evidence log: what was verified, how, and what remains unproven
+project-docs/    evidence log, and the final-year submission pack (deck, report, guide)
 project-specs/   product and technical specifications
 project-tasks/   task breakdowns
 Dockerfile       backend image for Render, Railway, or another Docker host
