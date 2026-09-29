@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://hustlrzz.vercel.app">
-    <img src="docs/screenshots/01-landing-hero.png" alt="Hustlrzz landing page — hero and the simulated cockpit" width="100%" />
+    <img src="docs/images_project/12-landing-hero.png" alt="Hustlrzz landing page — hero and the simulated cockpit" width="100%" />
   </a>
 </p>
 
@@ -18,8 +18,6 @@
   <a href="https://github.com/dgexplores/hustlrzz">Explore the code</a>
   &nbsp;·&nbsp;
   <a href="docs/images_project/INDEX.md">Interface gallery</a>
-  &nbsp;·&nbsp;
-  <a href="docs/SCREENSHOTS.md">Annotated screenshots</a>
 </p>
 
 <p align="center"><sub>
@@ -32,10 +30,10 @@
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/02-landing-bento-sample-data.png"
+  <img src="docs/images_project/13-landing-bento-sample-data.png"
        alt="Resume signals and telemetry panels, each marked Sample data"
        width="49%" />
-  <img src="docs/screenshots/03-landing-bento-metrics.png"
+  <img src="docs/images_project/14-landing-bento-metrics.png"
        alt="Interview probe panel and metric tiles, each marked Sample data"
        width="49%" />
 </p>
@@ -47,10 +45,10 @@
 </sub></p>
 
 <p align="center">
-  <img src="docs/screenshots/04-settings-byok-and-data.png"
+  <img src="docs/images_project/15-settings-byok-and-data.png"
        alt="Settings — bring your own key and data rights"
        width="49%" />
-  <img src="docs/screenshots/05-settings-delete-confirmation.png"
+  <img src="docs/images_project/16-settings-delete-confirmation.png"
        alt="Account deletion confirmation, disabled until the word DELETE is typed"
        width="49%" />
 </p>

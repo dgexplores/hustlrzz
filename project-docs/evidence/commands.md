@@ -1048,3 +1048,34 @@ so the submit button stayed disabled and the first click silently did nothing.
 Typing real keystrokes updated state and the button enabled. Worth knowing: a
 disabled button after a programmatic fill is a harness artefact, not an application
 bug, and the symptom looks exactly like a broken feature.
+
+## 2026-09-29 Consolidating the image folders
+
+There were **three** image folders, two of which were not obviously related:
+
+- `docs/screenshots/` — 5 shots, 868K
+- `docs/images_project/` — 12 shots, 1.4M
+- `project-docs/evidence/shots/` — 17 shots, 5.0M, from the design work
+
+Two real duplicates were found. `hero-1440-light.png` and
+`hero-1440-light-production.png` are byte-identical once normalised to the same
+width, 548K stored twice. And `12-landing-hero.png` was a copy of
+`01-landing-hero.png` at a different scale, which is what prompted the question.
+
+`docs/screenshots/` is gone. Its four unique shots — the two bento captures and the
+two settings captures — were moved into the gallery as 13 through 16 and resized to
+match, and its hero was dropped because the gallery already had one. `SCREENSHOTS.md`
+was folded into the gallery index and retired, so the annotated captions survive
+without a second image folder. The README now points every reference at
+`docs/images_project/`.
+
+Verified: no duplicate image hashes remain across the whole repo, and no markdown
+reference is broken. The first check reported all sixteen gallery images as broken
+because it resolved relative paths from the repository root rather than from the
+referring file's own directory; GitHub resolves them relative to the document, and
+they render.
+
+Still in place: `project-docs/evidence/shots/` at 16 files and 4.8M. These are not
+duplicates but they are stale — captures of a single-header layout and a 320px
+viewport that the design has since moved past. Pruning evidence is a judgement call
+about what history to keep, so it is reported rather than deleted.

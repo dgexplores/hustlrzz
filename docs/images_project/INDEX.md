@@ -126,3 +126,46 @@ unchanged. No migration was needed.
   Google's authorization page is verified.
 - **A finished interview with a scored report.** That needs a full live session.
 - **`/dashboard/session/{id}`**, because this throwaway account had no session.
+
+---
+
+## Annotated shots
+
+Captured in the same pass; kept here so the gallery stays the single image folder.
+
+### 13 · Sample-data markers on illustrative figures
+
+![Bento with sample-data markers](13-landing-bento-sample-data.png)
+
+`98.4%` and the 80/80/88 bars read as results measured on the visitor unless something
+says otherwise. Each panel carries a `SAMPLE DATA` badge inline with the label it
+qualifies.
+
+### 14 · …on every panel that shows a number
+
+![Bento metrics](14-landing-bento-metrics.png)
+
+All four fabricated figures — `98.4%`, the telemetry bars, `14 probes`, and the
+`0.4/m · 98% · 100%` tiles — are marked.
+
+### 15 · Settings: bring your own key and data rights
+
+![Settings, AI key and data](15-settings-byok-and-data.png)
+
+A stored key is encrypted at rest and cannot be read back. This is the shot that
+confirms `AI_KEYS_ENCRYPTION_KEY` reached production: a disabled keyring renders
+"Not enabled on this deployment" instead.
+
+### 16 · Account deletion is not one click away
+
+![Delete confirmation](16-settings-delete-confirmation.png)
+
+`Permanently delete` stays disabled until the exact word is typed. Case, a trailing
+space, and a substring are all rejected, and the server enforces the same check
+independently of the browser.
+
+## Note on the hero
+
+`12-landing-hero.png` is the only landing capture. The earlier copy of it that lived in
+a second folder was removed rather than kept, so the gallery holds one image per screen
+and nothing is stored twice.
