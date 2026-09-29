@@ -4,12 +4,60 @@
 
 > Prepare from your own resume. Practice with a live AI interviewer. Improve what you say — and how you say it.
 
-[**Launch the live app ↗**](https://hustlrzz.vercel.app) &nbsp;·&nbsp;
-[Backend health ↗](https://hustlrzz-api.onrender.com/health) &nbsp;·&nbsp;
-[Explore the code](https://github.com/dgexplores/hustlrzz)
+<p align="center">
+  <a href="https://hustlrzz.vercel.app">
+    <img src="docs/screenshots/01-landing-hero.png" alt="Hustlrzz landing page — hero and the simulated cockpit" width="100%" />
+  </a>
+</p>
 
-[Launch readiness, privacy boundaries, and rollout gates](docs/LAUNCH_READINESS.md) &nbsp;·&nbsp;
-[Live screenshots](docs/SCREENSHOTS.md)
+<p align="center">
+  <a href="https://hustlrzz.vercel.app"><strong>Launch the live app ↗</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://hustlrzz-api.onrender.com/health">Backend health ↗</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/dgexplores/hustlrzz">Explore the code</a>
+  &nbsp;·&nbsp;
+  <a href="docs/SCREENSHOTS.md">All screenshots</a>
+</p>
+
+<p align="center"><sub>
+  Screenshots captured from the live deployment on 2026-09-28. Nothing here is a
+  mock-up.
+</sub></p>
+
+---
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/02-landing-bento-sample-data.png"
+       alt="Resume signals and telemetry panels, each marked Sample data"
+       width="49%" />
+  <img src="docs/screenshots/03-landing-bento-metrics.png"
+       alt="Interview probe panel and metric tiles, each marked Sample data"
+       width="49%" />
+</p>
+
+<p align="center"><sub>
+  Every figure on the marketing page is illustrative. A visible <code>Sample data</code>
+  badge sits inline with the label it qualifies, so <code>98.4%</code> and
+  <code>Latency: 24ms</code> cannot be read as measurements taken on the visitor.
+</sub></p>
+
+<p align="center">
+  <img src="docs/screenshots/04-settings-byok-and-data.png"
+       alt="Settings — bring your own key and data rights"
+       width="49%" />
+  <img src="docs/screenshots/05-settings-delete-confirmation.png"
+       alt="Account deletion confirmation, disabled until the word DELETE is typed"
+       width="49%" />
+</p>
+
+<p align="center"><sub>
+  Left: a stored provider key is encrypted at rest and cannot be read back. Right:
+  account deletion stays disabled until the exact word is typed, and the server
+  enforces that check independently of the browser.
+</sub></p>
 
 ---
 
