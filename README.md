@@ -1,5 +1,7 @@
 # Hustlrzz
 
+[![CI](https://github.com/dgexplores/hustlrzz/actions/workflows/ci.yml/badge.svg)](https://github.com/dgexplores/hustlrzz/actions/workflows/ci.yml)
+
 ### Your private, real-time AI mock interview coach
 
 > Prepare from your own resume. Practice with a live AI interviewer. Improve what you say — and how you say it.
@@ -24,6 +26,16 @@
   Screenshots captured from the live deployment on 2026-09-28. Nothing here is a
   mock-up.
 </sub></p>
+
+## 60-second brief
+
+Private AI mock-interview coach: resume + job description in, tailored question pack, live voice/typed WebSocket interview, scored report with presence feedback. Stack: Next.js 16 + TypeScript frontend, FastAPI interview service, Supabase Auth + Postgres (RLS), free-tier AI (Groq, Gemini) with per-user keys. Live app and backend health links above verified HTTP 200 on 2026-10-08.
+
+| | |
+|---|---|
+| Code | [`backend/`](backend) — preparation, live interviewer, coaching, RAG · [`frontend/`](frontend) — auth, prepare, interview, dashboard |
+| Data | [`supabase/`](supabase) — schema and migrations · [`docs/`](docs) — auth, email, ops guides |
+| Specs | [`project-specs/`](project-specs) · [`project-docs/`](project-docs) (final-year submission pack) |
 
 ---
 
