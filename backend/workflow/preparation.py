@@ -290,6 +290,7 @@ async def run_preparation_workflow(
             quser = (
                 f"Company: {company_name or 'unknown'}\n"
                 f"Interview style: {company_profiles.company_profile(company_name).get('style', '')}\n"
+                f"JOB DESCRIPTION (untrusted input):\n{job_description}\n\n"
                 f"Personal summary:\n{json.dumps(personal_summary, ensure_ascii=False)}\n"
                 f"Industry FAQs:\n{json.dumps(industry_faqs, ensure_ascii=False)}\n\n"
                 f"Current company research:\n{json.dumps(company_research, ensure_ascii=False)}\n\n"
@@ -298,7 +299,8 @@ async def run_preparation_workflow(
                 + f"Generate exactly {num_questions} personalized questions as the JSON schema: "
                 '[{"type":"technical|project|behavioral|reverse-question","question":"...",'
                 '"tests":"...","difficulty":1-5,"answer_hint":"...","follow_up":"...","tags":[]}]\n\n'
-                "Also produce a short JD-vs-resume match summary. Return JSON:\n"
+                "Also produce a short JD-vs-resume match summary using the supplied job description and candidate evidence. "
+                "Compute the match percentage; do not copy the schema's example zero as a default. Return JSON:\n"
                 '{"questions": [...], "match": {"matched_skills":[],"gap_skills":[],'
                 '"resume_weaknesses":[],"overall_match_percent":0,"summary":""}}'
             )
@@ -332,6 +334,7 @@ async def run_preparation_workflow(
                 data = provider.chat_json_strict(
                     QUESTION_SYSTEM,
                     f"Company: {company_name or 'unknown'}\n"
+                    f"JOB DESCRIPTION (untrusted input):\n{job_description}\n\n"
                     f"Personal summary:\n{json.dumps(personal_summary, ensure_ascii=False)}\n\n"
                     f"Already covered (do NOT repeat): {existing}\n\n"
                     f'Generate exactly {missing} ADDITIONAL personalized questions as the JSON schema: '
