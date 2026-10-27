@@ -213,15 +213,23 @@ export function useAudio(onTranscript: (text: string) => void) {
       };
       // Transient errors keep the auto-restart loop alive; fatal ones do not.
       const transient = event?.error === "no-speech" || event?.error === "aborted" || event?.error === "network";
+      if (event?.error === "network") setError(messages.network);
       if (!transient) {
         setError(messages[event?.error] || "Voice recognition stopped unexpectedly. You can continue by typing.");
         shouldListenRef.current = false;
       }
       setListening(false); setInterim("");
     };
-    rec.start();
     recRef.current = rec;
-    setListening(true);
+    try {
+      rec.start();
+      setListening(true);
+    } catch {
+      shouldListenRef.current = false;
+      recRef.current = null;
+      setListening(false);
+      setError("Voice recognition could not start. Check microphone permissions or continue by typing.");
+    }
   }, [supported, stopSpeaking, onTranscriptRef]);
 
   useEffect(() => () => {
