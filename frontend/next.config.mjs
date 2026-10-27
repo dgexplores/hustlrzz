@@ -18,6 +18,8 @@ const nextConfig = {
     const connectSrc = [
       "'self'",
       "https://*.supabase.co",
+      "https://cdn.jsdelivr.net",
+      "https://storage.googleapis.com",
       "wss://*.supabase.co",
       "https://*.onrender.com",
       "wss://*.onrender.com",
