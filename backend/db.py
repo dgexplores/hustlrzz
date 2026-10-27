@@ -5,6 +5,10 @@ Server-side access uses the service-role key. Tables mirror supabase/schema.sql.
 
 from __future__ import annotations
 
+import threading
+import time
+import httpx
+
 from supabase import create_client
 from supabase.lib.client_options import ClientOptions
 
@@ -12,6 +16,9 @@ from backend import config
 
 _client = None
 _ready = False
+_probe_lock = threading.Lock()
+_probe_until = 0.0
+_probe_ready = False
 
 
 def get_client():
@@ -40,6 +47,34 @@ def get_client():
 def is_ready() -> bool:
     get_client()
     return _ready
+
+
+def check_connectivity() -> bool:
+    """Probe the database without reading user records; cache for 30 seconds.
+
+    Client construction only validates configuration. It cannot detect paused
+    projects, DNS failures, expired credentials, or an unavailable database.
+    """
+    global _probe_until, _probe_ready
+    with _probe_lock:
+        if time.monotonic() < _probe_until:
+            return _probe_ready
+        _probe_ready = False
+        if config.SUPABASE_URL and config.SUPABASE_SERVICE_ROLE_KEY:
+            try:
+                response = httpx.get(
+                    config.SUPABASE_URL.rstrip('/') + '/rest/v1/workflows',
+                    params={'select': 'workflow_id', 'limit': '0'},
+                    headers={'apikey': config.SUPABASE_SERVICE_ROLE_KEY,
+                             'Authorization': 'Bearer ' + config.SUPABASE_SERVICE_ROLE_KEY},
+                    timeout=3.0,
+                    follow_redirects=False,
+                )
+                _probe_ready = response.status_code == 200 and response.json() == []
+            except (httpx.HTTPError, ValueError):
+                pass
+        _probe_until = time.monotonic() + 30.0
+        return _probe_ready
 
 
 def _require_client():

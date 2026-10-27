@@ -11,7 +11,7 @@ coaching without uploading camera video.
 - Backend unit suite must pass.
 - Frontend lint, TypeScript, and production build must pass.
 - Production dependency audit must report no high or critical vulnerabilities.
-- Render `/health` must report AI configured and database ready.
+- Render `/health` must report API liveness and AI configuration. `/ready` must return HTTP 200 with `db_ready:true` after a real zero-row database query. Then verify sign-in and an AI request; configuration alone does not prove either works.
 - Vercel and Render deployments must both complete for the same commit.
 - Camera and microphone failure must not block typed practice.
 

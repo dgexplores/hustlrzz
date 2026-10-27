@@ -253,8 +253,17 @@ def health():
         "version": app.version,
         "ai_configured": provider.is_configured(),
         "provider": config.AI_PROVIDER,
-        "db_ready": dbc.is_ready(),
+        "db_configured": dbc.is_ready(),
+        "db_ready": None,
+        "dependency_status": "not_checked; use /ready",
     }
+
+
+@router.get("/ready")
+def readiness(response: Response):
+    ready = dbc.check_connectivity()
+    response.status_code = 200 if ready else 503
+    return {"status": "ready" if ready else "unavailable", "db_ready": ready}
 
 
 @router.get("/interview/personas")
