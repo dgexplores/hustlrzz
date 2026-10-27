@@ -37,7 +37,10 @@ export const useCamera = (
           video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         });
-        if (cancelled) return stopStream();
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
