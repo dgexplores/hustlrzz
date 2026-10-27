@@ -237,7 +237,7 @@ application-level delete, so "deleted" means "no longer in the live system".
 - Stored user keys are never returned by any endpoint, including the account export.
 - Account deletion is rate limited, requires explicit confirmation, deletes the login
   last, and reports per-table results.
-- `GET /health` reports API, AI-provider, and database readiness.
+- `GET /health` reports API liveness and whether AI/database credentials are configured; it does not call a model or database. `GET /ready` performs a cached, zero-row database query and returns HTTP 503 when Supabase is unreachable. Verify sign-in and a real AI request separately before a demo.
 
 ---
 

@@ -1,3 +1,5 @@
+> Current verification note (27 October 2026): `/health` now distinguishes configuration from readiness. Use `/ready` for a real database probe, then verify sign-in and AI generation. JSON snippets below record earlier observations and do not prove current availability.
+
 # Prometheus 2 / SPEED October AI Challenge — submission pack
 
 Hackathon: educational AI tool · $1,500 ($1k 1st) · solo ok (1-4) · students only
